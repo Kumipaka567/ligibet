@@ -49,15 +49,24 @@ each of which breaks silently hours after the deploy that caused it.
 
 ## Deployment
 
-The site runs in two places from the same commit. Render hosts the API and the
-realtime game engine; Vercel serves the frontend from its CDN and points at the
-Render API.
+The site is **ligibet.site**. It runs in two places from the same commit: Render
+hosts the API and the realtime game engine at `api.ligibet.site`, and Vercel
+serves the frontend from its CDN at `ligibet.site`, pointed at that API.
+
+| Host | Record | Points at |
+| --- | --- | --- |
+| `ligibet.site` | A / ALIAS | Vercel (values come from the Vercel domain screen) |
+| `www.ligibet.site` | CNAME | `cname.vercel-dns.com` |
+| `api.ligibet.site` | CNAME | `<your-service>.onrender.com` |
+
+Both providers issue TLS certificates automatically once the records resolve,
+which usually takes minutes but can take longer to propagate.
 
 The frontend is a static bundle, so the API origin has to be chosen at build
 time rather than read at runtime. `BACKEND_ORIGIN` does that:
 `frontend/scripts/write-backend-origin.js` writes it into the generated config
 the app imports before `ng build` runs. With the variable unset the committed
-default (`https://api.ligibet.it.com`) is used unchanged.
+default (`https://api.ligibet.site`) is used unchanged.
 
 ### Render — API and game engine
 
@@ -95,11 +104,43 @@ variable:
 BACKEND_ORIGIN = https://<your-render-service>.onrender.com
 ```
 
-Finally add that Vercel domain to `CORS_ORIGIN` on Render, otherwise the browser
-blocks every API call. That failure looks like the site hanging rather than an
-error, so it is worth checking first when a fresh deployment does nothing.
+Once `api.ligibet.site` is attached to the Render service, `BACKEND_ORIGIN` can
+be dropped — the committed default already points there.
+
+Finally add every frontend origin to `CORS_ORIGIN` on Render, otherwise the
+browser blocks every API call. That failure looks like the site hanging rather
+than an error, so it is worth checking first when a fresh deployment does
+nothing.
 
 The cache rules matter and `npm run check` enforces them: hashed assets are
 immutable for a year, while `/` and `/index.html` are `no-store`. A cached app
 shell keeps asking for chunk files that the next deploy deleted, and the app
 simply fails to boot.
+
+### First boot on a fresh database
+
+A new cluster is empty, and an empty database is the one failure this codebase
+cannot detect on its own: every login fails and every registration disappears,
+while the API itself looks healthy. The server therefore refuses to start until
+you say the emptiness is intentional.
+
+1. Set `ALLOW_EMPTY_DATABASE=true` on Render for the first deploy.
+2. Create the first administrator — the account that can approve withdrawals, so
+   give it a real passphrase:
+
+   ```bash
+   MONGODB_URI='<the same URI Render uses>' \
+     node backend/create-superadmin.js admin 254712345678 '<a long passphrase>'
+   ```
+
+   There are no default credentials: the script requires all three arguments and
+   refuses to run without `MONGODB_URI`.
+3. Remove `ALLOW_EMPTY_DATABASE` once real accounts exist, so the guard is back
+   in place the next time the connection string is wrong.
+
+Confirm what the running service actually connected to before opening it up —
+`/healthz` reports the cluster host, the database name and the account count:
+
+```bash
+curl https://api.ligibet.site/healthz
+```

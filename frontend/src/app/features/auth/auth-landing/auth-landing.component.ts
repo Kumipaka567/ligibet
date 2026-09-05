@@ -205,7 +205,7 @@ import { AuthService } from '../../../core/services/auth.service';
           </div>
         </section>
 
-        <p class="lb-auth-foot">18+ only &bull; Play responsibly &bull; ligibet.it.com</p>
+        <p class="lb-auth-foot">18+ only &bull; Play responsibly &bull; ligibet.site</p>
       </main>
     </div>
 

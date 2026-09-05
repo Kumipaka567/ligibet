@@ -10,6 +10,10 @@
 # the connected socket clients all live in this process's memory, so a second
 # instance would run its own independent round with its own multiplier and two
 # players would see different results for the same bet.
+#
+# Attach api.ligibet.site to this service under Settings → Custom Domains. The
+# frontend's committed default already points there, so a Vercel build with no
+# BACKEND_ORIGIN set still reaches the right API once that domain resolves.
 
 services:
   - type: web
@@ -34,10 +38,12 @@ services:
       - key: PORT
         value: 10000
 
-      # Browser origins allowed to call this API. Include the Vercel production
-      # domain, and 'https://*.vercel.app' if preview deployments should reach
-      # this API too. Anything not listed here fails in the browser only, which
-      # looks like the site hanging rather than a CORS error, so keep it current.
+      # Browser origins allowed to call this API — for this deployment
+      # https://ligibet.site and https://www.ligibet.site, plus the Vercel
+      # project domain and 'https://*.vercel.app' if preview deployments should
+      # reach this API too. Anything not listed here fails in the browser only,
+      # which looks like the site hanging rather than a CORS error, so keep it
+      # current.
       - key: CORS_ORIGIN
         sync: false
 
@@ -45,6 +51,14 @@ services:
       - key: JWT_SECRET
         sync: false
       - key: MONGODB_URI
+        sync: false
+
+      # A brand-new cluster has no accounts, and the server refuses to start
+      # against an empty database — an empty one answers every login with a
+      # plain failure and is otherwise indistinguishable from the right one.
+      # Set this to true for the first boot of a fresh deployment, then remove
+      # it once real accounts exist so the guard protects the next deploy.
+      - key: ALLOW_EMPTY_DATABASE
         sync: false
 
       # PayHero M-Pesa integration. Optional — deposits and withdrawals are the

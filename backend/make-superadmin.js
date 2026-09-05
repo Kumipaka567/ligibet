@@ -7,7 +7,7 @@
  *   node make-superadmin.js <username_or_phone>
  *
  * Example:
- *   node make-superadmin.js 0792011285
+ *   node make-superadmin.js 254712345678
  */
 require('dotenv').config();
 const mongoose = require('mongoose');
@@ -60,7 +60,11 @@ if (!inputIdentifier) {
   process.exit(1);
 }
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/ligibet';
+const MONGODB_URI = (process.env.MONGODB_URI || '').trim();
+if (!MONGODB_URI) {
+  console.error('❌ MONGODB_URI is not set. Refusing to guess a database — a localhost fallback would report success against a database nobody is serving.');
+  process.exit(1);
+}
 
 (async () => {
   try {

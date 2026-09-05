@@ -120,8 +120,8 @@ const MONGODB_TARGET = describeMongoUri(MONGODB_URI);
 const defaultCorsOrigins = [
   'http://localhost:4200',
   'http://127.0.0.1:4200',
-  'https://ligibet.it.com',
-  'https://www.ligibet.it.com'
+  'https://ligibet.site',
+  'https://www.ligibet.site'
 ];
 const configuredCorsOrigins = (process.env.CORS_ORIGIN || defaultCorsOrigins.join(','))
   .split(',')
@@ -133,7 +133,7 @@ const configuredCorsOrigins = (process.env.CORS_ORIGIN || defaultCorsOrigins.joi
 // a wildcard label, 'https://*.vercel.app', which matches exactly one level of
 // subdomain. Entries without a '*' still have to match in full, and the pattern
 // is anchored at both ends: a plain suffix test would also accept
-// 'https://ligibet.it.com.attacker.example'.
+// 'https://ligibet.site.attacker.example'.
 const allowedCorsOrigins = new Set(configuredCorsOrigins.filter(origin => !origin.includes('*')));
 const allowedCorsPatterns = configuredCorsOrigins
   .filter(origin => origin.includes('*'))
@@ -1545,15 +1545,7 @@ async function userHasChatBalance(userId) {
 const recentChatMessages = [];
 
 const REALISTIC_KENYAN_CHAT_MESSAGES = [
-  "Usindanganywe hapa na watu kujeni niwasaidie saai before tomorrow 0108359051 need 100 people's who are serious kbnz",
-  "Usindanganywe hapa na watu kujeni niwasaidie saai before tomorrow 0108359051 need 100 people's who are serious swpy",
-  "nwzz Usindanganywe hapa na watu kujeni niwasaidie saaii before kesho whts ap 0756319633 welcome all",
-  "cvfa Make sure umetext huyu mtu nmewin 180K 0102003082",
-  "Usindanganywe hapa na watu kujeni niwasaidie saai before tomorrow 0108359051 need 100 people's who are serious xnow",
-  "xfbe Usindanganywe hapa na watu kujeni niwasaidie saaii before kesho whts ap 0756319633 welcome all",
-  "Usindanganywe hapa na watu kujeni niwasaidie saai before tomorrow 0108359051 need 100 people's who are serious ngkx",
   "Surely",
-  "pgmv Watu wa Aviator tumshukuru huyu mtu nmewin 180K 0102003082",
   "Watu wameona hiyo 24.8x? Nimekula 12,000 safi",
   "Cashed out at 5.2x! Weekend sorted",
   "Hii 100x ilikuwa kali sana! Who caught it?",
@@ -1569,7 +1561,6 @@ const REALISTIC_KENYAN_CHAT_MESSAGES = [
   "Nani ako ready for the next flight?",
   "Game iko na form leo usiku",
   "Patience pays in this game guys",
-  "0712398822 WhatsApp group ya live aviator signals tuko 500 members",
   "Tumshukuru huyu admin wa tips nimewin 45k leo",
   "Hawa watu wa tips wanasaidia kweli ama?",
   "Mimi I use my own strategy 2x na 3x tu",

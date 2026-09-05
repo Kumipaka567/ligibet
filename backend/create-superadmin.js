@@ -1,18 +1,19 @@
 /**
  * create-superadmin.js
  * --------------------
- * Creates a brand-new Superadmin account directly in MongoDB.
+ * Creates the first Superadmin account directly in MongoDB, or promotes an
+ * existing user to Superadmin and resets their password.
  *
  * Usage:
  *   node create-superadmin.js <username> <phone_number> <password>
  *
  * Example:
- *   node create-superadmin.js superadmin 254712345678 Admin@2026
+ *   node create-superadmin.js admin 254712345678 'a long passphrase'
  *
- * If no arguments are provided, it creates a default Superadmin:
- *   Username: superadmin
- *   Phone:    +254700000000
- *   Password: SuperAdmin@2026
+ * All three arguments are required and MONGODB_URI must be set. There are
+ * deliberately no defaults: this script mints an account that can approve
+ * withdrawals, and a default username and password committed to the repository
+ * is a published credential for every deployment that ever runs it bare.
  */
 require('dotenv').config();
 const mongoose = require('mongoose');
@@ -23,16 +24,31 @@ function escapeRegExp(string) {
   return String(string || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/ligibet';
+function fail(message) {
+  console.error(`❌ ${message}`);
+  process.exit(1);
+}
 
-const inputUsername = process.argv[2] || 'superadmin';
-const inputPhone = process.argv[3] || '+254700000000';
-const inputPassword = process.argv[4] || 'SuperAdmin@2026';
+// No localhost fallback. Running this with MONGODB_URI unset would report
+// complete success while writing the superadmin into a database nobody is
+// serving, and the account would simply not exist when you tried to log in.
+const MONGODB_URI = (process.env.MONGODB_URI || '').trim();
+if (!MONGODB_URI) {
+  fail('MONGODB_URI is not set. Refusing to guess a database.');
+}
+
+const [, , inputUsername, inputPhone, inputPassword] = process.argv;
+if (!inputUsername || !inputPhone || !inputPassword) {
+  fail('Usage: node create-superadmin.js <username> <phone_number> <password>');
+}
+if (inputPassword.length < 12) {
+  fail('Choose a password of at least 12 characters. This account can approve withdrawals.');
+}
 
 async function run() {
   try {
     await mongoose.connect(MONGODB_URI);
-    console.log('Connected to MongoDB.');
+    console.log(`Connected to ${mongoose.connection.host}/${mongoose.connection.name}.`);
 
     const username = inputUsername.trim();
     const phone = inputPhone.trim();
@@ -64,7 +80,10 @@ async function run() {
         phone_number: phone,
         password_hash: passwordHash,
         role: 'superadmin',
-        balance: 10000.00
+        // Opens at zero. A starting balance here is money that entered the
+        // ledger without a deposit behind it, which makes every payout
+        // reconciliation afterwards disagree with what actually came in.
+        balance: 0
       });
       console.log(`\n=======================================================`);
       console.log(`✅  New SUPERADMIN account created successfully!`);
@@ -77,8 +96,8 @@ async function run() {
     console.log(`   Role:     ${user.role}`);
     console.log(`   Balance:  KES ${user.balance}`);
     console.log(`=======================================================`);
-    console.log(`👉 You can now log in at http://localhost:4200/login`);
-    console.log(`👉 Access dashboard at http://localhost:4200/admin\n`);
+    console.log(`👉 Log in at https://ligibet.site/login`);
+    console.log(`👉 Admin dashboard at https://ligibet.site/admin\n`);
 
     await mongoose.disconnect();
   } catch (err) {

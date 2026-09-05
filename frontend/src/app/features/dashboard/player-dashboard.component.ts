@@ -107,7 +107,7 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
       prize: 'KSH 1,000,000',
       prizeSuffix: 'every game!',
       cta: 'Play Now',
-      tag: 'ligibet.it.com 18+',
+      tag: 'ligibet.site 18+',
       gameId: 'kings-move',
       art: 'assets/games/photos/kings-move.jpg'
     },
