@@ -37,7 +37,8 @@ const {
   AdminLog,
   LoginHistory,
   Notification,
-  ChatMessage
+  ChatMessage,
+  Counter
 } = require('./models');
 
 // Collected by the checks below and reported by /healthz. Declared here so the
@@ -4271,6 +4272,7 @@ async function startServer() {
         role: 'superadmin',
         balance: 1000.00
       });
+      await Counter.findByIdAndUpdate('users_id', { $set: { seq: 1 } }, { upsert: true });
       observedUserCount = 1;
       console.log('=======================================================');
       console.log('🎉 Initialized fresh database with default SUPERADMIN:');
