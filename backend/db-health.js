@@ -13,7 +13,14 @@
  *
  * Never prints credentials.
  */
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 require('dotenv').config();
+
+const dns = require('dns');
+try { dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']); } catch (e) {}
+
 const mongoose = require('mongoose');
 
 const MONGODB_URI = process.argv[2] || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/ligibet';

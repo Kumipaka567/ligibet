@@ -12,6 +12,13 @@ export function getBackendOrigin(): string {
   if (typeof window === 'undefined') return PRODUCTION_BACKEND_ORIGIN;
 
   const hostname = window.location.hostname;
+  const port = window.location.port;
+
+  // If already served directly from the backend (e.g. on Render or backend static serving)
+  if (hostname.endsWith('.onrender.com') || hostname === 'api.ligibet.site' || port === '3000') {
+    return window.location.origin;
+  }
+
   const isLocalOrLan = hostname === 'localhost'
     || hostname === '127.0.0.1'
     || /^192\.168\.\d+\.\d+$/.test(hostname)

@@ -11,6 +11,9 @@
     "build": "node scripts/check-config.js && npm --prefix frontend install && npm --prefix frontend run build && npm --prefix backend install --omit=dev",
     "start": "node backend/server.js",
     "dev:backend": "npm --prefix backend run dev",
-    "dev:frontend": "npm --prefix frontend start"
+    "dev:frontend": "npm --prefix frontend start",
+    "create-admin": "node backend/create-superadmin.js",
+    "make-admin": "node backend/make-superadmin.js",
+    "db:health": "node backend/db-health.js"
   }
 }

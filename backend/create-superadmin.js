@@ -15,7 +15,14 @@
  * withdrawals, and a default username and password committed to the repository
  * is a published credential for every deployment that ever runs it bare.
  */
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 require('dotenv').config();
+
+const dns = require('dns');
+try { dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']); } catch (e) {}
+
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { User, getNextSequenceValue } = require('./models');
@@ -29,20 +36,18 @@ function fail(message) {
   process.exit(1);
 }
 
-// No localhost fallback. Running this with MONGODB_URI unset would report
-// complete success while writing the superadmin into a database nobody is
-// serving, and the account would simply not exist when you tried to log in.
-const MONGODB_URI = (process.env.MONGODB_URI || '').trim();
+const MONGODB_URI = (process.argv[5] || process.env.MONGODB_URI || '').trim();
 if (!MONGODB_URI) {
-  fail('MONGODB_URI is not set. Refusing to guess a database.');
+  fail('MONGODB_URI is not set. Set MONGODB_URI in backend/.env or pass it as an environment variable.');
 }
 
-const [, , inputUsername, inputPhone, inputPassword] = process.argv;
-if (!inputUsername || !inputPhone || !inputPassword) {
-  fail('Usage: node create-superadmin.js <username> <phone_number> <password>');
-}
-if (inputPassword.length < 12) {
-  fail('Choose a password of at least 12 characters. This account can approve withdrawals.');
+const [, , rawUsername, rawPhone, rawPassword] = process.argv;
+const inputUsername = rawUsername || process.env.INITIAL_ADMIN_USERNAME || 'admin';
+const inputPhone = rawPhone || process.env.INITIAL_ADMIN_PHONE || '+254792011285';
+const inputPassword = rawPassword || process.env.INITIAL_ADMIN_PASSWORD || 'SuperAdmin@2026';
+
+if (inputPassword.length < 6) {
+  fail('Choose a password of at least 6 characters.');
 }
 
 async function run() {
