@@ -1,0 +1,63 @@
+# Render blueprint for LIGIBET.
+#
+# One web service running backend/server.js. The build also compiles the
+# Angular frontend, because server.js serves frontend/dist/frontend/browser as
+# static files when it is present — so this service is a complete, standalone
+# deployment of the site. The Vercel deployment is a second, CDN-hosted copy of
+# the same frontend that talks back to this API.
+#
+# The service must run as a single instance. The crash rounds, their timers and
+# the connected socket clients all live in this process's memory, so a second
+# instance would run its own independent round with its own multiplier and two
+# players would see different results for the same bet.
+
+services:
+  - type: web
+    name: ligibet
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    buildCommand: npm run build
+    startCommand: npm start
+    # server.js answers /healthz with 503 while MONGODB_URI, JWT_SECRET or the
+    # database itself are wrong, which is exactly when a deploy must not go
+    # live. Leave this set so a misconfigured build is rolled back instead of
+    # replacing a working one.
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22.20.0
+
+      # Render assigns the port; server.js already reads it.
+      - key: PORT
+        value: 10000
+
+      # Browser origins allowed to call this API. Include the Vercel production
+      # domain, and 'https://*.vercel.app' if preview deployments should reach
+      # this API too. Anything not listed here fails in the browser only, which
+      # looks like the site hanging rather than a CORS error, so keep it current.
+      - key: CORS_ORIGIN
+        sync: false
+
+      # Secrets: set these in the Render dashboard, never in this file.
+      - key: JWT_SECRET
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+
+      # PayHero M-Pesa integration. Optional — deposits and withdrawals are the
+      # only features that need them.
+      - key: PAYHERO_BASE_URL
+        value: https://backend.payhero.co.ke/api/v2
+      - key: PAYHERO_API_USERNAME
+        sync: false
+      - key: PAYHERO_API_PASSWORD
+        sync: false
+      - key: PAYHERO_CHANNEL_ID
+        sync: false
+      - key: PAYHERO_CALLBACK_URL
+        sync: false
+      - key: PAYHERO_CALLBACK_TOKEN
+        sync: false

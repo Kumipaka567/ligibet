@@ -1,0 +1,16 @@
+{
+  "name": "ligibet",
+  "version": "1.0.0",
+  "description": "LIGIBET Crash Gaming Platform",
+  "private": true,
+  "engines": {
+    "node": "^20.19.0 || ^22.12.0 || >=24.0.0"
+  },
+  "scripts": {
+    "check": "node scripts/check-config.js",
+    "build": "node scripts/check-config.js && npm --prefix frontend install && npm --prefix frontend run build && npm --prefix backend install --omit=dev",
+    "start": "node backend/server.js",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend start"
+  }
+}

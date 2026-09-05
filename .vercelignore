@@ -1,0 +1,13 @@
+# Vercel builds and hosts the Angular frontend only; the API lives on Render.
+# Everything below would otherwise be uploaded on every deploy for nothing.
+backend/
+start-backend.bat
+
+node_modules/
+frontend/node_modules/
+frontend/.angular/
+frontend/dist/
+
+*.log
+.env
+.env.*

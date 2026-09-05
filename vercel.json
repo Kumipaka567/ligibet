@@ -1,0 +1,67 @@
+{
+  "version": 2,
+  "installCommand": "npm install --prefix frontend",
+  "buildCommand": "node scripts/check-config.js && npm --prefix frontend run build",
+  "outputDirectory": "frontend/dist/frontend/browser",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/((?!assets/|favicon|icon-|manifest|downloads/|sw\\.js|.*\\.(?:js|css|json|ico|png|jpg|jpeg|gif|svg|woff2?|ttf|mp3|mpeg|apk)).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        },
+        {
+          "key": "Expires",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        },
+        {
+          "key": "Expires",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(.*\\.(?:js|css))",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1401 @@
+<div class="aviator-root dark-theme" [class.mini-mode]="isMiniView">
+
+  <!-- ═══════════════════════════════════════════════════════════
+       GAME LOADING SPLASH SCREEN — shown for 3s after login
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="game-loading-splash" *ngIf="gameLoading() && !isMiniView">
+    <div class="splash-inner">
+      <p class="splash-powered-label">POWERED BY</p>
+      <div class="splash-logo-row">
+        <div class="splash-logo-icon">
+          <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" fill="none">
+            <circle cx="24" cy="24" r="22" stroke="white" stroke-width="2" stroke-dasharray="4 3" opacity="0.6"/>
+            <circle cx="24" cy="24" r="14" stroke="white" stroke-width="1.5" stroke-dasharray="2 2" opacity="0.4"/>
+            <circle cx="24" cy="24" r="6" fill="white" opacity="0.8"/>
+          </svg>
+        </div>
+        <span class="splash-logo-name">SPRIBE</span>
+      </div>
+      <p class="splash-logo-tagline">INSIGHTFUL ENTERTAINMENT</p>
+      <div class="splash-dots">
+        <span class="dot"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="top-nav" *ngIf="!isMiniView">
+    <!-- Utility top bar (Row 1) -->
+    <div class="top-nav-utility">
+      <button class="go-back-btn" (click)="goBack()" title="Back to Dashboard">
+        ‹ Go Back
+      </button>
+      <button class="fullscreen-top-btn" (click)="toggleFullscreen()" title="Toggle Fullscreen">
+        <span class="fs-text">View Fullscreen</span>
+        <svg class="fs-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+      </button>
+    </div>
+
+    <!-- In-Game Brand & Action Bar (Row 2) -->
+    <div class="game-brand-bar">
+      <div class="brand">
+        <span class="brand-title">Aviator</span>
+        <span class="provably-fair-tag" (click)="openHistoryModal()" title="Provably Fair Game Engine">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Provably Fair
+        </span>
+      </div>
+
+      <div class="nav-actions">
+        <!-- Balance Badge -->
+        <div class="balance-badge" (click)="openWalletModal()" title="Wallet Balance - Click to Deposit">
+          <span class="balance-amount">{{ userBalance() | number:'1.2-2' }} KES</span>
+        </div>
+
+        <!-- Deposit Button (Direct on header) -->
+        <button class="game-deposit-btn" (click)="openDepositFromProfile()" title="Deposit Funds">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>Deposit</span>
+        </button>
+
+        <!-- Profile Avatar Dropdown Trigger -->
+        <div class="profile-dropdown-wrap" id="profileDropdownWrap">
+          <button class="profile-btn"
+                  (click)="toggleProfileDropdown($event)"
+                  title="Wallet and account options"
+                  [attr.aria-expanded]="showProfileDropdown()">
+            <span class="profile-avatar-letter">{{ currentUser()?.username?.charAt(0)?.toUpperCase() || 'P' }}</span>
+            <span class="profile-chevron" [class.open]="showProfileDropdown()">▾</span>
+          </button>
+
+          <div class="profile-dropdown-menu" *ngIf="showProfileDropdown()" (click)="$event.stopPropagation()">
+            <div class="profile-dropdown-header">
+              <span class="pdh-avatar">{{ selectedAvatarIcon() }}</span>
+              <span class="pdh-info">
+                <span class="pdh-name">{{ currentUser()?.username || 'Player' }}</span>
+                <span class="pdh-balance">{{ userBalance() | number:'1.2-2' }} KES</span>
+              </span>
+              <button class="change-avatar-btn" type="button" (click)="openAvatarModal()">Change</button>
+            </div>
+            <div class="profile-dropdown-divider"></div>
+            <button type="button" class="pdm-item deposit-item" (click)="openDepositFromProfile()">
+              <svg class="pdm-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+              Deposit funds
+            </button>
+            <button type="button" class="pdm-item" (click)="openWithdrawFromProfile()">
+              <svg class="pdm-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              Withdraw funds
+            </button>
+            <button type="button" class="pdm-item bonus-claim-item"
+                    [class.claimed]="currentUser()?.bonus_claimed"
+                    [disabled]="currentUser()?.bonus_claimed || isClaimingBonus()"
+                    (click)="claimWelcomeBonus()">
+              <svg class="pdm-svg-icon text-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+              <span>{{ currentUser()?.bonus_claimed ? '3,500 KES bonus claimed' : (isClaimingBonus() ? 'Claiming bonus…' : 'Claim 3,500 KES bonus') }}</span>
+            </button>
+            <div class="profile-dropdown-divider"></div>
+            <button type="button" class="pdm-item download-app-item" (click)="downloadApp()">
+              <svg class="pdm-svg-icon text-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span>Download Mobile App</span>
+            </button>
+            <button type="button" class="pdm-item" (click)="openFreeBetsModal()">
+              <svg class="pdm-svg-icon text-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              Free bets
+            </button>
+            <button type="button" class="pdm-item" (click)="openHistoryModal()">
+              <svg class="pdm-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              My bet history
+            </button>
+            <button type="button" class="pdm-item" (click)="openGameLimitsModal()">
+              <svg class="pdm-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+              Game limits
+            </button>
+            <button type="button" class="pdm-item" (click)="openHowToPlayModal()">
+              <svg class="pdm-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              How to play
+            </button>
+            <button type="button" class="pdm-item" (click)="openGameRulesModal()">
+              <svg class="pdm-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              Game rules
+            </button>
+            <button type="button" class="pdm-item" (click)="openProvablyFairModal()">
+              <svg class="pdm-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Provably fair settings
+            </button>
+            <button *ngIf="currentUser()?.role === 'admin' || currentUser()?.role === 'superadmin'" type="button" class="pdm-item admin-item" (click)="navigateToAdmin()">
+              <svg class="pdm-svg-icon text-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              {{ currentUser()?.role === 'superadmin' ? 'Superadmin dashboard' : 'Admin dashboard' }}
+            </button>
+            <div class="profile-dropdown-divider"></div>
+            <button type="button" class="pdm-item" (click)="goBack()">
+              <svg class="pdm-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              Home
+            </button>
+            <button type="button" class="pdm-item logout-item" (click)="logout()">
+              <svg class="pdm-svg-icon text-red" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              Logout
+            </button>
+          </div>
+        </div>
+
+        <!-- Sound & Settings Dropdown Trigger -->
+        <div class="settings-dropdown-wrap" id="settingsDropdownWrap">
+          <button class="settings-btn"
+                  type="button"
+                  (click)="toggleGameMenu($event)"
+                  title="Sound and game settings"
+                  [class.active]="showGameMenu()"
+                  [attr.aria-expanded]="showGameMenu()">
+            <svg *ngIf="soundEnabled()" class="svg-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            <svg *ngIf="!soundEnabled()" class="svg-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+            <span class="settings-chevron" [class.open]="showGameMenu()">▾</span>
+          </button>
+
+          <div class="settings-dropdown-menu" *ngIf="showGameMenu()" (click)="$event.stopPropagation()">
+            <p class="settings-menu-title">GAME SETTINGS</p>
+            <button type="button" class="settings-menu-row" (click)="toggleSound()">
+              <span>
+                <svg class="svg-nav-icon margin-right-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                Sound
+              </span>
+              <span class="spribe-switch" [class.is-on]="soundEnabled()"><i class="switch-handle"></i></span>
+            </button>
+            <button type="button" class="settings-menu-row" (click)="toggleMusic()">
+              <span>
+                <svg class="svg-nav-icon margin-right-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                Music
+              </span>
+              <span class="spribe-switch" [class.is-on]="musicEnabled()"><i class="switch-handle"></i></span>
+            </button>
+            <button type="button" class="settings-menu-row" (click)="toggleAnimation()">
+              <span>
+                <svg class="svg-nav-icon margin-right-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
+                Animation
+              </span>
+              <span class="spribe-switch" [class.is-on]="animationEnabled()"><i class="switch-handle"></i></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat icon button -->
+        <button class="chat-header-btn" [class.active]="showChatModal()" (click)="toggleChat()" title="Game Chat">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN LAYOUT (SIDEBAR + GAME VIEWPORT) -->
+  <div class="main-layout" [class.mini-layout]="isMiniView">
+    <!-- LEFT SIDEBAR: LIVE BETS FEED -->
+    <aside class="left-sidebar glass-card" *ngIf="!isMiniView">
+      <div class="bets-tabs">
+        <button [class.active]="activeTab() === 'all'" (click)="activeTab.set('all')">All Bets</button>
+        <button [class.active]="activeTab() === 'my'" (click)="activeTab.set('my')">Previous</button>
+        <button [class.active]="activeTab() === 'top'" (click)="activeTab.set('top')">Top</button>
+      </div>
+
+      <div class="bets-header-info">
+        <div class="bets-summary">
+          <div class="bets-avatar-stack" aria-hidden="true">
+            <span *ngFor="let item of displayBetsList().slice(0, 4)" class="bets-avatar">
+              {{ item.avatarIcon }}
+            </span>
+          </div>
+          <span class="bets-count"><b>{{ settledBetsCount() }}</b>/{{ betsCount() }} Bets</span>
+        </div>
+        <div class="total-win-summary">
+          <strong>{{ totalWinAmount() | number:'1.2-2' }}</strong>
+          <span>Total win KES</span>
+        </div>
+      </div>
+      <div class="bets-progress-track" aria-hidden="true">
+        <span class="bets-progress-fill" [style.width.%]="settledBetsPercent()"></span>
+      </div>
+
+      <div class="bets-table-header">
+        <span class="col-player">Player</span>
+        <span class="col-bet text-right">Bet KES</span>
+        <span class="col-mult text-center">X</span>
+        <span class="col-win text-right">Win KES</span>
+      </div>
+
+      <div class="bets-list">
+        <div *ngFor="let item of displayBetsList()" 
+             class="bet-row" 
+             [class.cashed-out]="item.cashedOut" 
+             [class.my-bet]="item.isCurrentUser">
+          <span class="col-player player-name">
+            <span class="user-avatar-icon">{{ item.avatarIcon }}</span>
+            {{ item.player }}
+          </span>
+          <span class="col-bet text-right">{{ item.bet | number:'1.2-2' }}</span>
+          <span class="col-mult text-center">
+            <span *ngIf="item.multiplier" class="mult-badge" [class.high-win]="item.multiplier >= 10">
+              {{ item.multiplier | number:'1.2-2' }}x
+            </span>
+            <span *ngIf="!item.multiplier" class="waiting-dash">-</span>
+          </span>
+          <span class="col-win text-right win-amount">
+            {{ item.win > 0 ? (item.win | number:'1.2-2') : '' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button (click)="openHistoryModal()" title="Open provably fair game history">
+          <span aria-hidden="true">&#9670;</span> Provably Fair Game
+        </button>
+        <span>Powered by <strong>SPRIBE</strong></span>
+      </div>
+    </aside>
+
+    <!-- RIGHT MAIN GAME AREA -->
+    <main class="game-area">
+      <!-- LIVE TOURNAMENT BANNER -->
+      <div class="live-banner" *ngIf="!isMiniView">
+        <span class="live-dot"><i class="live-dot-pulse"></i> LIVE</span>
+        <span class="banner-text">Mfalme Wa Anga KES 400,000 Daily Crown</span>
+        <span class="connection-status" [class.online]="isConnected()">
+          {{ isConnected() ? 'Socket Connected' : 'Demo Mode' }}
+        </span>
+      </div>
+
+      <!-- ROOM SWITCHER & MULTIPLIER HISTORY BAR -->
+      <div class="history-bar-container glass-card" [class.mini-history-bar]="isMiniView">
+        <div class="room-selector" *ngIf="!isMiniView">
+          <button [class.active]="selectedRoom() === 1" (click)="requestRoomChange(1)">
+            <span class="room-close" aria-hidden="true">×</span> Room #1
+          </button>
+          <button [class.active]="selectedRoom() === 2" (click)="requestRoomChange(2)">
+            <span class="room-close" aria-hidden="true">×</span> Room #2
+          </button>
+          <button [class.active]="selectedRoom() === 3" (click)="requestRoomChange(3)">
+            <span class="room-close" aria-hidden="true">×</span> Room #3
+          </button>
+        </div>
+
+        <div class="multiplier-ribbon">
+          <div *ngFor="let mult of history()" 
+               class="mult-pill" 
+               [class.low]="mult < 2.0" 
+               [class.mid]="mult >= 2.0 && mult < 10.0" 
+               [class.high]="mult >= 10.0">
+            {{ mult | number:'1.2-2' }}x
+          </div>
+        </div>
+
+        <div class="game-menu-wrap" id="aviatorGameMenu" *ngIf="!isMiniView">
+          <button
+            type="button"
+            class="more-ribbon-btn"
+            [class.open]="showGameMenu()"
+            (click)="toggleGameMenu($event)"
+            title="Game options"
+            aria-label="Open game options"
+            [attr.aria-expanded]="showGameMenu()"
+          >
+            •••
+          </button>
+
+          <!-- SPRIBE AVIATOR GAME OPTIONS DROPDOWN -->
+          <div class="spribe-dropdown-menu" *ngIf="showGameMenu()" (click)="$event.stopPropagation()">
+            <!-- HEADER WITH USERNAME & CHANGE AVATAR -->
+            <div class="spribe-dropdown-header">
+              <div class="spribe-user-avatar">
+                <span>{{ selectedAvatarIcon() }}</span>
+              </div>
+              <div class="spribe-user-info">
+                <span class="spribe-username-text">{{ currentUser()?.username || 'demo_65881' }}</span>
+                <span class="spribe-user-balance">{{ userBalance() | number:'1.2-2' }} KES</span>
+              </div>
+              <button class="spribe-change-avatar-btn" type="button" (click)="openAvatarModal()">
+                <span class="btn-icon">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </span>
+                <span>Change Avatar</span>
+              </button>
+            </div>
+
+            <div class="spribe-menu-divider"></div>
+
+            <!-- TOGGLE SWITCHES -->
+            <div class="spribe-toggle-section">
+              <div class="spribe-toggle-row" (click)="toggleSound()">
+                <div class="spribe-toggle-label">
+                  <span class="toggle-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                  </span>
+                  <span>Sound</span>
+                </div>
+                <div class="spribe-switch" [class.is-on]="soundEnabled()">
+                  <div class="switch-handle"></div>
+                </div>
+              </div>
+
+              <div class="spribe-toggle-row" (click)="toggleMusic()">
+                <div class="spribe-toggle-label">
+                  <span class="toggle-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                  </span>
+                  <span>Music</span>
+                </div>
+                <div class="spribe-switch" [class.is-on]="musicEnabled()">
+                  <div class="switch-handle"></div>
+                </div>
+              </div>
+
+              <div class="spribe-toggle-row" (click)="toggleAnimation()">
+                <div class="spribe-toggle-label">
+                  <span class="toggle-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
+                  </span>
+                  <span>Animation</span>
+                </div>
+                <div class="spribe-switch" [class.is-on]="animationEnabled()">
+                  <div class="switch-handle"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="spribe-menu-divider"></div>
+
+            <!-- MENU ITEMS LIST -->
+            <div class="spribe-menu-items">
+              <button type="button" class="spribe-menu-btn" (click)="openDepositFromProfile()">
+                <span class="menu-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
+                <span>Deposit Funds</span>
+              </button>
+
+              <button type="button" class="spribe-menu-btn" (click)="openWithdrawFromProfile()">
+                <span class="menu-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+                <span>Withdraw Funds</span>
+              </button>
+
+              <button type="button" class="spribe-menu-btn" (click)="openFreeBetsModal()">
+                <span class="menu-btn-icon"><svg class="text-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>
+                <span>Free Bets</span>
+              </button>
+
+              <button type="button" class="spribe-menu-btn" (click)="openHistoryModal()">
+                <span class="menu-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+                <span>My Bet History</span>
+              </button>
+
+              <button type="button" class="spribe-menu-btn" (click)="openGameLimitsModal()">
+                <span class="menu-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>
+                <span>Game Limits</span>
+              </button>
+
+              <button type="button" class="spribe-menu-btn" (click)="openHowToPlayModal()">
+                <span class="menu-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+                <span>How To Play</span>
+              </button>
+
+              <button type="button" class="spribe-menu-btn" (click)="openGameRulesModal()">
+                <span class="menu-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
+                <span>Game Rules</span>
+              </button>
+
+              <button type="button" class="spribe-menu-btn" (click)="openProvablyFairModal()">
+                <span class="menu-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+                <span>Provably Fair Settings</span>
+              </button>
+
+              <button *ngIf="currentUser()?.role === 'admin' || currentUser()?.role === 'superadmin'" class="spribe-menu-btn admin-btn" (click)="navigateToAdmin()">
+                <span class="menu-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+                <span>{{ currentUser()?.role === 'superadmin' ? 'Superadmin Dashboard' : 'Admin Dashboard' }}</span>
+              </button>
+            </div>
+
+            <div class="spribe-menu-divider"></div>
+
+            <!-- FOOTER HOME & LOGOUT LINKS -->
+            <div class="spribe-menu-footer">
+              <button type="button" class="spribe-footer-btn" (click)="goBack()">
+                <span class="menu-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+                <span>Home</span>
+              </button>
+              <button type="button" class="spribe-footer-btn logout-btn" (click)="logout()">
+                <span class="menu-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+                <span>Logout</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CANVAS FLIGHT VIEWPORT -->
+      <div class="canvas-viewport glass-card" #canvasContainer>
+        <canvas #flightCanvas></canvas>
+
+        <!-- OVERLAY MULTIPLIER & STAGE TEXT -->
+        <div class="canvas-overlay">
+          <!-- 1. WAITING PRE-ROUND STAGE WITH SPONSOR / PARTNERS GRAPHIC -->
+          <div *ngIf="gameState() === 'WAITING'" class="stage-overlay waiting">
+            <div class="partner-branding-box">
+              <div class="ufc-partner-badge">
+                <div class="ufc-logo-wrap">
+                  <span class="ufc-title">UFC</span>
+                </div>
+                <div class="vertical-divider"></div>
+                <div class="aviator-title-wrap">
+                  <img src="/assets/images/plane.png" class="waiting-plane-logo" alt="Aviator Plane" />
+                  <span class="aviator-title">Aviator</span>
+                </div>
+              </div>
+              
+              <div class="partner-subtitle">OFFICIAL PARTNERS</div>
+
+              <!-- RED LINE PROGRESS COUNTDOWN REDUCING TO THE LEFT -->
+              <div class="waiting-progress-track">
+                <div class="waiting-progress-fill" [style.width.%]="countdownProgress()"></div>
+              </div>
+
+              <!-- SPRIBE BADGE WITH EXACT DOTTED S LOGO, OFFICIAL GAME CHECKMARK, AND SINCE 2019 -->
+              <div class="spribe-cert-badge">
+                <div class="cert-header">
+                  <!-- Exact Spribe Dotted Matrix Icon -->
+                  <svg class="spribe-logo-icon" viewBox="0 0 40 40" fill="#ffffff">
+                    <circle cx="20" cy="5" r="1.2" opacity="0.6"/>
+                    <circle cx="16" cy="6" r="1.3" opacity="0.7"/>
+                    <circle cx="24" cy="6" r="1.3" opacity="0.7"/>
+                    <circle cx="13" cy="8" r="1.4" opacity="0.8"/>
+                    <circle cx="27" cy="8" r="1.4" opacity="0.8"/>
+                    <circle cx="10" cy="11" r="1.5" opacity="0.9"/>
+                    <circle cx="14" cy="11" r="1.9"/>
+                    <circle cx="18" cy="10" r="2.1"/>
+                    <circle cx="22" cy="10" r="2.1"/>
+                    <circle cx="26" cy="11" r="1.7"/>
+                    <circle cx="30" cy="11" r="1.4" opacity="0.8"/>
+                    <circle cx="8" cy="15" r="1.5" opacity="0.8"/>
+                    <circle cx="12" cy="14" r="2.2"/>
+                    <circle cx="16" cy="14" r="2.2"/>
+                    <circle cx="20" cy="14" r="1.8"/>
+                    <circle cx="24" cy="14" r="1.2" opacity="0.5"/>
+                    <circle cx="28" cy="15" r="1.1" opacity="0.4"/>
+                    <circle cx="32" cy="15" r="1.0" opacity="0.3"/>
+                    <circle cx="7" cy="20" r="1.6" opacity="0.9"/>
+                    <circle cx="11" cy="19" r="2.2"/>
+                    <circle cx="15" cy="19" r="2.2"/>
+                    <circle cx="20" cy="20" r="2.2"/>
+                    <circle cx="25" cy="21" r="2.2"/>
+                    <circle cx="29" cy="21" r="2.2"/>
+                    <circle cx="33" cy="20" r="1.6" opacity="0.9"/>
+                    <circle cx="8" cy="25" r="1.0" opacity="0.3"/>
+                    <circle cx="12" cy="25" r="1.1" opacity="0.4"/>
+                    <circle cx="16" cy="26" r="1.2" opacity="0.5"/>
+                    <circle cx="20" cy="26" r="1.8"/>
+                    <circle cx="24" cy="26" r="2.2"/>
+                    <circle cx="28" cy="26" r="2.2"/>
+                    <circle cx="32" cy="25" r="1.5" opacity="0.8"/>
+                    <circle cx="10" cy="29" r="1.4" opacity="0.8"/>
+                    <circle cx="14" cy="29" r="1.7"/>
+                    <circle cx="18" cy="30" r="2.1"/>
+                    <circle cx="22" cy="30" r="2.1"/>
+                    <circle cx="26" cy="29" r="1.9"/>
+                    <circle cx="30" cy="29" r="1.5" opacity="0.9"/>
+                    <circle cx="13" cy="32" r="1.4" opacity="0.8"/>
+                    <circle cx="27" cy="32" r="1.4" opacity="0.8"/>
+                    <circle cx="16" cy="34" r="1.3" opacity="0.7"/>
+                    <circle cx="24" cy="34" r="1.3" opacity="0.7"/>
+                    <circle cx="20" cy="35" r="1.2" opacity="0.6"/>
+                  </svg>
+                  <span class="cert-title">SPRIBE</span>
+                </div>
+                <div class="cert-status-pill">
+                  <span class="cert-status-text">Official Game</span>
+                  <span class="spribe-check-circle">
+                    <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </span>
+                </div>
+                <span class="cert-since">Since 2019</span>
+              </div>
+            </div>
+            
+            <div class="betting-countdown-box">
+              <div class="loader-spinner"></div>
+              <h2 class="betting-title">WAITING FOR NEXT ROUND</h2>
+              <div class="countdown-timer">{{ countdownSeconds() }}s</div>
+              <div class="progress-bar">
+                <div class="progress-fill" [style.width.%]="countdownProgress()"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. RUNNING FLIGHT STAGE -->
+          <div *ngIf="gameState() === 'RUNNING'" class="stage-overlay running">
+            <h1 class="live-multiplier-display">{{ currentMultiplier() | number:'1.2-2' }}x</h1>
+          </div>
+
+          <!-- 3. CRASHED ("FLEW AWAY!") STAGE -->
+          <div *ngIf="gameState() === 'CRASHED'" class="stage-overlay crashed">
+            <h2 class="flew-away-text">FLEW AWAY!</h2>
+            <h1 class="crashed-multiplier-display">{{ finalCrashMultiplier() | number:'1.2-2' }}x</h1>
+          </div>
+
+          <!-- 4. CASHOUT VICTORY OVERLAY -->
+          <div *ngIf="cashoutNotification()" class="cashout-overlay-banner animate-cashout-banner">
+            <div class="cashout-card-glow">
+              <div class="cashout-message">
+                <span>You have cashed out!</span>
+                <strong>{{ cashoutNotification()?.multiplier | number:'1.2-2' }}x</strong>
+              </div>
+              <div class="cashout-win-chip">
+                <span>Win KES</span>
+                <strong>{{ cashoutNotification()?.payout | number:'1.2-2' }}</strong>
+              </div>
+              <button class="cashout-close" type="button" aria-label="Dismiss cashout notification" (click)="dismissCashoutNotification()">&times;</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DUAL BET CONTROL PANELS -->
+      <div class="dual-bet-panels" *ngIf="!isMiniView">
+        <!-- PANEL 1 -->
+        <div class="bet-panel-box" [class.panel-active]="gameState() === 'RUNNING' && panel1().hasActiveBet && !panel1().hasCashedOut">
+          <!-- Header Row: [ Bet | Auto ] Switch + Optional Minimize Button -->
+          <div class="panel-header-row">
+            <div class="panel-subtabs">
+              <button type="button" [class.active]="panel1().mode === 'bet'" (click)="setPanelMode(1, 'bet')">Bet</button>
+              <button type="button" [class.active]="panel1().mode === 'auto'" (click)="setPanelMode(1, 'auto')">Auto</button>
+            </div>
+            
+            <button *ngIf="!showPanel2()" type="button" class="panel-add-btn" (click)="togglePanel2()" title="Open Second Bet Panel">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
+                <rect x="2.5" y="2.5" width="19" height="19" rx="5" stroke="#484f56" stroke-width="1.8"/>
+                <line x1="12" y1="7" x2="12" y2="17" stroke="#94a0a8" stroke-width="2" stroke-linecap="round"/>
+                <line x1="7" y1="12" x2="17" y2="12" stroke="#94a0a8" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Body Row: Controls (Stepper + 2x2 Presets) & Big Bet Button -->
+          <div class="panel-body">
+            <div class="controls-col">
+              <div class="amount-stepper">
+                <button type="button" class="step-btn" (click)="adjustPanelAmount(1, -10)" [disabled]="panel1().hasActiveBet || panel1().queuedAmount > 0 || panel1().isPending">−</button>
+                <input type="number" 
+                       [ngModel]="panel1().amount" 
+                       (ngModelChange)="setPanelAmount(1, $event)" 
+                       min="1" 
+                       step="10" 
+                       [disabled]="panel1().hasActiveBet || panel1().queuedAmount > 0 || panel1().isPending" 
+                       class="amount-input" />
+                <button type="button" class="step-btn" (click)="adjustPanelAmount(1, 10)" [disabled]="panel1().hasActiveBet || panel1().queuedAmount > 0 || panel1().isPending">+</button>
+              </div>
+
+              <div class="preset-buttons">
+                <button type="button" [class.active]="panel1().selectedPreset === 100" (click)="selectPresetAmount(1, 100)" [disabled]="panel1().hasActiveBet || panel1().queuedAmount > 0 || panel1().isPending">100</button>
+                <button type="button" [class.active]="panel1().selectedPreset === 250" (click)="selectPresetAmount(1, 250)" [disabled]="panel1().hasActiveBet || panel1().queuedAmount > 0 || panel1().isPending">250</button>
+                <button type="button" [class.active]="panel1().selectedPreset === 1000" (click)="selectPresetAmount(1, 1000)" [disabled]="panel1().hasActiveBet || panel1().queuedAmount > 0 || panel1().isPending">1,000</button>
+                <button type="button" [class.active]="panel1().selectedPreset === 25000" (click)="selectPresetAmount(1, 25000)" [disabled]="panel1().hasActiveBet || panel1().queuedAmount > 0 || panel1().isPending">25,000</button>
+              </div>
+            </div>
+
+            <div class="action-col">
+              <!-- 1. WAITING: NO BET PLACED YET -> GREEN BET BUTTON -->
+              <button *ngIf="gameState() === 'WAITING' && !panel1().hasActiveBet && !panel1().queuedAmount" 
+                      class="big-bet-btn green" 
+                      [disabled]="panel1().isPending"
+                      (click)="placeBet(1)">
+                <span class="btn-title">{{ panel1().isPending ? 'Placing...' : 'Bet' }}</span>
+                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- 2. WAITING: BET PLACED OR QUEUED -> RED CANCEL BUTTON (ALLOWS CANCELLING BEFORE FLIGHT) -->
+              <button *ngIf="gameState() === 'WAITING' && (panel1().hasActiveBet || panel1().queuedAmount > 0)" 
+                      class="big-bet-btn queued"
+                      (click)="cancelBet(1)">
+                <span class="btn-title">Cancel</span>
+                <span class="btn-sub">Waiting for next round</span>
+              </button>
+
+              <!-- 3. RUNNING: BET QUEUED FOR NEXT ROUND -> RED CANCEL BUTTON -->
+              <button *ngIf="gameState() === 'RUNNING' && panel1().queuedAmount > 0"
+                      class="big-bet-btn queued"
+                      (click)="cancelQueuedBet(1)">
+                <span class="btn-title">Cancel</span>
+                <span class="btn-sub">Waiting for next round</span>
+              </button>
+
+              <!-- 4. RUNNING: ACTIVE BET IN FLIGHT -> GOLD CASH OUT BUTTON -->
+              <button *ngIf="gameState() === 'RUNNING' && panel1().hasActiveBet && !panel1().hasCashedOut" 
+                      class="big-bet-btn gold pulse" 
+                      [disabled]="panel1().isPending"
+                      (click)="cashOut(1)">
+                <span class="btn-title">{{ panel1().isPending ? 'Cashing...' : 'Cash Out' }}</span>
+                <span class="btn-sub">{{ potentialPayout1() | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- 5. RUNNING: CASHED OUT -> GREEN BET NEXT BUTTON -->
+              <button *ngIf="gameState() === 'RUNNING' && panel1().hasCashedOut && !panel1().queuedAmount"
+                      class="big-bet-btn next-round"
+                      (click)="queueBet(1)">
+                <span class="btn-title">Bet</span>
+                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- 6. RUNNING: NO ACTIVE BET -> GREEN BET NEXT BUTTON -->
+              <button *ngIf="gameState() === 'RUNNING' && !panel1().hasActiveBet && !panel1().hasCashedOut && !panel1().queuedAmount"
+                      class="big-bet-btn green"
+                      (click)="queueBet(1)">
+                <span class="btn-title">Bet</span>
+                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- 7. CRASHED: BET QUEUED -> RED CANCEL BUTTON -->
+              <button *ngIf="gameState() === 'CRASHED' && panel1().queuedAmount > 0"
+                      class="big-bet-btn queued"
+                      (click)="cancelQueuedBet(1)">
+                <span class="btn-title">Cancel</span>
+                <span class="btn-sub">Waiting for next round</span>
+              </button>
+
+              <!-- 8. CRASHED: NO QUEUED BET -> GREEN BET BUTTON -->
+              <button *ngIf="gameState() === 'CRASHED' && !panel1().queuedAmount"
+                      class="big-bet-btn green"
+                      (click)="queueBet(1)">
+                <span class="btn-title">Bet</span>
+                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }} KES</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Bottom Auto Controls Row: Visible ONLY when panel1 mode === 'auto' (Matching Image 2) -->
+          <div class="auto-controls-row" *ngIf="panel1().mode === 'auto'">
+            <!-- Auto Bet Toggle -->
+            <div class="auto-toggle-group" (click)="toggleAutoBet(1)">
+              <span class="auto-toggle-label">Auto bet</span>
+              <div class="spribe-toggle-switch" [class.active]="panel1().autoBetEnabled">
+                <span class="toggle-handle"></span>
+              </div>
+            </div>
+
+            <!-- Auto Cash Out Toggle + Multiplier Input -->
+            <div class="auto-cashout-group">
+              <div class="auto-toggle-group" (click)="toggleAutoCashOut(1)">
+                <span class="auto-toggle-label">Auto Cash Out</span>
+                <div class="spribe-toggle-switch" [class.active]="panel1().autoCashOutEnabled">
+                  <span class="toggle-handle"></span>
+                </div>
+              </div>
+
+              <div class="auto-mult-box">
+                <input type="number" 
+                       [ngModel]="panel1().autoTarget" 
+                       (ngModelChange)="setAutoCashout(1, $event)" 
+                       step="0.1" 
+                       min="1.1" 
+                       class="auto-mult-input" />
+                <button type="button" class="auto-reset-btn" (click)="resetAutoCashout(1)" title="Reset Multiplier">✕</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL 2 (Collapsible via toggle button) -->
+        <div class="bet-panel-box" *ngIf="showPanel2()" [class.panel-active]="gameState() === 'RUNNING' && panel2().hasActiveBet && !panel2().hasCashedOut">
+          <!-- Header Row: [ Bet | Auto ] Switch + [-] Close Button -->
+          <div class="panel-header-row">
+            <div class="panel-subtabs">
+              <button type="button" [class.active]="panel2().mode === 'bet'" (click)="setPanelMode(2, 'bet')">Bet</button>
+              <button type="button" [class.active]="panel2().mode === 'auto'" (click)="setPanelMode(2, 'auto')">Auto</button>
+            </div>
+
+            <button type="button" class="panel-close-btn" (click)="togglePanel2()" title="Close Second Bet Panel">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
+                <rect x="2.5" y="2.5" width="19" height="19" rx="5" stroke="#484f56" stroke-width="1.8"/>
+                <line x1="7" y1="12" x2="17" y2="12" stroke="#94a0a8" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Body Row: Controls (Stepper + 2x2 Presets) & Big Bet Button -->
+          <div class="panel-body">
+            <div class="controls-col">
+              <div class="amount-stepper">
+                <button type="button" class="step-btn" (click)="adjustPanelAmount(2, -10)" [disabled]="panel2().hasActiveBet || panel2().queuedAmount > 0 || panel2().isPending">−</button>
+                <input type="number" 
+                       [ngModel]="panel2().amount" 
+                       (ngModelChange)="setPanelAmount(2, $event)" 
+                       min="1" 
+                       step="10" 
+                       [disabled]="panel2().hasActiveBet || panel2().queuedAmount > 0 || panel2().isPending" 
+                       class="amount-input" />
+                <button type="button" class="step-btn" (click)="adjustPanelAmount(2, 10)" [disabled]="panel2().hasActiveBet || panel2().queuedAmount > 0 || panel2().isPending">+</button>
+              </div>
+
+              <div class="preset-buttons">
+                <button type="button" [class.active]="panel2().selectedPreset === 100" (click)="selectPresetAmount(2, 100)" [disabled]="panel2().hasActiveBet || panel2().queuedAmount > 0 || panel2().isPending">100</button>
+                <button type="button" [class.active]="panel2().selectedPreset === 250" (click)="selectPresetAmount(2, 250)" [disabled]="panel2().hasActiveBet || panel2().queuedAmount > 0 || panel2().isPending">250</button>
+                <button type="button" [class.active]="panel2().selectedPreset === 1000" (click)="selectPresetAmount(2, 1000)" [disabled]="panel2().hasActiveBet || panel2().queuedAmount > 0 || panel2().isPending">1,000</button>
+                <button type="button" [class.active]="panel2().selectedPreset === 25000" (click)="selectPresetAmount(2, 25000)" [disabled]="panel2().hasActiveBet || panel2().queuedAmount > 0 || panel2().isPending">25,000</button>
+              </div>
+            </div>
+
+            <div class="action-col">
+              <!-- 1. WAITING: NO BET PLACED YET -> GREEN BET BUTTON -->
+              <button *ngIf="gameState() === 'WAITING' && !panel2().hasActiveBet && !panel2().queuedAmount" 
+                      class="big-bet-btn green" 
+                      [disabled]="panel2().isPending"
+                      (click)="placeBet(2)">
+                <span class="btn-title">{{ panel2().isPending ? 'Placing...' : 'Bet' }}</span>
+                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- 2. WAITING: BET PLACED OR QUEUED -> RED CANCEL BUTTON (ALLOWS CANCELLING BEFORE FLIGHT) -->
+              <button *ngIf="gameState() === 'WAITING' && (panel2().hasActiveBet || panel2().queuedAmount > 0)" 
+                      class="big-bet-btn queued"
+                      (click)="cancelBet(2)">
+                <span class="btn-title">Cancel</span>
+                <span class="btn-sub">Waiting for next round</span>
+              </button>
+
+              <!-- 3. RUNNING: BET QUEUED FOR NEXT ROUND -> RED CANCEL BUTTON -->
+              <button *ngIf="gameState() === 'RUNNING' && panel2().queuedAmount > 0"
+                      class="big-bet-btn queued"
+                      (click)="cancelQueuedBet(2)">
+                <span class="btn-title">Cancel</span>
+                <span class="btn-sub">Waiting for next round</span>
+              </button>
+
+              <!-- 4. RUNNING: ACTIVE BET IN FLIGHT -> GOLD CASH OUT BUTTON -->
+              <button *ngIf="gameState() === 'RUNNING' && panel2().hasActiveBet && !panel2().hasCashedOut" 
+                      class="big-bet-btn gold pulse" 
+                      [disabled]="panel2().isPending"
+                      (click)="cashOut(2)">
+                <span class="btn-title">{{ panel2().isPending ? 'Cashing...' : 'Cash Out' }}</span>
+                <span class="btn-sub">{{ potentialPayout2() | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- 5. RUNNING: CASHED OUT -> GREEN BET NEXT BUTTON -->
+              <button *ngIf="gameState() === 'RUNNING' && panel2().hasCashedOut && !panel2().queuedAmount"
+                      class="big-bet-btn next-round"
+                      (click)="queueBet(2)">
+                <span class="btn-title">Bet</span>
+                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- 6. RUNNING: NO ACTIVE BET -> GREEN BET NEXT BUTTON -->
+              <button *ngIf="gameState() === 'RUNNING' && !panel2().hasActiveBet && !panel2().hasCashedOut && !panel2().queuedAmount"
+                      class="big-bet-btn green"
+                      (click)="queueBet(2)">
+                <span class="btn-title">Bet</span>
+                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- 7. CRASHED: BET QUEUED -> RED CANCEL BUTTON -->
+              <button *ngIf="gameState() === 'CRASHED' && panel2().queuedAmount > 0"
+                      class="big-bet-btn queued"
+                      (click)="cancelQueuedBet(2)">
+                <span class="btn-title">Cancel</span>
+                <span class="btn-sub">Waiting for next round</span>
+              </button>
+
+              <!-- 8. CRASHED: NO QUEUED BET -> GREEN BET BUTTON -->
+              <button *ngIf="gameState() === 'CRASHED' && !panel2().queuedAmount"
+                      class="big-bet-btn green"
+                      (click)="queueBet(2)">
+                <span class="btn-title">Bet</span>
+                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }} KES</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Bottom Auto Controls Row: Visible ONLY when panel2 mode === 'auto' (Matching Image 2) -->
+          <div class="auto-controls-row" *ngIf="panel2().mode === 'auto'">
+            <!-- Auto Bet Toggle -->
+            <div class="auto-toggle-group" (click)="toggleAutoBet(2)">
+              <span class="auto-toggle-label">Auto bet</span>
+              <div class="spribe-toggle-switch" [class.active]="panel2().autoBetEnabled">
+                <span class="toggle-handle"></span>
+              </div>
+            </div>
+
+            <!-- Auto Cash Out Toggle + Multiplier Input -->
+            <div class="auto-cashout-group">
+              <div class="auto-toggle-group" (click)="toggleAutoCashOut(2)">
+                <span class="auto-toggle-label">Auto Cash Out</span>
+                <div class="spribe-toggle-switch" [class.active]="panel2().autoCashOutEnabled">
+                  <span class="toggle-handle"></span>
+                </div>
+              </div>
+
+              <div class="auto-mult-box">
+                <input type="number" 
+                       [ngModel]="panel2().autoTarget" 
+                       (ngModelChange)="setAutoCashout(2, $event)" 
+                       step="0.1" 
+                       min="1.1" 
+                       class="auto-mult-input" />
+                <button type="button" class="auto-reset-btn" (click)="resetAutoCashout(2)" title="Reset Multiplier">✕</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         RIGHT SIDEBAR: REAL-TIME SPRIBE / BETIKA PLAYER CHAT
+         ═══════════════════════════════════════════════════════════ -->
+    <aside class="chat-right-panel" *ngIf="showChatModal()">
+      <!-- TOP HEADER (Info, Online Count, Close) -->
+      <div class="chat-header-bar">
+        <button type="button" class="chat-info-btn" (click)="showChatInfoModal.set(true)" title="Chat Community Rules">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+        </button>
+
+        <div class="chat-online-pill">
+          <span class="online-label">Online:</span>
+          <strong class="online-count">{{ onlineChatUsers() | number }}</strong>
+        </div>
+
+        <button type="button" class="chat-close-btn" (click)="closeChat()" title="Close Chat">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- CHAT STREAM LIST -->
+      <div class="chat-messages-container" #chatScrollContainer (scroll)="onChatScroll($event)">
+        <div *ngFor="let msg of chatMessages(); trackBy: trackChatMessage" class="chat-message-row" [class.is-self]="msg.isSelf" [class.is-rain-row]="msg.type === 'rain' || msg.rainData" [class.is-system-row]="msg.type === 'system'">
+          <!-- 0. System Notice / Balance Warning (Exact match to media_1787133646264.png) -->
+          <div *ngIf="msg.type === 'system'" class="chat-system-warning">
+            <span>{{ msg.message }}</span>
+          </div>
+
+          <!-- 1. Normal User Avatar -->
+          <div *ngIf="msg.type !== 'rain' && msg.type !== 'system' && !msg.rainData" class="chat-user-avatar">
+            <img *ngIf="msg.avatarIcon && msg.avatarIcon.startsWith('data:image')" [src]="msg.avatarIcon" class="avatar-photo-img" alt="Avatar" />
+            <span *ngIf="!msg.avatarIcon || !msg.avatarIcon.startsWith('data:image')" class="avatar-letter" [style.background-color]="msg.isSelf ? '#16a34a' : (msg.avatarColor || '#0284c7')">
+              {{ msg.isSelf ? 'U' : (msg.displayName ? msg.displayName.charAt(0) : '2') }}
+            </span>
+          </div>
+
+          <!-- 2. Bot Avatar (Blue Circle 'B' with 'Bot' green badge below it) -->
+          <div *ngIf="msg.type === 'rain' || msg.rainData" class="chat-bot-avatar-wrap">
+            <div class="chat-bot-avatar">
+              <span>B</span>
+            </div>
+            <span class="bot-badge">Bot</span>
+          </div>
+
+          <!-- A. Normal Message Bubble -->
+          <div *ngIf="msg.type !== 'rain' && msg.type !== 'system' && !msg.rainData" class="chat-bubble">
+            <div class="bubble-header">
+              <span class="chat-username" [style.color]="msg.isSelf ? '#4ade80' : (msg.avatarColor || '#38bdf8')">
+                {{ msg.isSelf ? 'You (' + msg.displayName + ')' : msg.displayName }}
+              </span>
+              <span class="chat-time">{{ msg.createdAt | date:'HH:mm:ss' }}</span>
+            </div>
+            <p class="chat-text">{{ msg.message }}</p>
+          </div>
+
+          <!-- B. SPRIBE RAIN CARD (Exact Match to media_1787092053184.png) -->
+          <div *ngIf="msg.type === 'rain' || msg.rainData" class="chat-rain-outer-card">
+            <div class="rain-sender-header">
+              <span class="rain-username">captain</span>
+              <span class="rain-time">{{ msg.createdAt | date:'HH:mm:ss' }}</span>
+            </div>
+
+            <div class="chat-rain-inner-card">
+              <!-- Top Row: Rain Title & Gold Coin Amount -->
+              <div class="rain-top-row">
+                <div class="rain-title-group">
+                  <span class="rain-cloud-icon">🌧️</span>
+                  <strong class="rain-title-text">{{ msg.rainData?.title || 'Rain' }}</strong>
+                </div>
+                <div class="rain-amount-badge">
+                  <span class="gold-coin-icon">🪙</span>
+                  <span class="rain-amount-text">{{ (msg.rainData?.amountPerClaim || 20) | number:'1.2-2' }} KES</span>
+                </div>
+              </div>
+
+              <!-- Sub-row: Quantity -->
+              <div class="rain-quantity-row">
+                <span class="quantity-label">Quantity:</span>
+                <strong class="quantity-value">{{ msg.rainData?.quantityClaimed || 99 }} / {{ msg.rainData?.quantityTotal || 125 }}</strong>
+              </div>
+
+              <!-- Progress Bar -->
+              <div class="rain-progress-bar">
+                <div class="rain-progress-fill" [style.width.%]="(((msg.rainData?.quantityClaimed || 99) / (msg.rainData?.quantityTotal || 125)) * 100)"></div>
+              </div>
+
+              <!-- Claimed Avatars Row -->
+              <div class="rain-claimants-row">
+                <div class="claimants-stack">
+                  <div *ngFor="let avatar of (msg.rainData?.claimedAvatars || []); let i = index" class="claimant-mini-avatar" [style.z-index]="20 - i">
+                    <img [src]="avatar" alt="Claimant" />
+                  </div>
+                  <div class="claimant-extra-badge">
+                    <span>+{{ msg.rainData?.extraClaimantsCount || 13 }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Big Neon Green Claim Button -->
+              <button 
+                type="button" 
+                class="rain-claim-btn"
+                [class.claimed]="msg.rainData?.isClaimed || claimedRainIds.has(msg.rainData?.id || '')"
+                [class.finished]="(msg.rainData?.quantityClaimed || 0) >= (msg.rainData?.quantityTotal || 125)"
+                [disabled]="isClaimingRain() || msg.rainData?.isClaimed || claimedRainIds.has(msg.rainData?.id || '') || (msg.rainData?.quantityClaimed || 0) >= (msg.rainData?.quantityTotal || 125)"
+                (click)="claimRain(msg, $event)"
+              >
+                <span *ngIf="msg.rainData?.isClaimed || claimedRainIds.has(msg.rainData?.id || '')">✓ Claimed</span>
+                <span *ngIf="!msg.rainData?.isClaimed && !claimedRainIds.has(msg.rainData?.id || '') && (msg.rainData?.quantityClaimed || 0) < (msg.rainData?.quantityTotal || 125)">Claim</span>
+                <span *ngIf="!msg.rainData?.isClaimed && !claimedRainIds.has(msg.rainData?.id || '') && (msg.rainData?.quantityClaimed || 0) >= (msg.rainData?.quantityTotal || 125)">Finished</span>
+              </button>
+            </div>
+
+            <!-- Footer Total -->
+            <div class="rain-footer-total">
+              <span class="total-label">Total:</span>
+              <strong class="total-amount">{{ (msg.rainData?.totalAmount || 2500) | number:'1.2-2' }} KES</strong>
+            </div>
+          </div>
+
+          <!-- Like Heart Icon (Only on other players' messages) -->
+          <button *ngIf="!msg.isSelf" type="button" class="chat-like-btn" [class.liked]="msg.hasLiked || userLikedMessageIds.has(msg.id)" (click)="likeMessage(msg, $event)">
+            <svg viewBox="0 0 24 24" class="heart-icon" [attr.fill]="(msg.hasLiked || userLikedMessageIds.has(msg.id)) ? '#ef4444' : '#4b5563'" stroke="none">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+            <span *ngIf="msg.likes > 0" class="like-count">{{ msg.likes }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- FLOATING "NEW MESSAGES" PILL -->
+      <button *ngIf="hasNewMessagesBelow()" class="floating-new-messages-pill" (click)="scrollToChatBottom()">
+        <span>New messages</span>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+
+      <!-- BOTTOM INPUT CONTAINER -->
+      <div class="chat-input-bar">
+        <div class="chat-input-row">
+          <input 
+            type="text" 
+            class="chat-text-input" 
+            [(ngModel)]="chatInputText" 
+            (keydown.enter)="sendChat()"
+            (focus)="onChatInputFocus()"
+            maxlength="160"
+            placeholder="Your message..."
+            #chatTextInput
+          />
+
+          <span class="chat-char-counter">AA {{ 160 - (chatInputText.length || 0) }}</span>
+
+          <button 
+            type="button" 
+            class="chat-send-btn" 
+            [disabled]="!chatInputText.trim()" 
+            [class.active]="chatInputText.trim().length > 0"
+            (click)="sendChat()" 
+            title="Send Message"
+          >
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div *ngIf="bonusNotif()" class="bonus-notification" [class.info]="bonusNotif()?.type === 'info'" role="alert">
+    <div class="bonus-notification-icon">
+      <svg *ngIf="bonusNotif()?.type === 'success'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+      <svg *ngIf="bonusNotif()?.type !== 'success'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <div class="bonus-notification-content">
+      <span class="bonus-notification-eyebrow">LIGIBET REWARDS</span>
+      <strong>{{ bonusNotif()?.title }}</strong>
+      <p>{{ bonusNotif()?.message }}</p>
+    </div>
+    <button class="bonus-notification-close" (click)="dismissBonusNotification()" aria-label="Dismiss notification">✕</button>
+  </div>
+
+  <!-- TOAST NOTIFICATION: PREMIUM SLEEK GLASS FLOATING PILL -->
+  <div *ngIf="toastMessage()" class="toast-popup" [class.error]="isToastError()" role="status">
+    <div class="toast-indicator-badge">
+      <svg *ngIf="!isToastError()" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+      <svg *ngIf="isToastError()" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+    </div>
+    <span class="toast-text-msg">{{ toastMessage() }}</span>
+    <button (click)="toastMessage.set(null)" class="toast-close" aria-label="Close notification">&times;</button>
+  </div>
+
+  <!-- WALLET / DEPOSIT / WITHDRAWAL MODAL -->
+  <div *ngIf="showWalletModal()" class="modal-backdrop">
+    <div class="modal-card glass-card custom-screenshot-wallet-modal">
+      
+      <!-- TOP HEADER BAR (MATCHING SCREENSHOT) -->
+      <div class="custom-wallet-top-header">
+        <button class="back-glass-btn" (click)="showWalletModal.set(false)" title="Close">←</button>
+        <h2 class="top-header-title">
+          {{ walletTab() === 'deposit' ? 'Deposit' : (walletTab() === 'withdraw' ? 'Withdrawal' : 'Transaction History') }}
+        </h2>
+        <div class="top-balance-pill">{{ userBalance() | number:'1.2-2' }} KES</div>
+      </div>
+
+      <!-- MODAL TABS -->
+      <div class="modal-tabs wallet-action-tabs" role="tablist" aria-label="Wallet actions">
+        <button class="wallet-action-tab" [class.active]="walletTab() === 'deposit'" (click)="setWalletTab('deposit')">Deposit</button>
+        <button class="wallet-action-tab" [class.active]="walletTab() === 'withdraw'" (click)="setWalletTab('withdraw')">Withdrawal</button>
+        <button class="wallet-action-tab" [class.active]="walletTab() === 'transactions'" (click)="setWalletTab('transactions')">History</button>
+      </div>
+
+      <!-- DEPOSIT TAB -->
+      <div *ngIf="walletTab() === 'deposit'" class="screenshot-tab-body">
+        <div class="mpesa-main-card">
+          <h3 class="mpesa-card-title">M-Pesa Deposit</h3>
+
+          <div class="custom-field-group">
+            <label class="custom-field-label">Amount (KES)</label>
+            <input type="number" 
+                   [ngModel]="depositVal()" 
+                   (ngModelChange)="depositVal.set($event)" 
+                   placeholder="Enter amount" 
+                   class="custom-dark-input" />
+          </div>
+
+          <div class="custom-field-group">
+            <label class="custom-field-label">M-Pesa number for this prompt</label>
+            <input type="tel"
+                   [ngModel]="mpesaPhone()"
+                   (ngModelChange)="mpesaPhone.set($event)"
+                   placeholder="e.g. 0712345678"
+                   class="custom-dark-input" />
+          </div>
+          <p class="mpesa-ownership-note">You can prompt another M-Pesa number. The deposit is still credited only to your LigiBet account.</p>
+
+          <!-- 6 PRESET PILLS GRID (2 ROWS x 3 COLS) -->
+          <div class="preset-grid-6">
+            <button *ngFor="let preset of depositPresets()"
+                    [class.active]="depositSelectedPreset() === preset"
+                    (click)="selectDepositPreset(preset)">{{ preset }}</button>
+          </div>
+
+          <button class="main-green-action-btn" [disabled]="mpesaStatus() === 'sending' || mpesaStatus() === 'waiting'" (click)="submitDeposit()">
+            {{ mpesaStatus() === 'sending' ? 'Sending Prompt...' : (mpesaStatus() === 'waiting' ? 'Prompt Sent...' : 'Pay with M-Pesa') }}
+          </button>
+
+          <!-- ACTIVE PROMPT / WAITING STATUS CARD -->
+          <div *ngIf="mpesaStatus() === 'waiting'" class="stk-prompt-waiting-card margin-top">
+            <div class="prompt-pulse-dot"></div>
+            <div class="prompt-text-col">
+              <span class="prompt-title">M-Pesa STK Push Sent</span>
+              <span class="prompt-sub">{{ mpesaStatusMsg() || 'Check your phone and enter your M-Pesa PIN.' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- WITHDRAWAL TAB -->
+      <div *ngIf="walletTab() === 'withdraw'" class="screenshot-tab-body">
+        
+        <!-- ADMIN / WITHDRAWAL POP-UP NOTIFICATION BANNER (ONLY SHOWN ON WITHDRAWAL TAB) -->
+        <div
+          class="tab-withdrawal-notif-card"
+          [class.type-complete]="withdrawalNotif()?.type === 'completed'"
+          [class.type-rejected]="withdrawalNotif()?.type === 'rejected'"
+          [class.type-pending]="withdrawalNotif()?.type === 'pending'"
+          *ngIf="withdrawalNotif() !== null"
+          role="alert"
+        >
+          <div class="notif-accent-bar"></div>
+          <div class="notif-content-body">
+            <div class="notif-top-bar">
+              <div class="notif-brand-tag">
+                <span class="notif-icon-svg">
+                  <svg *ngIf="withdrawalNotif()?.type === 'completed'" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
+                  <svg *ngIf="withdrawalNotif()?.type === 'rejected'" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                  <svg *ngIf="withdrawalNotif()?.type !== 'completed' && withdrawalNotif()?.type !== 'rejected'" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </span>
+                <span class="notif-brand-title">LIGIBET WITHDRAWAL</span>
+                <span class="notif-time-stamp">{{ withdrawalNotif()?.timestamp }}</span>
+              </div>
+              <button class="notif-close-btn" (click)="dismissWithdrawalNotification()" title="Close">✕</button>
+            </div>
+
+            <div class="notif-card-title">{{ withdrawalNotif()?.title }}</div>
+            <div class="notif-card-msg">{{ withdrawalNotif()?.message }}</div>
+
+            <div class="notif-progress-track">
+              <div class="notif-progress-bar"
+                   [class.type-complete]="withdrawalNotif()?.type === 'completed'"
+                   [class.type-rejected]="withdrawalNotif()?.type === 'rejected'"
+                   [class.type-pending]="withdrawalNotif()?.type === 'pending'"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mpesa-main-card">
+          <h3 class="mpesa-card-title">M-Pesa Withdrawal</h3>
+
+          <div class="custom-field-group">
+            <label class="custom-field-label">Amount (KES)</label>
+            <input type="number" 
+                   [ngModel]="withdrawVal()" 
+                   (ngModelChange)="withdrawVal.set($event)" 
+                   placeholder="Enter amount" 
+                   class="custom-dark-input" />
+          </div>
+
+          <!-- 6 PRESET PILLS GRID (2 ROWS x 3 COLS) -->
+          <div class="preset-grid-6">
+            <button [class.active]="withdrawSelectedPreset() === 500" (click)="selectWithdrawPreset(500)">500</button>
+            <button [class.active]="withdrawSelectedPreset() === 1000" (click)="selectWithdrawPreset(1000)">1000</button>
+            <button [class.active]="withdrawSelectedPreset() === 2000" (click)="selectWithdrawPreset(2000)">2000</button>
+            <button [class.active]="withdrawSelectedPreset() === 3000" (click)="selectWithdrawPreset(3000)">3000</button>
+            <button [class.active]="withdrawSelectedPreset() === 5000" (click)="selectWithdrawPreset(5000)">5000</button>
+            <button [class.active]="withdrawSelectedPreset() === 10000" (click)="selectWithdrawPreset(10000)">10000</button>
+          </div>
+
+          <!-- MAIN GREEN WITHDRAWAL BUTTON -->
+          <button class="main-green-action-btn" [disabled]="isSubmittingWithdrawal()" (click)="submitWithdraw()">
+            {{ isSubmittingWithdrawal() ? 'Submitting Withdrawal...' : 'Withdraw via M-Pesa' }}
+          </button>
+
+          <!-- 3-STEP WITHDRAWAL PROCESS TRACKER -->
+          <div class="stk-tracker-card">
+            <div class="stk-step" [class.active]="true" [class.done]="true">
+              <div class="step-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+              <span class="step-label">Requested</span>
+            </div>
+            <div class="step-line" [class.active]="true"></div>
+            <div class="stk-step" [class.active]="true">
+              <div class="step-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+              <span class="step-label">Processing</span>
+            </div>
+            <div class="step-line"></div>
+            <div class="stk-step">
+              <div class="step-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+              <span class="step-label">Paid</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TRANSACTION HISTORY LIST BELOW WITHDRAWAL CARD -->
+        <div class="embedded-history-section">
+          <h4 class="history-section-title">Transaction History</h4>
+          <div *ngIf="filteredTransactionHistory.length === 0" class="empty-history-text">
+            No recent withdrawal transactions recorded.
+          </div>
+          <div *ngIf="filteredTransactionHistory.length > 0" class="history-cards-list">
+            <div *ngFor="let tx of filteredTransactionHistory" class="history-item-card">
+              <div class="tx-info-col">
+                <span class="tx-amount-orange">- {{ tx.amount | number:'1.2-2' }} KES</span>
+                <span class="tx-date-sub">{{ tx.created_at | date:'dd/MM/yyyy, HH:mm:ss' }}</span>
+              </div>
+              <span class="tx-status-tag" [class.failed]="tx.status === 'failed'" [class.completed]="tx.status === 'completed'" [class.pending]="tx.status === 'pending'">
+                {{ tx.status === 'completed' ? 'Completed' : (tx.status === 'failed' ? 'Failed' : 'Pending') }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TRANSACTIONS HISTORY FULL TAB -->
+      <div *ngIf="walletTab() === 'transactions'" class="screenshot-tab-body">
+        <div class="mpesa-main-card">
+          <div class="tx-history-header">
+            <h3 class="mpesa-card-title">All Transactions</h3>
+            <button class="tx-refresh-btn" (click)="loadTransactionsHistory()">
+              <svg class="svg-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              Refresh
+            </button>
+          </div>
+
+          <div class="transaction-type-tabs">
+            <button type="button" [class.active]="transactionHistoryTab() === 'deposit'" (click)="transactionHistoryTab.set('deposit')">Deposits</button>
+            <button type="button" [class.active]="transactionHistoryTab() === 'withdrawal'" (click)="transactionHistoryTab.set('withdrawal')">Withdrawals</button>
+          </div>
+
+          <div *ngIf="isLoadingTransactions" class="tx-loading">Loading transactions...</div>
+          <div *ngIf="!isLoadingTransactions && filteredTransactionHistory.length === 0" class="tx-empty">
+            No {{ transactionHistoryTab() === 'deposit' ? 'deposit' : 'withdrawal' }} transactions found.
+          </div>
+
+          <div *ngIf="!isLoadingTransactions && filteredTransactionHistory.length > 0" class="history-cards-list">
+            <div *ngFor="let tx of filteredTransactionHistory" class="history-item-card">
+              <div class="tx-info-col">
+                <span [class.tx-amount-green]="tx.type === 'deposit'" [class.tx-amount-orange]="tx.type === 'withdrawal'">
+                  {{ tx.type === 'deposit' ? '+ ' : '- ' }}{{ tx.amount | number:'1.2-2' }} KES
+                </span>
+                <span class="tx-date-sub">{{ tx.created_at | date:'dd/MM/yyyy, HH:mm:ss' }}</span>
+                <span class="tx-ref-code" *ngIf="tx.reference">Ref: {{ tx.reference }}</span>
+              </div>
+              <span class="tx-status-tag" [class.failed]="tx.status === 'failed'" [class.completed]="tx.status === 'completed'" [class.pending]="tx.status === 'pending'">
+                {{ tx.status === 'completed' ? 'Completed' : (tx.status === 'failed' ? 'Failed' : 'Pending') }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ROOM CHANGE MODAL -->
+  <div *ngIf="showRoomModal()" class="modal-backdrop" (click)="cancelRoomChange()">
+    <div class="modal-card glass-card room-change-modal" role="dialog" aria-modal="true" aria-labelledby="change-room-title" (click)="$event.stopPropagation()">
+      <button class="modal-close" type="button" aria-label="Close" (click)="cancelRoomChange()">&times;</button>
+      <h2 id="change-room-title" class="modal-title">CHANGE ROOM</h2>
+      <p class="room-change-notice">Switching rooms will load that room's current game. Do you wish to continue?</p>
+      <div class="room-choice-list">
+        <button type="button" [class.selected]="pendingRoom() === 1" (click)="pendingRoom.set(1)"><span></span>Room #1</button>
+        <button type="button" [class.selected]="pendingRoom() === 2" (click)="pendingRoom.set(2)"><span></span>Room #2</button>
+        <button type="button" [class.selected]="pendingRoom() === 3" (click)="pendingRoom.set(3)"><span></span>Room #3</button>
+      </div>
+      <button type="button" class="modal-submit-btn green room-change-submit" (click)="confirmRoomChange()">CHANGE</button>
+    </div>
+  </div>
+
+  <!-- PROVABLY FAIR & HISTORY MODAL -->
+  <div *ngIf="showHistoryModal()" class="modal-backdrop">
+    <div class="modal-card glass-card history-modal">
+      <button class="modal-close" (click)="showHistoryModal.set(false)">✕</button>
+      <h2 class="modal-title">ROUND HISTORY & PROVABLY FAIR</h2>
+      <p class="modal-subtitle">Cryptographic SHA-256 verification seeds</p>
+
+      <div class="history-list-box">
+        <div *ngFor="let mult of history(); let i = index" class="history-modal-row">
+          <span class="round-num">Round #{{ history().length - i }}</span>
+          <span class="round-mult-badge" [class.low]="mult < 2.0" [class.mid]="mult >= 2.0 && mult < 10.0" [class.high]="mult >= 10.0">
+            {{ mult | number:'1.2-2' }}x
+          </span>
+          <span class="pf-hash">HMAC: sha256_verified</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROFILE MODAL -->
+  <div *ngIf="showProfileModal()" class="modal-backdrop" (click)="showProfileModal.set(false)">
+    <div class="modal-card glass-card" (click)="$event.stopPropagation()">
+      <button class="modal-close" (click)="showProfileModal.set(false)">✕</button>
+      <h2 class="modal-title">USER ACCOUNT</h2>
+      <div class="user-summary-card">
+        <div class="big-avatar">{{ currentUser()?.username?.charAt(0)?.toUpperCase() || 'P' }}</div>
+        <div>
+          <h3>{{ currentUser()?.username || 'Aviator Player' }}</h3>
+          <p class="role-badge">PLAYER</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AVATAR SELECTION MODAL -->
+  <div *ngIf="showAvatarModal()" class="modal-backdrop" (click)="showAvatarModal.set(false)">
+    <div class="modal-card glass-card avatar-select-modal" (click)="$event.stopPropagation()">
+      <button class="modal-close" (click)="showAvatarModal.set(false)">✕</button>
+      <h2 class="modal-title">CHANGE AVATAR</h2>
+      <p class="modal-subtitle">Choose your display icon for game rounds</p>
+      <div class="avatar-grid">
+        <button *ngFor="let avatar of avatarOptions"
+                class="avatar-option-btn"
+                [class.selected]="selectedAvatarIcon() === avatar"
+                (click)="selectAvatar(avatar)">
+          <span class="avatar-emoji">{{ avatar }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FREE BETS MODAL -->
+  <div *ngIf="showFreeBetsModal()" class="modal-backdrop" (click)="showFreeBetsModal.set(false)">
+    <div class="modal-card glass-card info-modal" (click)="$event.stopPropagation()">
+      <button class="modal-close" (click)="showFreeBetsModal.set(false)">✕</button>
+      <h2 class="modal-title">FREE BETS & BONUSES</h2>
+      <div class="info-content">
+        <div *ngIf="!currentUser()?.bonus_claimed" class="free-bets-bonus-promo">
+          <p class="bonus-highlight-text"><strong>KES 3,500 Welcome Bonus</strong> is ready for your account!</p>
+          <button class="main-green-action-btn margin-top" [disabled]="isClaimingBonus()" (click)="claimWelcomeBonus(); showFreeBetsModal.set(false)">
+            {{ isClaimingBonus() ? 'Claiming bonus…' : 'Claim KES 3,500 Bonus' }}
+          </button>
+        </div>
+        <div *ngIf="currentUser()?.bonus_claimed">
+          <p><strong>Welcome Bonus:</strong> KES 3,500 has been claimed and credited to your wallet.</p>
+          <p class="sub-info">Check back soon for tournament rain bonuses and seasonal free bets!</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME LIMITS MODAL -->
+  <div *ngIf="showLimitsModal()" class="modal-backdrop" (click)="showLimitsModal.set(false)">
+    <div class="modal-card glass-card info-modal" (click)="$event.stopPropagation()">
+      <button class="modal-close" (click)="showLimitsModal.set(false)">✕</button>
+      <h2 class="modal-title">GAME LIMITS</h2>
+      <div class="info-table">
+        <div class="info-row"><span>Minimum Bet</span><strong>10 KES</strong></div>
+        <div class="info-row"><span>Maximum Bet</span><strong>100,000 KES</strong></div>
+        <div class="info-row"><span>Maximum Win Per Round</span><strong>1,000,000 KES</strong></div>
+        <div class="info-row"><span>RTP (Return To Player)</span><strong>97%</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOW TO PLAY MODAL -->
+  <div *ngIf="showHowToPlayModal()" class="modal-backdrop" (click)="showHowToPlayModal.set(false)">
+    <div class="modal-card glass-card info-modal" (click)="$event.stopPropagation()">
+      <button class="modal-close" (click)="showHowToPlayModal.set(false)">✕</button>
+      <h2 class="modal-title">HOW TO PLAY AVIATOR</h2>
+      <div class="how-to-play-steps">
+        <div class="step-item"><span class="step-num">1</span> Place your bet before the plane takes off.</div>
+        <div class="step-item"><span class="step-num">2</span> Watch the plane take off and the multiplier increase.</div>
+        <div class="step-item"><span class="step-num">3</span> Cash out before the plane flies away to win your bet × multiplier!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME RULES MODAL -->
+  <div *ngIf="showRulesModal()" class="modal-backdrop" (click)="showRulesModal.set(false)">
+    <div class="modal-card glass-card info-modal" (click)="$event.stopPropagation()">
+      <button class="modal-close" (click)="showRulesModal.set(false)">✕</button>
+      <h2 class="modal-title">GAME RULES</h2>
+      <div class="rules-text">
+        <p>1. The multiplier starts at 1.00x and grows as the plane climbs higher.</p>
+        <p>2. You must press <strong>CASH OUT</strong> before the plane flies away.</p>
+        <p>3. If the plane flies away before you cash out, your bet is lost.</p>
+        <p>4. All round outcomes are powered by a Provably Fair cryptographic RNG algorithm.</p>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- CHAT INFO & RULES MODAL -->
+  <div *ngIf="showChatInfoModal()" class="modal-backdrop" (click)="showChatInfoModal.set(false)">
+    <div class="modal-card glass-card info-modal" (click)="$event.stopPropagation()">
+      <button class="modal-close" (click)="showChatInfoModal.set(false)">✕</button>
+      <h2 class="modal-title">AVIATOR CHAT RULES</h2>
+      <div class="rules-text">
+        <p>1. <strong>Community Respect:</strong> Be courteous to fellow players.</p>
+        <p>2. <strong>Participation Requirement:</strong> A minimum successful deposit of KES 2,000 is required to send messages in the chat.</p>
+        <p>3. <strong>Fair Play:</strong> Spamming, abusive language, or harassment will result in chat privileges being suspended.</p>
+        <p>4. <strong>Provably Fair:</strong> All crash odds are certified and independently verifiable.</p>
+      </div>
+    </div>
+  </div>
+
+</div>

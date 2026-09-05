@@ -1,0 +1,100 @@
+<div class="ligibet-auth-viewport">
+  <div class="auth-mobile-container">
+
+    <!-- MAIN CONTENT -->
+    <main class="auth-main-content">
+      
+      <!-- BRAND LOGO -->
+      <div class="brand-header">
+        <div class="brand-logo-badge">
+          <img src="/assets/images/ligibet-logo.png" alt="LigiBet Logo" class="brand-logo-img" onerror="this.src='/favicon.svg'" />
+        </div>
+        <h1 class="brand-title">
+          <span class="brand-ligi">Ligi</span><span class="brand-bet">Bet</span>
+        </h1>
+        <p class="brand-tagline">Kenya's #1 Aviator & Sports Platform</p>
+      </div>
+
+      <!-- VERIFICATION CARD -->
+      <section class="verification-card">
+        
+        <div class="card-header">
+          <div class="security-badge" [class.is-verified]="isVerified">
+            <svg *ngIf="!isVerified" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            <svg *ngIf="isVerified" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>{{ isVerified ? 'Phone Number Verified' : 'SMS Security Verification' }}</span>
+          </div>
+          <h2 class="verification-heading">
+            {{ isVerified ? 'Account Activated!' : 'Enter 6-Digit Code' }}
+          </h2>
+          <p class="verification-subtext">
+            {{ isVerified ? 'Welcome to LigiBet! Redirecting you to your account...' : 'We sent an automated verification SMS code to:' }}
+          </p>
+          <p class="phone-number-display" *ngIf="!isVerified">
+            {{ phoneNumber }}
+          </p>
+        </div>
+
+        <!-- REALISTIC INCOMING SMS NOTIFICATION PILL -->
+        <div class="sms-notification-pill" *ngIf="!isVerified && visibleOtpCode">
+          <div class="sms-pill-header">
+            <div class="sms-sender-row">
+              <span class="sms-dot"></span>
+              <span class="sms-sender">SMS &bull; LigiBet OTP</span>
+            </div>
+            <span class="sms-time">Just now</span>
+          </div>
+          <p class="sms-body-text">
+            Your verification code is <strong class="sms-code-highlight">{{ visibleOtpCode }}</strong>. Enter this code to complete registration.
+          </p>
+        </div>
+
+        <!-- 6 OTP INPUT DIGITS -->
+        <div class="otp-inputs-wrapper" [class.is-verified]="isVerified">
+          <div 
+            *ngFor="let digit of otpDigits; let i = index" 
+            class="otp-digit-cell"
+            [class.is-active]="activeDigitIndex === i && !isVerified"
+            [class.is-filled]="digit !== ''"
+            [class.is-verified]="isVerified"
+          >
+            <span class="digit-text">{{ digit }}</span>
+            <span class="cursor-blink" *ngIf="activeDigitIndex === i && digit === '' && !isVerified"></span>
+          </div>
+        </div>
+
+        <!-- STATUS / COUNTDOWN / VERIFY BUTTON -->
+        <div class="verification-actions">
+          <div class="status-indicator" *ngIf="!isVerified">
+            <span class="status-spinner-circle" *ngIf="verificationStep === 'verifying'"></span>
+            <span class="status-msg">{{ statusMessage }}</span>
+          </div>
+
+          <div class="countdown-row" *ngIf="!isVerified">
+            <span class="countdown-text">Didn't receive SMS? Resend in <strong class="timer-digits">00:{{ resendSeconds < 10 ? '0' + resendSeconds : resendSeconds }}</strong></span>
+          </div>
+
+          <button 
+            type="button" 
+            class="btn-verify-action" 
+            [disabled]="verificationStep !== 'verifying' && !isVerified"
+            [class.is-verified]="isVerified"
+            (click)="continueToDashboard()"
+          >
+            <span *ngIf="verificationStep === 'generating' || verificationStep === 'typing'">Receiving SMS Code...</span>
+            <span *ngIf="verificationStep === 'verifying'">Validating Code...</span>
+            <span *ngIf="isVerified">Enter LigiBet Now &rarr;</span>
+          </button>
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+</div>

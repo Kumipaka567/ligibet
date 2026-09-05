@@ -1,0 +1,415 @@
+<div class="aviator-root dark-theme">
+  <!-- TOP NAVIGATION BAR -->
+  <header class="top-nav">
+    <div class="nav-left">
+      <button class="go-back-btn" (click)="goBack()" title="Back to Dashboard">
+        ‹ Back
+      </button>
+      <div class="brand">
+        <span class="brand-title">Aviator</span>
+        <span class="provably-fair-tag" (click)="openHistoryModal()" title="Provably Fair Game Engine">
+          Provably Fair
+        </span>
+      </div>
+    </div>
+
+    <div class="nav-actions">
+      <div class="balance-badge" (click)="openWalletModal()">
+        <span class="balance-label">WALLET</span>
+        <span class="balance-amount">{{ userBalance | number:'1.2-2' }} KES</span>
+      </div>
+
+      <button class="nav-icon-btn deposit-btn" (click)="openWalletModal()" title="Deposit Funds">
+        Deposit
+      </button>
+
+      <button class="nav-icon-btn" (click)="openHistoryModal()" title="Round History & Verification">
+        History
+      </button>
+
+      <button class="nav-icon-btn" (click)="openProfileModal()" title="Profile & Account">
+        Profile
+      </button>
+
+      <button class="nav-icon-btn" (click)="toggleFullscreen()" title="Toggle Fullscreen">
+        Fullscreen
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN LAYOUT (SIDEBAR + GAME VIEWPORT) -->
+  <div class="main-layout">
+    <!-- LEFT SIDEBAR: LIVE BETS FEED -->
+    <aside class="left-sidebar glass-card">
+      <div class="bets-tabs">
+        <button [class.active]="betsTab === 'all'" (click)="betsTab = 'all'">All Bets</button>
+        <button [class.active]="betsTab === 'my'" (click)="betsTab = 'my'">My Bets</button>
+        <button [class.active]="betsTab === 'top'" (click)="betsTab = 'top'">Top Wins</button>
+      </div>
+
+      <div class="bets-header-info">
+        <span class="bets-title">{{ betsTab === 'all' ? 'ALL BETS' : (betsTab === 'my' ? 'MY BETS' : 'TOP WINS') }}</span>
+        <span class="bets-count">{{ displayBetsList.length }}</span>
+      </div>
+
+      <div class="bets-table-header">
+        <span class="col-player">Player</span>
+        <span class="col-bet text-right">Bet KES</span>
+        <span class="col-mult text-center">X</span>
+        <span class="col-win text-right">Win KES</span>
+      </div>
+
+      <div class="bets-list">
+        <div *ngFor="let item of displayBetsList" class="bet-row" [class.cashed-out]="item.cashedOut" [class.my-bet]="item.player === currentUser?.username">
+          <span class="col-player player-name">
+            <span class="user-avatar-icon">P</span>
+            {{ item.player }}
+          </span>
+          <span class="col-bet text-right">{{ item.bet | number:'1.2-2' }}</span>
+          <span class="col-mult text-center">
+            <span *ngIf="item.multiplier" class="mult-badge" [class.high-win]="item.multiplier >= 10">
+              {{ item.multiplier | number:'1.2-2' }}x
+            </span>
+            <span *ngIf="!item.multiplier" class="waiting-dash">-</span>
+          </span>
+          <span class="col-win text-right win-amount">
+            {{ item.win > 0 ? (item.win | number:'1.2-2') : '' }}
+          </span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- RIGHT GAME AREA -->
+    <main class="game-area">
+      <!-- LIVE TOURNAMENT BANNER -->
+      <div class="live-banner">
+        <span class="live-dot">LIVE</span>
+        <span class="banner-text">Mfalme Wa Anga - KES 400,000 Daily Prize Pool</span>
+        <span class="connection-status" [class.online]="isConnected">
+          {{ isConnected ? 'Connected' : 'Connecting...' }}
+        </span>
+      </div>
+
+      <!-- MULTIPLIER ROUND HISTORY RIBBON -->
+      <div class="history-bar-container glass-card">
+        <div class="multiplier-ribbon">
+          <div *ngFor="let mult of history" 
+               class="mult-pill" 
+               [class.low]="mult < 2.0" 
+               [class.mid]="mult >= 2.0 && mult < 10.0" 
+               [class.high]="mult >= 10.0">
+            {{ mult | number:'1.2-2' }}x
+          </div>
+        </div>
+        <button class="more-ribbon-btn" (click)="openHistoryModal()" title="View full history">
+          History
+        </button>
+      </div>
+
+      <!-- CANVAS FLIGHT VIEWPORT -->
+      <div class="canvas-viewport glass-card" #canvasContainer>
+        <canvas #flightCanvas></canvas>
+
+        <!-- OVERLAY MULTIPLIER & STAGE TEXT -->
+        <div class="canvas-overlay">
+          <!-- 1. BETTING OPEN STAGE -->
+          <div *ngIf="currentPhase === 'betting'" class="stage-overlay betting">
+            <div class="betting-countdown-box">
+              <div class="loader-spinner"></div>
+              <h2 class="betting-title">PLACE YOUR BETS</h2>
+              <div class="countdown-timer">{{ countdownSeconds }}</div>
+              <p class="sub-text">NEXT ROUND STARTING SOON</p>
+              <div class="progress-bar">
+                <div class="progress-fill" [style.width.%]="bettingProgress"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. FLYING STAGE -->
+          <div *ngIf="currentPhase === 'flying'" class="stage-overlay flying">
+            <h1 class="live-multiplier-display">{{ animatedMultiplier | number:'1.2-2' }}x</h1>
+          </div>
+
+          <!-- 3. CRASHED STAGE -->
+          <div *ngIf="currentPhase === 'crashed'" class="stage-overlay crashed">
+            <h2 class="flew-away-text">FLEW AWAY!</h2>
+            <h1 class="crashed-multiplier-display">{{ finalCrashMultiplier | number:'1.2-2' }}x</h1>
+          </div>
+        </div>
+      </div>
+
+      <!-- DUAL BET CONTROL PANELS -->
+      <div class="dual-bet-panels">
+        <!-- PANEL 1 -->
+        <div class="bet-panel-box glass-card" [class.panel-active]="hasActiveBet1">
+          <div class="panel-header-row">
+            <div class="panel-subtabs">
+              <button [class.active]="panel1Tab === 'bet'" (click)="panel1Tab = 'bet'">Bet</button>
+              <button [class.active]="panel1Tab === 'auto'" (click)="panel1Tab = 'auto'">Auto</button>
+            </div>
+            <div class="auto-cashout-setting" *ngIf="panel1Tab === 'auto'">
+              <label class="auto-label">Auto Cashout:</label>
+              <input type="number" [(ngModel)]="autoCashout1Target" step="0.1" min="1.1" class="auto-mult-input" />
+              <span class="auto-x">x</span>
+            </div>
+          </div>
+
+          <div class="panel-body">
+            <div class="controls-col">
+              <div class="amount-stepper">
+                <button class="step-btn" (click)="adjustBetAmount(1, -50)" [disabled]="isBet1Disabled">-</button>
+                <input type="number" [(ngModel)]="bet1Amount" min="10" step="10" [disabled]="isBet1Disabled" class="amount-input" />
+                <button class="step-btn" (click)="adjustBetAmount(1, 50)" [disabled]="isBet1Disabled">+</button>
+              </div>
+
+              <div class="preset-buttons">
+                <button (click)="setBetAmount(1, 100)" [disabled]="isBet1Disabled">100</button>
+                <button (click)="setBetAmount(1, 250)" [disabled]="isBet1Disabled">250</button>
+                <button (click)="setBetAmount(1, 1000)" [disabled]="isBet1Disabled">1,000</button>
+                <button (click)="setBetAmount(1, 25000)" [disabled]="isBet1Disabled">25,000</button>
+              </div>
+            </div>
+
+            <div class="action-col">
+              <!-- BETTING PHASE: PLACE BET -->
+              <button *ngIf="currentPhase === 'betting' && !hasActiveBet1" 
+                      class="big-bet-btn green" 
+                      (click)="placeBet(1)">
+                <span class="btn-title">BET</span>
+                <span class="btn-sub">{{ bet1Amount | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- BET ACCEPTED / WAITING FOR FLIGHT -->
+              <button *ngIf="currentPhase === 'betting' && hasActiveBet1" 
+                      class="big-bet-btn orange" disabled>
+                <span class="btn-title">WAITING...</span>
+                <span class="btn-sub">{{ placedBet1Amount | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- FLYING: CASH OUT -->
+              <button *ngIf="currentPhase === 'flying' && hasActiveBet1 && !hasCashedOut1" 
+                      class="big-bet-btn gold pulse" 
+                      (click)="cashOut(1)">
+                <span class="btn-title">CASH OUT</span>
+                <span class="btn-sub">{{ potentialPayout1 | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- FLYING: CASHED OUT SUCCESS -->
+              <button *ngIf="currentPhase === 'flying' && hasCashedOut1" 
+                      class="big-bet-btn cashed" disabled>
+                <span class="btn-title">CASHED OUT</span>
+                <span class="btn-sub">{{ cashedOutPayout1 | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- FLYING / CRASHED: NO BET -->
+              <button *ngIf="(currentPhase === 'flying' || currentPhase === 'crashed') && !hasActiveBet1" 
+                      class="big-bet-btn gray" disabled>
+                <span class="btn-title">IN FLIGHT</span>
+                <span class="btn-sub">Wait next round</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL 2 -->
+        <div class="bet-panel-box glass-card" [class.panel-active]="hasActiveBet2">
+          <div class="panel-header-row">
+            <div class="panel-subtabs">
+              <button [class.active]="panel2Tab === 'bet'" (click)="panel2Tab = 'bet'">Bet</button>
+              <button [class.active]="panel2Tab === 'auto'" (click)="panel2Tab = 'auto'">Auto</button>
+            </div>
+            <div class="auto-cashout-setting" *ngIf="panel2Tab === 'auto'">
+              <label class="auto-label">Auto Cashout:</label>
+              <input type="number" [(ngModel)]="autoCashout2Target" step="0.1" min="1.1" class="auto-mult-input" />
+              <span class="auto-x">x</span>
+            </div>
+          </div>
+
+          <div class="panel-body">
+            <div class="controls-col">
+              <div class="amount-stepper">
+                <button class="step-btn" (click)="adjustBetAmount(2, -50)" [disabled]="isBet2Disabled">-</button>
+                <input type="number" [(ngModel)]="bet2Amount" min="10" step="10" [disabled]="isBet2Disabled" class="amount-input" />
+                <button class="step-btn" (click)="adjustBetAmount(2, 50)" [disabled]="isBet2Disabled">+</button>
+              </div>
+
+              <div class="preset-buttons">
+                <button (click)="setBetAmount(2, 100)" [disabled]="isBet2Disabled">100</button>
+                <button (click)="setBetAmount(2, 250)" [disabled]="isBet2Disabled">250</button>
+                <button (click)="setBetAmount(2, 1000)" [disabled]="isBet2Disabled">1,000</button>
+                <button (click)="setBetAmount(2, 25000)" [disabled]="isBet2Disabled">25,000</button>
+              </div>
+            </div>
+
+            <div class="action-col">
+              <!-- BETTING PHASE: PLACE BET -->
+              <button *ngIf="currentPhase === 'betting' && !hasActiveBet2" 
+                      class="big-bet-btn green" 
+                      (click)="placeBet(2)">
+                <span class="btn-title">BET</span>
+                <span class="btn-sub">{{ bet2Amount | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- BET ACCEPTED / WAITING FOR FLIGHT -->
+              <button *ngIf="currentPhase === 'betting' && hasActiveBet2" 
+                      class="big-bet-btn orange" disabled>
+                <span class="btn-title">WAITING...</span>
+                <span class="btn-sub">{{ placedBet2Amount | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- FLYING: CASH OUT -->
+              <button *ngIf="currentPhase === 'flying' && hasActiveBet2 && !hasCashedOut2" 
+                      class="big-bet-btn gold pulse" 
+                      (click)="cashOut(2)">
+                <span class="btn-title">CASH OUT</span>
+                <span class="btn-sub">{{ potentialPayout2 | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- FLYING: CASHED OUT SUCCESS -->
+              <button *ngIf="currentPhase === 'flying' && hasCashedOut2" 
+                      class="big-bet-btn cashed" disabled>
+                <span class="btn-title">CASHED OUT</span>
+                <span class="btn-sub">{{ cashedOutPayout2 | number:'1.2-2' }} KES</span>
+              </button>
+
+              <!-- FLYING / CRASHED: NO BET -->
+              <button *ngIf="(currentPhase === 'flying' || currentPhase === 'crashed') && !hasActiveBet2" 
+                      class="big-bet-btn gray" disabled>
+                <span class="btn-title">IN FLIGHT</span>
+                <span class="btn-sub">Wait next round</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div *ngIf="toastMessage" class="toast-popup" [class.error]="isToastError">
+    <span>{{ toastMessage }}</span>
+    <button (click)="toastMessage = null" class="toast-close">✕</button>
+  </div>
+
+  <!-- WALLET / DEPOSIT / WITHDRAWAL MODAL -->
+  <div *ngIf="showWalletModal" class="modal-backdrop">
+    <div class="modal-card glass-card">
+      <button class="modal-close" (click)="showWalletModal = false">✕</button>
+      <h2 class="modal-title">WALLET & BANKING</h2>
+      <p class="modal-subtitle">Available Balance: <strong>{{ userBalance | number:'1.2-2' }} KES</strong></p>
+
+      <div class="modal-tabs">
+        <button [class.active]="walletTab === 'deposit'" (click)="walletTab = 'deposit'">DEPOSIT</button>
+        <button [class.active]="walletTab === 'withdraw'" (click)="walletTab = 'withdraw'">WITHDRAW</button>
+      </div>
+
+      <!-- DEPOSIT FORM -->
+      <div *ngIf="walletTab === 'deposit'" class="modal-body-form">
+        <label class="input-label">Quick Preset Deposit (KES)</label>
+        <div class="preset-grid">
+          <button (click)="depositVal = 100">100</button>
+          <button (click)="depositVal = 200">200</button>
+          <button (click)="depositVal = 500">500</button>
+          <button (click)="depositVal = 1000">1,000</button>
+          <button (click)="depositVal = 2000">2,000</button>
+          <button (click)="depositVal = 5000">5,000</button>
+        </div>
+
+        <div class="form-group margin-top">
+          <label class="input-label">Custom Deposit Amount</label>
+          <input type="number" [(ngModel)]="depositVal" min="10" class="input-styled" />
+        </div>
+
+        <button class="modal-submit-btn green" (click)="submitDeposit()">
+          CONFIRM DEPOSIT
+        </button>
+      </div>
+
+      <!-- WITHDRAW FORM -->
+      <div *ngIf="walletTab === 'withdraw'" class="modal-body-form">
+        <div class="form-group">
+          <label class="input-label">Withdrawal Amount (KES)</label>
+          <input type="number" [(ngModel)]="withdrawVal" min="10" max="50000" class="input-styled" />
+        </div>
+
+        <div class="form-group margin-top-sm">
+          <label class="input-label">Payout Account Details</label>
+          <input type="text" [(ngModel)]="withdrawDetails" placeholder="e.g. M-Pesa Phone Number / Bank Account" class="input-styled" />
+        </div>
+
+        <button class="modal-submit-btn gold" (click)="submitWithdraw()">
+          CONFIRM WITHDRAWAL
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROVABLY FAIR & HISTORY MODAL -->
+  <div *ngIf="showHistoryModal" class="modal-backdrop">
+    <div class="modal-card glass-card history-modal">
+      <button class="modal-close" (click)="showHistoryModal = false">✕</button>
+      <h2 class="modal-title">ROUND HISTORY & PROVABLY FAIR</h2>
+      <p class="modal-subtitle">Cryptographic verification seed SHA-256 integrity</p>
+
+      <div class="history-list-box">
+        <div *ngFor="let mult of history; let i = index" class="history-modal-row">
+          <span class="round-num">Round #{{ history.length - i }}</span>
+          <span class="round-mult-badge" [class.low]="mult < 2.0" [class.mid]="mult >= 2.0 && mult < 10.0" [class.high]="mult >= 10.0">
+            {{ mult | number:'1.2-2' }}x
+          </span>
+          <span class="pf-hash">HMAC: sha256_verified</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROFILE & SETTINGS MODAL -->
+  <div *ngIf="showProfileModal" class="modal-backdrop">
+    <div class="modal-card glass-card">
+      <button class="modal-close" (click)="showProfileModal = false">✕</button>
+      <h2 class="modal-title">USER PROFILE & SETTINGS</h2>
+
+      <div class="user-summary-card">
+        <div class="big-avatar">{{ currentUser?.username?.charAt(0)?.toUpperCase() || 'P' }}</div>
+        <div>
+          <h3>{{ currentUser?.username }}</h3>
+          <p class="role-badge">{{ currentUser?.role | uppercase }}</p>
+        </div>
+      </div>
+
+      <div class="modal-tabs">
+        <button [class.active]="profileTab === 'security'" (click)="profileTab = 'security'">ACCOUNT</button>
+        <button [class.active]="profileTab === 'history'" (click)="profileTab = 'history'">SESSIONS</button>
+      </div>
+
+      <div *ngIf="profileTab === 'security'" class="modal-body-form">
+        <div class="form-group">
+          <label class="input-label">Change Username</label>
+          <div class="input-inline">
+            <input type="text" [(ngModel)]="newUsername" placeholder="New username" class="input-styled" />
+            <button (click)="updateUsername()" class="inline-btn">Save</button>
+          </div>
+        </div>
+
+        <div class="form-group margin-top-sm">
+          <label class="input-label">Change Password</label>
+          <input type="password" [(ngModel)]="currentPass" placeholder="Current password" class="input-styled margin-bottom-sm" />
+          <input type="password" [(ngModel)]="newPass" placeholder="New password" class="input-styled" />
+          <button (click)="updatePassword()" class="modal-submit-btn margin-top-sm">Update Password</button>
+        </div>
+
+        <button (click)="logout()" class="modal-submit-btn red margin-top">LOG OUT</button>
+      </div>
+
+      <div *ngIf="profileTab === 'history'" class="modal-body-form">
+        <h4>Recent Sessions</h4>
+        <div class="session-list">
+          <div *ngFor="let s of userSessions" class="session-item">
+            <span>IP: {{ s.ip_address || '127.0.0.1' }}</span>
+            <span class="session-time">{{ s.created_at | date:'short' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,568 @@
+<div class="lb-app">
+
+  <!-- ============================ TOP BAR ============================ -->
+  <header class="lb-topbar">
+    <div class="lb-topbar-row">
+      <button class="lb-burger" type="button" (click)="toggleMobileMenu()" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+
+      <a class="lb-logo" (click)="setNavTab('home')">
+        <span class="lb-logo-mark">
+          <img src="assets/images/ligibet-logo.png" alt="" onerror="this.style.display='none'" />
+        </span>
+        <span class="lb-logo-word"><b>Ligi</b>Bets</span>
+      </a>
+
+      <nav class="lb-mainnav">
+        <button
+          *ngFor="let item of primaryNav"
+          type="button"
+          class="lb-mainnav-item"
+          [class.active]="activeNavTab() === item.id"
+          (click)="setNavTab(item.id)"
+        >{{ item.label }}</button>
+      </nav>
+
+      <div class="lb-topbar-actions">
+        <button class="lb-search" type="button" aria-label="Search">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path>
+          </svg>
+          <span>Search</span>
+        </button>
+
+        <ng-container *ngIf="currentUser() as user; else guestActions">
+          <button class="lb-balance" type="button" (click)="goToWallet()">
+            <span class="lb-balance-label">Balance</span>
+            <span class="lb-balance-value">KES {{ userBalance() | number:'1.2-2' }}</span>
+          </button>
+          <button class="lb-btn lb-btn-deposit" type="button" (click)="openDeposit()">Deposit</button>
+          <div class="lb-profile">
+            <button class="lb-btn lb-btn-profile" type="button" (click)="toggleProfileMenu()" aria-label="Account menu">
+              <span class="lb-avatar">{{ (user.username || '?').charAt(0).toUpperCase() }}</span>
+              <span class="lb-profile-name">{{ user.username }}</span>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+
+            <div class="lb-profile-menu" *ngIf="showProfileMenu()">
+              <div class="lb-profile-head">
+                <span class="lb-avatar lg">{{ (user.username || '?').charAt(0).toUpperCase() }}</span>
+                <span class="lb-profile-head-text">
+                  <b>{{ user.username }}</b>
+                  <em>KES {{ userBalance() | number:'1.2-2' }}</em>
+                </span>
+              </div>
+              <button type="button" (click)="openDeposit()">Deposit</button>
+              <button type="button" (click)="openWithdraw()">Withdraw</button>
+              <button type="button" (click)="goToWallet()">My Wallet &amp; History</button>
+              <button type="button" (click)="openAccountSettings()">Account Settings</button>
+              <button type="button" (click)="goToAviator()">Play Aviator</button>
+              <button type="button" (click)="downloadApp()">Download App</button>
+              <button type="button" class="admin" *ngIf="isPrivileged()" (click)="goToAdmin()">Admin Dashboard</button>
+              <button type="button" class="danger" (click)="logout()">Log out</button>
+            </div>
+          </div>
+        </ng-container>
+
+        <ng-template #guestActions>
+          <button class="lb-btn lb-btn-login" type="button" (click)="goToLogin()">Login</button>
+          <button class="lb-btn lb-btn-join" type="button" (click)="goToLogin()">Join Now</button>
+        </ng-template>
+      </div>
+    </div>
+
+    <!-- ============================ ICON RAIL ============================ -->
+    <div class="lb-rail-wrap">
+      <button class="lb-rail-arrow left" type="button" aria-label="Scroll left">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div class="lb-rail">
+        <button
+          *ngFor="let item of navRail"
+          type="button"
+          class="lb-rail-item"
+          [class.active]="activeNavTab() === item.id"
+          (click)="setNavTab(item.id)"
+        >
+          <span class="lb-rail-icon">
+            <img [src]="item.icon" [alt]="item.label" />
+            <em class="lb-rail-badge" *ngIf="item.badge" [class.is-new]="item.badge === 'NEW'">{{ item.badge }}</em>
+          </span>
+          <span class="lb-rail-label">{{ item.label }}</span>
+        </button>
+      </div>
+      <button class="lb-rail-arrow right" type="button" aria-label="Scroll right">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Tap-anywhere exit for the mobile drawers -->
+  <div class="lb-drawer-backdrop"
+       *ngIf="mobileMenuOpen() || showMobileSlipDrawer() || showProfileMenu()"
+       (click)="closeAllDrawers()"></div>
+
+  <!-- ============================ BODY ============================ -->
+  <div class="lb-body">
+
+    <!-- ---------------------------- LEFT ---------------------------- -->
+    <aside class="lb-left" [class.open]="mobileMenuOpen()">
+      <header class="lb-drawer-head">
+        <button type="button" class="lb-drawer-back" (click)="closeMobileMenu()">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M15 5l-7 7 7 7"/></svg>
+          Back
+        </button>
+        <span>Menu</span>
+        <button type="button" class="lb-drawer-close" (click)="closeMobileMenu()" aria-label="Close menu">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </header>
+
+      <div class="lb-side-tiles">
+        <button
+          *ngFor="let tile of sideTiles"
+          type="button"
+          class="lb-side-tile"
+          (click)="closeMobileMenu(); openGame(tile.id)"
+          [attr.aria-label]="tile.name"
+        >
+          <img [src]="tileImage(tile)" [alt]="tile.name" loading="lazy" />
+        </button>
+      </div>
+
+      <section class="lb-panel">
+        <header class="lb-panel-head">
+          <h3>Top Leagues</h3>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>
+        </header>
+        <ul class="lb-league-list">
+          <li *ngFor="let league of topLeagues">
+            <span class="lb-dot"></span>
+            <span class="lb-league-text">
+              <span class="lb-league-name">{{ league.name }}</span>
+              <span class="lb-league-region">{{ league.region }}</span>
+            </span>
+            <span class="lb-league-count">{{ league.count }}</span>
+          </li>
+        </ul>
+      </section>
+
+      <section class="lb-panel">
+        <header class="lb-panel-head"><h3>Sports</h3></header>
+        <ul class="lb-sport-list">
+          <li
+            *ngFor="let sport of sportsList"
+            [class.active]="selectedSport() === sport.id"
+            (click)="selectSport(sport.id)"
+          >
+            <span class="lb-sport-name">{{ sport.name }}</span>
+            <span class="lb-sport-count">{{ sport.count }}</span>
+          </li>
+        </ul>
+      </section>
+
+      <button class="lb-datasaver" type="button" (click)="toggleDataSaver()">
+        <span class="lb-switch" [class.on]="dataSaverEnabled()"><i></i></span>
+        Data Saver {{ dataSaverEnabled() ? 'On' : 'Off' }}
+      </button>
+    </aside>
+
+    <!-- ---------------------------- MAIN ---------------------------- -->
+    <main class="lb-main">
+
+      <!-- HERO CAROUSEL -->
+      <section class="lb-hero" (mouseenter)="pauseBanner()" (mouseleave)="resumeBanner()">
+        <button class="lb-hero-arrow left" type="button" aria-label="Previous" (click)="prevBanner()">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+
+        <div class="lb-hero-slides">
+          <div
+            *ngFor="let banner of heroBanners; let i = index"
+            class="lb-hero-slide"
+            [class.active]="currentBannerIndex() === i"
+          >
+            <img class="lb-hero-photo" [src]="banner.image" [alt]="banner.headline" (click)="openGame(banner.gameId)" />
+            <div class="lb-hero-inner">
+              <div class="lb-hero-brand">
+                <span class="lb-hero-mark"><b>Ligi</b>Bets</span>
+              </div>
+              <div class="lb-hero-copy">
+                <h2>{{ banner.headline }}</h2>
+                <p class="lb-hero-prize">{{ banner.prize }} <span>{{ banner.prizeSuffix }}</span></p>
+                <button class="lb-hero-cta" type="button" (click)="openGame(banner.gameId)">{{ banner.cta }}</button>
+              </div>
+              <img class="lb-hero-art" [src]="banner.art" [alt]="banner.headline" (click)="openGame(banner.gameId)" />
+              <span class="lb-hero-tag">{{ banner.tag }} <i>18+</i></span>
+            </div>
+          </div>
+        </div>
+
+        <button class="lb-hero-arrow right" type="button" aria-label="Next" (click)="nextBanner()">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+
+        <!-- Slide Indicators -->
+        <div class="lb-hero-dots">
+          <button
+            *ngFor="let b of heroBanners; let i = index"
+            type="button"
+            class="lb-hero-dot"
+            [class.active]="currentBannerIndex() === i"
+            (click)="setBanner(i)"
+            [attr.aria-label]="'Slide ' + (i + 1)"
+          ></button>
+        </div>
+
+        <div class="lb-hero-progress"><i [style.width.%]="((currentBannerIndex() + 1) / heroBanners.length) * 100"></i></div>
+      </section>
+
+      <!-- GAME PANEL -->
+      <section class="lb-card">
+        <nav class="lb-gametabs">
+          <button
+            *ngFor="let tab of gameTabs"
+            type="button"
+            class="lb-gametab"
+            [class.active]="activeGameTab() === tab.id"
+            (click)="setGameTab(tab.id)"
+          >
+            <span class="lb-flame" *ngIf="tab.flame">
+              <svg viewBox="0 0 24 24" width="15" height="15"><path d="M12 2c3 4 5 6 5 9a5 5 0 0 1-10 0c0-3 2-4 5-9z" fill="#f97316"/></svg>
+            </span>
+            {{ tab.label }}
+          </button>
+        </nav>
+
+        <div class="lb-chips">
+          <button
+            *ngFor="let cat of gameCategories"
+            type="button"
+            class="lb-chip"
+            [class.active]="activeGameCategory() === cat.id"
+            (click)="setGameCategory(cat.id)"
+          >{{ cat.label }} <em>{{ cat.count }}</em></button>
+        </div>
+
+        <div class="lb-game-grid">
+          <button
+            *ngFor="let game of gameTiles"
+            type="button"
+            class="lb-game-tile"
+            (click)="openGame(game.id)"
+          >
+            <img [src]="tileImage(game)" [alt]="game.name" loading="lazy" />
+            <span class="lb-game-play">Play</span>
+          </button>
+          <button class="lb-game-next" type="button" aria-label="More games">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- QUICK LINKS -->
+      <section class="lb-quicklinks">
+        <button class="lb-quick-arrow" type="button" aria-label="Previous">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <div class="lb-quick-row">
+          <button *ngFor="let link of quickLinks" type="button" class="lb-quick" (click)="setNavTab(link.id)">
+            <img [src]="link.icon" [alt]="" />
+            <span>{{ link.label }}</span>
+            <em>{{ link.count }}</em>
+          </button>
+        </div>
+        <button class="lb-quick-arrow" type="button" aria-label="Next">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </section>
+
+      <!-- AVIATOR STRIP -->
+      <section class="lb-card lb-aviator-strip">
+        <header class="lb-card-head">
+          <h3>Aviator — recent multipliers</h3>
+          <button type="button" class="lb-link" (click)="goToAviator()">Play Aviator</button>
+        </header>
+        <div class="lb-multipliers">
+          <span
+            *ngFor="let multiplier of aviatorMultipliers()"
+            class="lb-mult"
+            [class.high]="multiplier >= 10"
+            [class.mid]="multiplier >= 2 && multiplier < 10"
+          >{{ multiplier | number:'1.2-2' }}x</span>
+        </div>
+      </section>
+
+      <!-- MATCHES -->
+      <section class="lb-card">
+        <header class="lb-card-head">
+          <h3>Upcoming Matches</h3>
+          <div class="lb-filters">
+            <button type="button" [class.active]="activeFilter() === 'all'" (click)="activeFilter.set('all')">All</button>
+            <button type="button" [class.active]="activeFilter() === 'live'" (click)="activeFilter.set('live')">Live</button>
+            <button type="button" [class.active]="activeFilter() === 'upcoming'" (click)="activeFilter.set('upcoming')">Upcoming</button>
+          </div>
+        </header>
+
+        <div class="lb-match-head">
+          <span>Match</span><span class="odds-col">1</span><span class="odds-col">X</span><span class="odds-col">2</span>
+        </div>
+
+        <article class="lb-match" *ngFor="let match of visibleMatches(); let i = index">
+          <div class="lb-match-info">
+            <span class="lb-match-comp">
+              <em class="lb-live-dot" *ngIf="match.state === 'live'"></em>
+              {{ match.competition }}
+              <b *ngIf="match.state === 'live'">{{ match.minute }}'</b>
+              <b *ngIf="match.state !== 'live'">{{ match.kickoff }}</b>
+            </span>
+            <span class="lb-match-teams">
+              <span>{{ match.home }}</span>
+              <span class="lb-score" *ngIf="match.state === 'live'">{{ match.homeScore }} - {{ match.awayScore }}</span>
+              <span>{{ match.away }}</span>
+            </span>
+            <span class="lb-match-markets">+{{ match.markets }} markets</span>
+          </div>
+          <button type="button" class="lb-odd" [class.picked]="isSelected(match.id, 'home')" (click)="toggleSelection(match, 'home')">{{ match.homeOdds | number:'1.2-2' }}</button>
+          <button type="button" class="lb-odd" [class.picked]="isSelected(match.id, 'draw')" (click)="toggleSelection(match, 'draw')">{{ match.drawOdds | number:'1.2-2' }}</button>
+          <button type="button" class="lb-odd" [class.picked]="isSelected(match.id, 'away')" (click)="toggleSelection(match, 'away')">{{ match.awayOdds | number:'1.2-2' }}</button>
+        </article>
+      </section>
+    </main>
+
+    <!-- ---------------------------- RIGHT ---------------------------- -->
+    <aside class="lb-right" [class.open]="showMobileSlipDrawer()">
+      <header class="lb-drawer-head">
+        <button type="button" class="lb-drawer-back" (click)="showMobileSlipDrawer.set(false)">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M15 5l-7 7 7 7"/></svg>
+          Back
+        </button>
+        <span>Betslip</span>
+        <button type="button" class="lb-drawer-close" (click)="showMobileSlipDrawer.set(false)" aria-label="Close betslip">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </header>
+
+      <section class="lb-slip">
+        <header class="lb-slip-head">
+          <span class="lb-slip-count">{{ selections().length }}</span>
+          <h3>Betslip</h3>
+          <button type="button" class="lb-slip-mybets">My bets</button>
+        </header>
+
+        <div class="lb-slip-mode">
+          <button type="button" class="active">REAL</button>
+          <button type="button">SIMULATE</button>
+          <span class="lb-slip-info" aria-hidden="true">i</span>
+          <button type="button" class="lb-slip-clear" (click)="clearSlip()">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            Remove all
+          </button>
+        </div>
+
+        <div class="lb-slip-empty" *ngIf="!selections().length">
+          <p class="lb-slip-empty-title">No selections</p>
+          <p class="lb-slip-empty-sub">Please add match selections by selecting the odds on any match</p>
+        </div>
+
+        <div class="lb-slip-items" *ngIf="selections().length">
+          <div class="lb-slip-item" *ngFor="let item of selections()">
+            <div class="lb-slip-item-text">
+              <span class="lb-slip-item-match">{{ item.matchLabel }}</span>
+              <span class="lb-slip-item-pick">{{ item.outcomeLabel }}</span>
+            </div>
+            <span class="lb-slip-item-odds">{{ item.odds | number:'1.2-2' }}</span>
+            <button type="button" class="lb-slip-item-remove" (click)="removeSelection(item)" aria-label="Remove">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <label class="lb-stake">
+            <span>Stake (KES)</span>
+            <input type="number" min="10" [(ngModel)]="stake" />
+          </label>
+
+          <dl class="lb-slip-totals">
+            <div><dt>Total odds</dt><dd>{{ combinedOdds() | number:'1.2-2' }}</dd></div>
+            <div><dt>Possible win</dt><dd class="win">KES {{ potentialReturn() | number:'1.2-2' }}</dd></div>
+          </dl>
+
+          <button type="button" class="lb-slip-place" (click)="placeDemoBet()">Place Bet</button>
+        </div>
+
+        <p class="lb-slip-notice" *ngIf="betNotice()">{{ betNotice() }}</p>
+
+        <div class="lb-booking">
+          <p>Have a booking code? Please enter it here.</p>
+          <input type="text" placeholder="Booking code" [(ngModel)]="betslipCode" />
+          <button type="button" class="lb-booking-btn" (click)="loadBetslipByCode()">Load betslip</button>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <!-- ============================ MOBILE BAR ============================ -->
+  <nav class="lb-mobilebar">
+    <button type="button" (click)="setNavTab('home')"><img src="assets/icons/home.svg" alt="" /><span>Home</span></button>
+    <button type="button" (click)="setNavTab('live')"><img src="assets/icons/live.svg" alt="" /><span>Live</span></button>
+    <button type="button" (click)="goToAviator()"><img src="assets/images/aviator-dashboard-logo.png" alt="" /><span>Aviator</span></button>
+    <button type="button" class="slip" (click)="toggleMobileSlipDrawer()">
+      <img src="assets/icons/crash.svg" alt="" /><span>Slip</span>
+      <em *ngIf="selections().length">{{ selections().length }}</em>
+    </button>
+    <button type="button" class="account" (click)="toggleProfileMenu()">
+      <span class="lb-avatar sm">{{ (currentUser()?.username || '?').charAt(0).toUpperCase() }}</span>
+      <span>Account</span>
+    </button>
+  </nav>
+
+  <!-- Profile sheet for phones, anchored to the bottom bar -->
+  <div class="lb-profile-sheet" *ngIf="showProfileMenu() && currentUser() as sheetUser">
+    <header class="lb-drawer-head">
+      <span class="lb-avatar lg">{{ (sheetUser.username || '?').charAt(0).toUpperCase() }}</span>
+      <span class="lb-profile-head-text">
+        <b>{{ sheetUser.username }}</b>
+        <em>KES {{ userBalance() | number:'1.2-2' }}</em>
+      </span>
+      <button type="button" class="lb-drawer-close" (click)="showProfileMenu.set(false)" aria-label="Close account menu">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </header>
+    <div class="lb-sheet-actions">
+      <button type="button" (click)="openDeposit()">Deposit</button>
+      <button type="button" (click)="openWithdraw()">Withdraw</button>
+      <button type="button" (click)="goToWallet()">My Wallet &amp; History</button>
+      <button type="button" (click)="openAccountSettings()">Account Settings</button>
+      <button type="button" (click)="goToAviator()">Play Aviator</button>
+      <button type="button" (click)="downloadApp()">Download App</button>
+      <button type="button" class="admin" *ngIf="isPrivileged()" (click)="goToAdmin()">Admin Dashboard</button>
+      <button type="button" class="danger" (click)="logout()">Log out</button>
+    </div>
+  </div>
+
+  <!-- ============================ DEPOSIT MODAL ============================ -->
+  <div class="modal-backdrop" *ngIf="showDepositModal()" (click)="showDepositModal.set(false)">
+    <section class="deposit-modal" role="dialog" aria-modal="true" aria-label="Deposit funds" (click)="$event.stopPropagation()">
+      <button class="modal-close" type="button" (click)="showDepositModal.set(false)">×</button>
+
+      <div class="mpesa-header">
+        <div class="mpesa-logo">M</div>
+        <div>
+          <h2>M-PESA Deposit</h2>
+          <p class="modal-intro">Fund your LigiBet account instantly</p>
+        </div>
+      </div>
+
+      <label class="modal-input-label">
+        <span>Deposit Amount (KES)</span>
+        <div class="modal-input-box">
+          <span class="currency-prefix">KES</span>
+          <input type="number" [min]="minimumDeposit()" [(ngModel)]="depositAmount">
+        </div>
+        <small class="modal-input-hint">Minimum deposit: KES {{ minimumDeposit() | number }}</small>
+      </label>
+
+      <label class="modal-input-label">
+        <span>M-Pesa Phone Number</span>
+        <input type="tel" [(ngModel)]="depositPhone" placeholder="2547XXXXXXXX" class="modal-phone-input">
+      </label>
+
+      <button class="deposit-submit-btn" type="button" [disabled]="isDepositing()" (click)="submitDeposit()">
+        {{ isDepositing() ? 'Sending Prompt…' : 'Deposit' }}
+      </button>
+
+      <p class="deposit-notice" *ngIf="depositNotice()">{{ depositNotice() }}</p>
+    </section>
+  </div>
+
+  <!-- ============================ WITHDRAW MODAL ============================ -->
+  <div class="modal-backdrop" *ngIf="showWithdrawModal()" (click)="showWithdrawModal.set(false)">
+    <section class="deposit-modal" role="dialog" aria-modal="true" aria-label="Withdraw funds" (click)="$event.stopPropagation()">
+      <button class="modal-close" type="button" (click)="showWithdrawModal.set(false)">&times;</button>
+
+      <div class="mpesa-header">
+        <div class="mpesa-logo withdraw">W</div>
+        <div>
+          <h2>Withdraw to M-PESA</h2>
+          <p class="modal-intro">Available balance: KES {{ userBalance() | number:'1.2-2' }}</p>
+        </div>
+      </div>
+
+      <label class="modal-input-label">
+        <span>Withdrawal Amount (KES)</span>
+        <div class="modal-input-box">
+          <span class="currency-prefix">KES</span>
+          <input type="number" min="10" [(ngModel)]="withdrawAmount">
+        </div>
+      </label>
+
+      <div class="lb-quick-amounts">
+        <button type="button" *ngFor="let amount of [100, 500, 1000, 5000]" (click)="withdrawAmount = amount">{{ amount }}</button>
+      </div>
+
+      <button class="deposit-submit-btn" type="button" [disabled]="isWithdrawing()" (click)="submitWithdraw()">
+        {{ isWithdrawing() ? 'Submitting…' : 'Withdraw' }}
+      </button>
+
+      <p class="deposit-notice warn" *ngIf="withdrawNotice()">{{ withdrawNotice() }}</p>
+    </section>
+  </div>
+
+  <!-- ============================ WITHDRAWAL POPUP ============================ -->
+  <div class="modal-backdrop" *ngIf="withdrawalPopup() as popup" (click)="closeWithdrawalPopup()">
+    <section class="lb-popup" [class.rejected]="popup.type === 'rejected'" [class.completed]="popup.type === 'completed'"
+             role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()">
+      <div class="lb-popup-icon">
+        <svg *ngIf="popup.type === 'completed'" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        <svg *ngIf="popup.type === 'rejected'" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 7v7M12 17.5v.5"/><circle cx="12" cy="12" r="9"/></svg>
+        <svg *ngIf="popup.type !== 'completed' && popup.type !== 'rejected'" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      </div>
+      <h2>{{ popup.title }}</h2>
+      <p>{{ popup.message }}</p>
+      <button type="button" class="lb-popup-btn" (click)="closeWithdrawalPopup()">OK</button>
+    </section>
+  </div>
+
+  <!-- ============================ ACCOUNT SETTINGS ============================ -->
+  <div class="modal-backdrop" *ngIf="showAccountModal()" (click)="showAccountModal.set(false)">
+    <section class="deposit-modal" role="dialog" aria-modal="true" aria-label="Account settings" (click)="$event.stopPropagation()">
+      <button class="modal-close" type="button" (click)="showAccountModal.set(false)">&times;</button>
+
+      <div class="mpesa-header">
+        <div class="lb-avatar lg">{{ (currentUser()?.username || '?').charAt(0).toUpperCase() }}</div>
+        <div>
+          <h2>Account Settings</h2>
+          <p class="modal-intro">{{ currentUser()?.phone_number || currentUser()?.username }}</p>
+        </div>
+      </div>
+
+      <div class="lb-alert-line error" *ngIf="accountError()">{{ accountError() }}</div>
+      <div class="lb-alert-line ok" *ngIf="accountNotice()">{{ accountNotice() }}</div>
+
+      <label class="modal-input-label">
+        <span>Display name</span>
+        <input type="text" class="modal-phone-input" [(ngModel)]="newUsername" placeholder="Your name">
+      </label>
+      <button class="lb-secondary-btn" type="button" [disabled]="isSavingAccount()" (click)="saveUsername()">Save name</button>
+
+      <hr class="lb-divider" />
+
+      <label class="modal-input-label">
+        <span>Current password</span>
+        <input type="password" class="modal-phone-input" [(ngModel)]="currentPassword" placeholder="Current password">
+      </label>
+      <label class="modal-input-label">
+        <span>New password</span>
+        <input type="password" class="modal-phone-input" [(ngModel)]="accountNewPassword" placeholder="Minimum 6 characters">
+      </label>
+      <button class="deposit-submit-btn" type="button" [disabled]="isSavingAccount()" (click)="saveAccountPassword()">
+        {{ isSavingAccount() ? 'Saving…' : 'Update password' }}
+      </button>
+    </section>
+  </div>
+
+  <!-- ============================ TOAST ============================ -->
+  <div class="lb-toast" *ngIf="toastMessage()" (click)="dismissToast()">{{ toastMessage() }}</div>
+
+</div>

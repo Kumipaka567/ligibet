@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320" role="img">
+  <defs>
+    <filter id="soft" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+<radialGradient id="ibg" cx="50%" cy="38%" r="76%"><stop offset="0%" stop-color="#88350f"/><stop offset="100%" stop-color="#140704"/></radialGradient>
+   <linearGradient id="bolt" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#fef08a"/><stop offset="100%" stop-color="#f59e0b"/></linearGradient>
+  </defs>
+  <rect width="320" height="320" rx="16" fill="url(#ibg)"/>
+<g transform="translate(160 116) scale(0.9149) translate(0 0)">
+    <circle cx="0" cy="0" r="82" fill="none" stroke="#f59e0b" stroke-width="10" opacity=".85"/>
+    <circle cx="0" cy="0" r="82" fill="none" stroke="#fde047" stroke-width="10" stroke-dasharray="72 443" stroke-linecap="round" transform="rotate(-90)"/>
+    <path d="M20 -62 L-46 20 H-6 L-22 74 L46 -10 H6 Z" fill="url(#bolt)" filter="url(#soft)"/></g><text x="160" y="240" text-anchor="middle" font-family="Impact,'Arial Black','Haettenschweiler',sans-serif" font-size="30" fill="#fde047" >INSTANT</text><text x="160" y="268" text-anchor="middle" font-family="Impact,'Arial Black','Haettenschweiler',sans-serif" font-size="30" fill="#ffffff" >VIRTUALS</text><rect x="126" y="278" width="68" height="7" rx="3.5" fill="#f59e0b"/><rect x="139" y="290" width="42" height="7" rx="3.5" fill="#f59e0b"/>
+</svg>

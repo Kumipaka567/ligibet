@@ -1,0 +1,17 @@
+# Normalise line endings. Development happens on Windows and both hosts build
+# on Linux, so without this every file committed from Windows arrives with CRLF
+# and shell scripts run there fail with "bad interpreter: /bin/sh^M".
+* text=auto eol=lf
+
+*.bat text eol=crlf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mp3 binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.apk binary

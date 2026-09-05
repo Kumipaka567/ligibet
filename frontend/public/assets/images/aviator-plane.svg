@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 60" width="120" height="60">
+  <defs>
+    <linearGradient id="jetBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F87171" />
+      <stop offset="50%" stop-color="#E11D48" />
+      <stop offset="100%" stop-color="#9F1239" />
+    </linearGradient>
+    <linearGradient id="wingGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FB7185" />
+      <stop offset="100%" stop-color="#BE123C" />
+    </linearGradient>
+    <linearGradient id="flameGrad" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#FACC15" stop-opacity="1"/>
+      <stop offset="50%" stop-color="#F97316" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#EF4444" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Jet Engine Flame Thrust -->
+  <polygon points="0,30 -25,24 -40,30 -25,36" fill="url(#flameGrad)" filter="url(#glow)" />
+  <polygon points="0,30 -15,27 -25,30 -15,33" fill="#FFFFFF" />
+
+  <!-- Main Jet Fuselage -->
+  <path d="M 5,30 Q 35,15 105,28 Q 115,30 105,32 Q 35,45 5,30 Z" fill="url(#jetBody)" filter="url(#glow)" />
+  
+  <!-- Cockpit Canopy Glass -->
+  <path d="M 60,24 Q 80,24 92,28 Q 75,30 60,28 Z" fill="#60A5FA" opacity="0.85" />
+
+  <!-- Top Wing -->
+  <polygon points="40,24 75,5 90,8 55,25" fill="url(#wingGrad)" />
+  
+  <!-- Bottom Wing -->
+  <polygon points="40,36 75,55 90,52 55,35" fill="url(#wingGrad)" />
+
+  <!-- Tail Fin -->
+  <polygon points="12,25 0,10 12,12 25,27" fill="#BE123C" />
+</svg>

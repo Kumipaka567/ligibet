@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#1b3f2b"/>
+      <stop offset="60%" stop-color="#0e2318"/>
+      <stop offset="100%" stop-color="#07120c"/>
+    </radialGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff1b8"/>
+      <stop offset="45%" stop-color="#f6c56f"/>
+      <stop offset="80%" stop-color="#d49a37"/>
+      <stop offset="100%" stop-color="#8a5a14"/>
+    </linearGradient>
+    <linearGradient id="redPlaneGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff6b6b"/>
+      <stop offset="50%" stop-color="#e02424"/>
+      <stop offset="100%" stop-color="#8a0909"/>
+    </linearGradient>
+    <linearGradient id="mintGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a7f3d0"/>
+      <stop offset="50%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Squircle Rounded Base -->
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bgGrad)" stroke="url(#goldGrad)" stroke-width="4"/>
+  <circle cx="64" cy="64" r="50" fill="none" stroke="rgba(246, 197, 111, 0.25)" stroke-width="1.5"/>
+
+  <!-- Glowing Multiplier Arc -->
+  <path d="M 28 82 A 42 42 0 0 1 96 44" fill="none" stroke="url(#goldGrad)" stroke-width="3" stroke-linecap="round" filter="url(#glow)"/>
+
+  <!-- Aviator Plane Icon -->
+  <g transform="translate(68, 38) rotate(32) scale(0.9)" filter="url(#glow)">
+    <path d="M 0 -22 L 7 -4 L 26 2 L 7 7 L 4 20 L 0 17 L -4 20 L -7 7 L -26 2 L -7 -4 Z" fill="url(#redPlaneGrad)" stroke="#fff" stroke-width="1"/>
+    <polygon points="0,-18 3,-4 0,-2 -3,-4" fill="#fff" opacity="0.8"/>
+  </g>
+
+  <!-- LigiBet Bold Emblem Text -->
+  <!-- Ligi (Gold) -->
+  <text x="32" y="104" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="900" fill="url(#goldGrad)" letter-spacing="-0.5">Ligi</text>
+  <!-- Bet (Mint Emerald) -->
+  <text x="74" y="104" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="900" fill="url(#mintGrad)" letter-spacing="-0.5">Bet</text>
+</svg>

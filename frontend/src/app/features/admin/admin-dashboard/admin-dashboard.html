@@ -1,0 +1,1123 @@
+<main class="admin-shell">
+  <!-- TOP NAVIGATION HEADER -->
+  <header class="admin-header">
+    <div class="brand-block">
+      <div class="brand-logo">
+        <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
+        <span>LIGIBET {{ isSuperAdmin ? 'SUPERADMIN' : 'ADMIN' }}</span>
+      </div>
+      <span class="eyebrow">{{ isSuperAdmin ? 'Master Console' : 'Administration' }}</span>
+    </div>
+
+    <!-- DESKTOP TABS -->
+    <div class="admin-tab-bar desktop-only">
+      <button [class.active]="activeTab === 'monitor' || activeTab === 'game'" (click)="setTab('monitor')">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span>Game & Monitor</span>
+      </button>
+      <button [class.active]="activeTab === 'withdrawal-settings'" (click)="setTab('withdrawal-settings')">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Withdrawal & Deposit</span>
+      </button>
+      <button [class.active]="activeTab === 'active-users'" (click)="setTab('active-users')">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Active Players</span>
+        <span *ngIf="pendingWithdrawalsList.length > 0" class="badge-count">{{ pendingWithdrawalsList.length }}</span>
+      </button>
+      <button [class.active]="activeTab === 'transactions'" (click)="setTab('transactions')">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        <span>Transactions</span>
+      </button>
+      <button [class.active]="activeTab === 'users'" (click)="setTab('users')">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Users</span>
+      </button>
+      <button *ngIf="isSuperAdmin" [class.active]="activeTab === 'admins'" (click)="setTab('admins')">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>Admins</span>
+      </button>
+      <button [class.active]="activeTab === 'logs'" (click)="setTab('logs')">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span>Audit</span>
+      </button>
+    </div>
+
+    <div class="header-right">
+      <span class="connection-pill" [class.connected]="isConnected$ | async">
+        <span class="indicator-dot"></span>
+        {{ (isConnected$ | async) ? 'Live' : 'Offline' }}
+      </span>
+
+      <!-- FULLSCREEN PLAY ROUTE BUTTON -->
+      <button class="game-view-btn" (click)="backToGame()" title="Open Player Fullscreen Aviator Game">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span>Play Fullscreen</span>
+      </button>
+
+      <button class="nav-btn logout" (click)="logout()" title="Logout">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+
+      <!-- MOBILE MENU DROPDOWN BUTTON -->
+      <button class="hamburger-btn mobile-only" (click)="toggleMobileMenu()" [class.active]="mobileMenuOpen" aria-label="Toggle navigation menu" title="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- MOBILE NAVIGATION DROPDOWN -->
+  <nav class="mobile-nav-menu" *ngIf="mobileMenuOpen">
+    <button class="game-view-btn full-width margin-bottom-xs" (click)="backToGame(); mobileMenuOpen = false">
+      <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Play Fullscreen (Play View)
+    </button>
+    <button [class.active]="activeTab === 'monitor' || activeTab === 'game'" (click)="setTab('monitor'); mobileMenuOpen = false">Game & Engine Monitor</button>
+    <button [class.active]="activeTab === 'withdrawal-settings'" (click)="setTab('withdrawal-settings'); mobileMenuOpen = false">Withdrawal & Deposit Settings</button>
+    <button [class.active]="activeTab === 'active-users'" (click)="setTab('active-users'); mobileMenuOpen = false">Active Players & Withdrawals ({{ pendingWithdrawalsList.length }})</button>
+    <button [class.active]="activeTab === 'transactions'" (click)="setTab('transactions'); mobileMenuOpen = false">Transactions</button>
+    <button [class.active]="activeTab === 'users'" (click)="setTab('users'); mobileMenuOpen = false">Users</button>
+    <button *ngIf="isSuperAdmin" [class.active]="activeTab === 'admins'" (click)="setTab('admins'); mobileMenuOpen = false">Admins</button>
+    <button [class.active]="activeTab === 'logs'" (click)="setTab('logs'); mobileMenuOpen = false">Audit Logs</button>
+    <button class="logout-btn" (click)="logout()">Logout</button>
+  </nav>
+
+  <!-- COMPACT OVERVIEW METRICS CARDS -->
+  <section class="stats-bar">
+    <!-- CLICKABLE ONLINE PLAYERS CARD -->
+    <div class="stat-card blue clickable-stat-card" (click)="setTab('active-users')" role="button" tabindex="0" title="Click to view Active Players, Phone Numbers & Balances">
+      <div class="stat-icon-wrapper">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="stat-info">
+        <div class="stat-label-row">
+          <span class="stat-label">Online Players</span>
+          <span class="micro-click-hint">View List →</span>
+        </div>
+        <strong class="stat-val mono">{{ stats.connectedPlayers }} <span class="stat-sub">({{ stats.onlineUsers }} users)</span></strong>
+      </div>
+    </div>
+
+    <div class="stat-card green">
+      <div class="stat-icon-wrapper">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <div class="stat-info">
+        <div class="stat-label-row">
+          <span class="stat-label">Total Deposits</span>
+          <button class="micro-reset-btn" (click)="openResetDepositsModal()" title="Reset Total Deposits Ledger to 0.00 KES">
+            Reset
+          </button>
+        </div>
+        <strong class="stat-val mono">{{ stats.totalDeposits | number:'1.2-2' }} KES</strong>
+      </div>
+    </div>
+
+    <div class="stat-card gold">
+      <div class="stat-icon-wrapper">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/><polyline points="15 15 21 15 21 21"/></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Total Withdrawals</span>
+        <strong class="stat-val mono">{{ stats.totalWithdrawals | number:'1.2-2' }} KES</strong>
+      </div>
+    </div>
+
+    <div class="stat-card purple">
+      <div class="stat-icon-wrapper">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Total Volume</span>
+        <strong class="stat-val mono">{{ stats.totalVolume | number:'1.2-2' }} KES</strong>
+      </div>
+    </div>
+  </section>
+
+  <section *ngIf="error$ | async as error" class="error-banner">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="banner-icon"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span>{{ error }}</span>
+  </section>
+
+  <!-- TAB: GAME & ENGINE MONITOR (COMPACT SIMULTANEOUS VIEW) -->
+  <ng-container *ngIf="activeTab === 'monitor' || activeTab === 'game'">
+    <ng-container *ngIf="nextRound$ | async as nextRound">
+      <!-- TOP ROW: MINI GAME RADAR + NEXT CRASH HERO CARD -->
+      <section class="mini-console-grid">
+        <!-- LEFT: MINI GAME RADAR (MUTED & COMPACT FOR ADMIN) -->
+        <article class="panel mini-radar-panel">
+          <div class="panel-title-row">
+            <div class="panel-heading-group">
+              <span class="panel-kicker">Live Radar Stream</span>
+              <div class="title-with-room-badge">
+                <h3>Mini Game Flight View</h3>
+                <span class="room-stream-chip">Room #{{ selectedMiniRoom }}</span>
+              </div>
+            </div>
+
+            <div class="panel-action-group">
+              <div class="room-stream-switcher">
+                <button 
+                  type="button" 
+                  class="room-stream-btn" 
+                  [class.active]="selectedMiniRoom === 1" 
+                  (click)="switchMiniRoom(1)"
+                  title="Stream Room 1 Radar"
+                >
+                  <span class="stream-dot" [class.flying]="roomStatus(nextRound.rooms, 1)?.phase === 'flying'"></span>
+                  R1
+                </button>
+                <button 
+                  type="button" 
+                  class="room-stream-btn" 
+                  [class.active]="selectedMiniRoom === 2" 
+                  (click)="switchMiniRoom(2)"
+                  title="Stream Room 2 Radar"
+                >
+                  <span class="stream-dot" [class.flying]="roomStatus(nextRound.rooms, 2)?.phase === 'flying'"></span>
+                  R2
+                </button>
+                <button 
+                  type="button" 
+                  class="room-stream-btn" 
+                  [class.active]="selectedMiniRoom === 3" 
+                  (click)="switchMiniRoom(3)"
+                  title="Stream Room 3 Radar"
+                >
+                  <span class="stream-dot" [class.flying]="roomStatus(nextRound.rooms, 3)?.phase === 'flying'"></span>
+                  R3
+                </button>
+              </div>
+
+              <button type="button" class="action-btn outline-sm" (click)="backToGame()" title="Open Player Fullscreen Aviator Game">
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Fullscreen
+              </button>
+            </div>
+          </div>
+
+          <div class="mini-game-frame">
+            <app-aviator-game [isMiniView]="true" [muteAudio]="true" [activeRoom]="selectedMiniRoom"></app-aviator-game>
+          </div>
+
+          <!-- ROOMS TELEMETRY SUBGRID (FITS PERFECTLY IN SPACE BELOW MINIGAME) -->
+          <div class="rooms-overview-subgrid">
+            <div 
+              class="room-subcard" 
+              *ngFor="let rNum of [1, 2, 3]"
+              [class.current-stream]="selectedMiniRoom === rNum"
+              (click)="switchMiniRoom(rNum)"
+            >
+              <ng-container *ngIf="roomStatus(nextRound.rooms, rNum) as rs">
+                <div class="room-subcard-header">
+                  <div class="room-subcard-name">
+                    <span class="room-indicator-pip" [class.flying]="rs.phase === 'flying'" [class.crashed]="rs.phase === 'crashed'"></span>
+                    <strong>ROOM #{{ rNum }}</strong>
+                    <span *ngIf="selectedMiniRoom === rNum" class="live-stream-badge">LIVE</span>
+                  </div>
+                  <span class="room-phase-tag" [class]="'phase-' + rs.phase">{{ rs.phase }}</span>
+                </div>
+
+                <div class="room-subcard-body">
+                  <div class="room-subcard-metric">
+                    <span class="metric-label">NEXT CRASH</span>
+                    <strong class="metric-value-red mono">{{ formatMultiplier(rs.nextCrashPoint) }}</strong>
+                  </div>
+                  <div class="room-subcard-metric">
+                    <span class="metric-label">{{ rs.phase === 'flying' ? 'LIVE MULT' : 'STATUS' }}</span>
+                    <strong class="metric-value mono" [class.text-gold]="rs.phase === 'flying'">
+                      {{ rs.phase === 'flying' ? formatMultiplier(rs.multiplier) : (rs.phase === 'crashed' ? 'Crashed' : 'Betting') }}
+                    </strong>
+                  </div>
+                  <div class="room-subcard-metric">
+                    <span class="metric-label">ROUND</span>
+                    <span class="metric-sub mono">#{{ rs.roundId || '--' }}</span>
+                  </div>
+                  <div class="room-subcard-metric">
+                    <span class="metric-label">BETS</span>
+                    <span class="metric-sub mono">{{ rs.activeBets }}</span>
+                  </div>
+                </div>
+
+                <div class="room-subcard-footer">
+                  <span class="switch-stream-text">
+                    {{ selectedMiniRoom === rNum ? '● Watching Stream' : 'Click to stream' }}
+                  </span>
+                </div>
+              </ng-container>
+
+              <ng-container *ngIf="!roomStatus(nextRound.rooms, rNum)">
+                <div class="room-subcard-header">
+                  <div class="room-subcard-name">
+                    <span class="room-indicator-pip"></span>
+                    <strong>ROOM #{{ rNum }}</strong>
+                  </div>
+                  <span class="room-phase-tag">offline</span>
+                </div>
+                <div class="room-subcard-body">
+                  <div class="room-subcard-metric">
+                    <span class="metric-label">NEXT CRASH</span>
+                    <strong class="metric-value-red mono">--</strong>
+                  </div>
+                  <div class="room-subcard-metric">
+                    <span class="metric-label">STATUS</span>
+                    <span class="metric-sub mono">Connecting…</span>
+                  </div>
+                </div>
+              </ng-container>
+            </div>
+          </div>
+        </article>
+
+        <!-- RIGHT: NEXT CRASH HERO CARD (INDICATED IN BOLD RED) -->
+        <article class="panel hero-panel">
+          <div class="panel-title-row">
+            <div class="panel-heading-group">
+              <span class="panel-kicker">Next Round Pre-Calculation</span>
+              <h3>Next Crash Multiplier</h3>
+            </div>
+            <span class="status-chip" [class.running]="nextRound.status === 'Running'" [class.crashed]="nextRound.status === 'Crashed'">
+              {{ nextRound.status }}
+            </span>
+          </div>
+
+          <!-- NEXT CRASH VALUE (INDICATED IN BOLD BRIGHT RED) -->
+          <div class="next-crash-box">
+            <span class="next-crash-label">NEXT CRASH MULTIPLIER</span>
+            <div class="crash-value-red mono">{{ formatMultiplier(nextRound.nextCrashPoint) }}</div>
+          </div>
+          <!-- OVERRIDE & RESET CRASH POINT CONTROLS -->
+          <div class="crash-control-bar">
+            <span class="control-label">Override / Set Next Crash Multiplier:</span>
+            <div class="control-input-row">
+              <input
+                type="number"
+                step="0.05"
+                min="1.00"
+                max="1000.00"
+                [(ngModel)]="customCrashPoint"
+                class="styled-input-sm mono"
+                placeholder="2.00"
+              />
+              <button class="sm-btn primary" (click)="overrideCrashPoint()">Set Crash</button>
+              <button class="sm-btn warning" (click)="resetCrashPoint()" title="Regenerate random Provably Fair crash point">Reset</button>
+            </div>
+
+
+            <!-- QUICK PRESET BUTTONS -->
+            <div class="quick-preset-row">
+              <button class="preset-pill" (click)="quickSetCrashPoint(1.15)">1.15x</button>
+              <button class="preset-pill" (click)="quickSetCrashPoint(1.50)">1.50x</button>
+              <button class="preset-pill" (click)="quickSetCrashPoint(2.00)">2.00x</button>
+              <button class="preset-pill" (click)="quickSetCrashPoint(3.50)">3.50x</button>
+              <button class="preset-pill" (click)="quickSetCrashPoint(5.00)">5.00x</button>
+              <button class="preset-pill" (click)="quickSetCrashPoint(10.00)">10.00x</button>
+            </div>
+
+            <div *ngIf="overrideSuccessMsg" class="success-callout mono">
+              {{ overrideSuccessMsg }}
+            </div>
+          </div>
+
+          <!-- SECONDARY ROOMS: each gets the same next-crash window and set control -->
+          <div class="secondary-rooms">
+            <div class="secondary-room-panel" *ngFor="let room of secondaryRooms">
+              <ng-container *ngIf="roomStatus(nextRound.rooms, room) as rs">
+                <div class="secondary-room-head">
+                  <span class="secondary-room-title">ROOM {{ room }} — NEXT CRASH MULTIPLIER</span>
+                  <span class="room-crash-phase" [class]="'phase-' + rs.phase">{{ rs.phase }}</span>
+                </div>
+
+                <div class="crash-value-red mono">{{ formatMultiplier(rs.nextCrashPoint) }}</div>
+
+                <div class="secondary-room-meta">
+                  <span>Round #{{ rs.roundId ?? '--' }}</span>
+                  <span>{{ rs.activeBets }} bet{{ rs.activeBets === 1 ? '' : 's' }}</span>
+                  <span *ngIf="rs.phase === 'flying'" class="room-crash-live mono">live {{ formatMultiplier(rs.multiplier) }}</span>
+                </div>
+              </ng-container>
+
+              <ng-container *ngIf="!roomStatus(nextRound.rooms, room)">
+                <div class="secondary-room-head">
+                  <span class="secondary-room-title">ROOM {{ room }} — NEXT CRASH MULTIPLIER</span>
+                </div>
+                <div class="crash-value-red mono">--</div>
+                <div class="secondary-room-meta"><span>Waiting for engine…</span></div>
+              </ng-container>
+
+              <div class="control-input-row">
+                <input
+                  type="number"
+                  step="0.05"
+                  min="1.00"
+                  max="1000.00"
+                  [(ngModel)]="roomCrashInput[room]"
+                  class="styled-input-sm mono"
+                  placeholder="2.00"
+                />
+                <button class="sm-btn primary" (click)="overrideRoomCrash(room)">Set Crash</button>
+                <button class="sm-btn warning" (click)="resetRoomCrash(room)" title="Regenerate random Provably Fair crash point">Reset</button>
+              </div>
+
+              <div class="quick-preset-row">
+                <button class="preset-pill" (click)="quickSetRoomCrash(room, 1.15)">1.15x</button>
+                <button class="preset-pill" (click)="quickSetRoomCrash(room, 1.50)">1.50x</button>
+                <button class="preset-pill" (click)="quickSetRoomCrash(room, 2.00)">2.00x</button>
+                <button class="preset-pill" (click)="quickSetRoomCrash(room, 3.50)">3.50x</button>
+                <button class="preset-pill" (click)="quickSetRoomCrash(room, 5.00)">5.00x</button>
+                <button class="preset-pill" (click)="quickSetRoomCrash(room, 10.00)">10.00x</button>
+              </div>
+
+              <div *ngIf="roomOverrideMsg[room]" class="success-callout mono">
+                {{ roomOverrideMsg[room] }}
+              </div>
+            </div>
+          </div>
+
+          <dl class="detail-grid">
+            <div>
+              <dt>Round ID</dt>
+              <dd class="mono">#{{ nextRound.nextRoundId || '--' }}</dd>
+            </div>
+            <div>
+              <dt>Countdown</dt>
+              <dd class="highlight mono">{{ formatCountdown(nextRound.countdownMs) }}</dd>
+            </div>
+            <div>
+              <dt>Generated</dt>
+              <dd class="mono">{{ nextRound.generatedAt ? (nextRound.generatedAt | date:'mediumTime') : '--' }}</dd>
+            </div>
+            <div class="wide">
+              <dt>HMAC-SHA256 Hash</dt>
+              <dd class="mono text-truncate">{{ nextRound.hash || '--' }}</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <!-- BOTTOM ROW: ACTIVE LIABILITIES & PREVIOUS SETTLEMENT AUDIT -->
+      <section class="telemetry-bottom-grid margin-top">
+        <!-- CURRENT ROUND LIVE STATE MACHINE & LIABILITIES -->
+        <article class="panel current-panel" *ngIf="currentRound$ | async as currentRound">
+          <div class="panel-title-row">
+            <div class="panel-heading-group">
+              <span class="panel-kicker">Live Flight Engine</span>
+              <h3>Active Flight Status</h3>
+            </div>
+            <span class="status-chip" [class.running]="currentRound.status === 'Running'" [class.crashed]="currentRound.status === 'Crashed'">
+              {{ currentRound.status }}
+            </span>
+          </div>
+
+          <div class="stat-list-grid">
+            <div class="stat-box">
+              <span>Current Tick</span>
+              <strong class="mono text-gold">{{ currentRound.currentMultiplier | number:'1.2-2' }}x</strong>
+            </div>
+            <div class="stat-box">
+              <span>Active Stakes</span>
+              <strong class="mono">{{ currentRound.numberOfBets }} Bets</strong>
+            </div>
+            <div class="stat-box">
+              <span>Round Volume</span>
+              <strong class="mono">{{ currentRound.totalStake | number:'1.2-2' }} KES</strong>
+            </div>
+            <div class="stat-box">
+              <span>Est. Liability</span>
+              <strong class="mono">{{ currentRound.estimatedPayout | number:'1.2-2' }} KES</strong>
+            </div>
+          </div>
+        </article>
+
+        <!-- PREVIOUS ROUND SUMMARY -->
+        <article class="panel settlement-panel" *ngIf="previousRound$ | async as prev">
+          <div class="panel-title-row">
+            <div class="panel-heading-group">
+              <span class="panel-kicker">Settlement Audit</span>
+              <h3>Previous Round (#{{ prev.roundId || '--' }})</h3>
+            </div>
+            <span class="crash-badge mono" *ngIf="prev.crashPoint">{{ prev.crashPoint | number:'1.2-2' }}x</span>
+          </div>
+
+          <div class="summary-metrics-grid">
+            <div><span>Bets Placed:</span> <strong class="mono">{{ prev.totalBets }}</strong></div>
+            <div><span>Total Stake:</span> <strong class="mono">{{ prev.totalStake | number:'1.2-2' }} KES</strong></div>
+            <div><span>Total Payout:</span> <strong class="mono">{{ prev.totalPayout | number:'1.2-2' }} KES</strong></div>
+            <div><span>Winners:</span> <strong class="text-green mono">{{ prev.winnerCount }}</strong></div>
+            <div><span>Losses:</span> <strong class="text-red mono">{{ prev.loserCount }}</strong></div>
+          </div>
+        </article>
+      </section>
+    </ng-container>
+  </ng-container>
+
+  <!-- TAB: WITHDRAWAL SETTINGS -->
+  <ng-container *ngIf="activeTab === 'withdrawal-settings'">
+    <section class="panel withdrawal-rule-panel">
+      <div class="panel-title-row">
+        <div>
+          <h2>Withdrawal Settings & Global Default Notice</h2>
+          <p class="panel-desc">Configure automated withdrawal qualification parameters and default user-facing dispatch notices.</p>
+        </div>
+      </div>
+
+      <div class="withdrawal-settings-grid">
+        <div class="form-group">
+          <label for="withdrawalSettingsWagerRequirement">Minimum Total Wager Qualification (KES)</label>
+          <input
+            id="withdrawalSettingsWagerRequirement"
+            type="number"
+            min="0"
+            step="1"
+            class="styled-input"
+            [(ngModel)]="withdrawalWagerRequirement"
+            [disabled]="isSavingWithdrawalWagerRequirement"
+          />
+          <p class="template-help">Set to 0 to disable automated wager limit checks. Admin approval will still be required.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="withdrawalSettingsPopupTitle">Global Withdrawal Popup Title (Default)</label>
+          <input
+            id="withdrawalSettingsPopupTitle"
+            type="text"
+            maxlength="100"
+            class="styled-input"
+            [(ngModel)]="withdrawalInitiationTitle"
+            [disabled]="isSavingWithdrawalWagerRequirement"
+          />
+        </div>
+
+        <div class="form-group full-span">
+          <label for="withdrawalSettingsPopupMessage">Global Withdrawal Popup Message (Default Template)</label>
+          <textarea
+            id="withdrawalSettingsPopupMessage"
+            rows="5"
+            maxlength="2000"
+            class="styled-textarea"
+            [(ngModel)]="withdrawalInitiationMessage"
+            [disabled]="isSavingWithdrawalWagerRequirement"
+          ></textarea>
+          <p class="template-help">This default notice is displayed to players on withdrawal submission unless customized individually per player.</p>
+        </div>
+      </div>
+
+      <button class="action-btn primary margin-top" (click)="saveWithdrawalWagerRequirement()" [disabled]="isSavingWithdrawalWagerRequirement">
+        {{ isSavingWithdrawalWagerRequirement ? 'Saving Settings...' : 'Save Configuration' }}
+      </button>
+    </section>
+    <section class="panel withdrawal-rule-panel">
+      <div class="panel-title-row">
+        <div>
+          <h2>Deposit Settings</h2>
+          <p class="panel-desc">Set the smallest amount a player is allowed to deposit. This is enforced on the server for every M-Pesa STK push.</p>
+        </div>
+      </div>
+
+      <div class="withdrawal-settings-grid">
+        <div class="form-group">
+          <label for="depositSettingsMinimum">Minimum Deposit (KES)</label>
+          <input
+            id="depositSettingsMinimum"
+            type="number"
+            min="1"
+            max="1000000"
+            step="1"
+            class="styled-input"
+            [(ngModel)]="minimumDepositAmount"
+            [disabled]="isSavingMinimumDeposit"
+          />
+          <p class="template-help">Players are shown this amount in the deposit tab and any smaller request is rejected. Allowed range: 1 to 1,000,000 KES.</p>
+        </div>
+      </div>
+
+      <button class="action-btn primary margin-top" (click)="saveMinimumDeposit()" [disabled]="isSavingMinimumDeposit">
+        {{ isSavingMinimumDeposit ? 'Saving Minimum...' : 'Save Minimum Deposit' }}
+      </button>
+    </section>
+  </ng-container>
+
+  <!-- TAB: TRANSACTIONS (DEPOSITS & WITHDRAWALS) -->
+  <ng-container *ngIf="activeTab === 'transactions'">
+    <section class="panel">
+      <div class="panel-title-row flex-wrap">
+        <div>
+          <h2>{{ txTypeFilter === 'deposit' ? 'M-Pesa Deposits Ledger' : 'Withdrawal Transactions Ledger' }}</h2>
+          <p class="panel-desc" *ngIf="txTypeFilter === 'deposit'">
+            M-Pesa STK Push deposits verified against Safaricom callbacks.
+          </p>
+        </div>
+        
+        <div class="filter-controls">
+          <button *ngIf="txTypeFilter === 'deposit'" class="action-btn danger-outline" (click)="openResetDepositsModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            Reset Total Deposits
+          </button>
+
+          <div class="select-wrap">
+            <select [(ngModel)]="txStatusFilter" (change)="fetchTransactions()" class="styled-select">
+              <option value="all">All Statuses</option>
+              <option value="completed">Completed</option>
+              <option value="failed">Failed</option>
+              <option value="pending">Pending</option>
+            </select>
+          </div>
+
+          <div class="search-wrap">
+            <input type="text" [(ngModel)]="txSearchQuery" (keyup.enter)="fetchTransactions()" placeholder="Search username, phone..." class="styled-input" />
+            <button (click)="fetchTransactions()" class="action-btn">Search</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="transaction-type-tabs" role="tablist" aria-label="Transaction type">
+        <button type="button" [class.active]="txTypeFilter === 'deposit'" (click)="setTransactionType('deposit')">M-Pesa Deposits</button>
+        <button type="button" [class.active]="txTypeFilter === 'withdrawal'" (click)="setTransactionType('withdrawal')">Withdrawals</button>
+      </div>
+
+      <div class="table-responsive margin-top">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Account</th>
+              <th>Phone</th>
+              <th>Amount</th>
+              <th>Reference / Receipt</th>
+              <th>Status</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let tx of transactionsList">
+              <td class="mono text-muted">#{{ tx.id }}</td>
+              <td><strong>{{ tx.username }}</strong></td>
+              <td class="mono">{{ tx.phone_number || '--' }}</td>
+              <td><strong class="mono">{{ tx.amount | number:'1.2-2' }} KES</strong></td>
+              <td class="mono text-xs">{{ tx.reference || '--' }}</td>
+              <td>
+                <span class="status-badge" [class.completed]="tx.status === 'completed'" [class.failed]="tx.status === 'failed'" [class.pending]="tx.status === 'pending'">
+                  {{ tx.status | uppercase }}
+                </span>
+              </td>
+              <td class="mono text-xs">{{ tx.created_at | date:'medium' }}</td>
+            </tr>
+            <tr *ngIf="transactionsList.length === 0">
+              <td colspan="7" class="text-center padding-lg text-muted">No records found matching query.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </ng-container>
+
+  <!-- TAB: USER MANAGEMENT -->
+  <ng-container *ngIf="activeTab === 'users'">
+    <section class="panel">
+      <div class="panel-title-row flex-wrap">
+        <div>
+          <h2>User Accounts Registry</h2>
+          <p class="panel-desc">Manage customer accounts, wallet balances, and roles.</p>
+        </div>
+
+        <div class="filter-controls">
+          <select [(ngModel)]="roleFilter" (change)="fetchUsers()" class="styled-select">
+            <option value="all">All Roles</option>
+            <option value="user">Players</option>
+            <option value="admin">Admins</option>
+          </select>
+
+          <input type="text" [(ngModel)]="searchQuery" (keyup.enter)="fetchUsers()" placeholder="Search username..." class="styled-input" />
+          <button (click)="fetchUsers()" class="action-btn">Filter</button>
+          <button (click)="exportUsersCSV()" class="action-btn outline">Export CSV</button>
+        </div>
+      </div>
+
+      <div class="table-responsive margin-top">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Username</th>
+              <th>Phone</th>
+              <th>Role</th>
+              <th>Balance</th>
+              <th>Status</th>
+              <th>Withdrawal Popup</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let u of userList">
+              <td class="mono text-muted">#{{ u.id }}</td>
+              <td><strong>{{ u.username }}</strong></td>
+              <td class="mono">{{ u.phone_number || '--' }}</td>
+              <td>
+                <span class="role-badge" [class.superadmin]="u.role === 'superadmin'" [class.admin]="u.role === 'admin'">
+                  {{ u.role | uppercase }}
+                </span>
+              </td>
+              <td><strong class="mono">{{ u.balance | number:'1.2-2' }} KES</strong></td>
+              <td>
+                <span class="status-badge" [class.failed]="u.is_suspended" [class.completed]="!u.is_suspended">
+                  {{ u.is_suspended ? 'SUSPENDED' : 'ACTIVE' }}
+                </span>
+              </td>
+              <td>
+                <span *ngIf="u.has_custom_withdrawal_popup" class="status-badge completed text-xs" title="Custom withdrawal notice is configured for this player">
+                  CUSTOM
+                </span>
+                <span *ngIf="!u.has_custom_withdrawal_popup" class="status-badge text-muted text-xs" title="Player receives the global default withdrawal notice">
+                  DEFAULT
+                </span>
+                <button class="sm-btn primary font-semibold" (click)="openPlayerWithdrawalPopupModal(u)" title="Configure the popup shown when this player attempts a withdrawal">
+                  Set Withdrawal Popup
+                </button>
+              </td>
+              <td>
+                <div class="btn-group-sm">
+                  <button class="sm-btn" (click)="adjustBalance(u)" title="Adjust Wallet Balance">Balance</button>
+                  <button class="sm-btn warning" (click)="toggleSuspend(u)">{{ u.is_suspended ? 'Activate' : 'Suspend' }}</button>
+                  <button class="sm-btn info" (click)="resetPassword(u)" title="Reset Password">Password</button>
+                  <button *ngIf="isSuperAdmin && u.role === 'user'" class="sm-btn primary" (click)="setUserRole(u, 'admin')" [disabled]="isSettingRole === u.id" title="Promote to Admin">Promote</button>
+                  <button *ngIf="isSuperAdmin && u.role === 'admin'" class="sm-btn warning" (click)="setUserRole(u, 'user')" [disabled]="isSettingRole === u.id" title="Demote to User">Demote</button>
+                  <button class="sm-btn danger" (click)="deleteUser(u)" title="Delete Account">Delete</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </ng-container>
+
+  <!-- TAB: ADMINS MANAGEMENT (SUPERADMIN ONLY) -->
+  <ng-container *ngIf="activeTab === 'admins' && isSuperAdmin">
+    <section class="panel">
+      <div class="panel-title-row">
+        <div>
+          <h2>Staff & Administrator Accounts</h2>
+          <p class="panel-desc">Manage administrative roles with elevated console permissions.</p>
+        </div>
+        <button class="action-btn primary" (click)="showCreateAdminModal = true">+ Create Admin Account</button>
+      </div>
+
+      <div class="table-responsive margin-top">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Username</th>
+              <th>Phone</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Created Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let adm of adminsList">
+              <td class="mono text-muted">#{{ adm.id }}</td>
+              <td><strong>{{ adm.username }}</strong></td>
+              <td class="mono">{{ adm.phone_number || '--' }}</td>
+              <td>
+                <span class="role-badge" [class.superadmin]="adm.role === 'superadmin'" [class.admin]="adm.role === 'admin'">
+                  {{ adm.role | uppercase }}
+                </span>
+              </td>
+              <td>
+                <span class="status-badge completed">ACTIVE</span>
+              </td>
+              <td class="mono text-xs">{{ adm.created_at | date:'medium' }}</td>
+              <td>
+                <button *ngIf="adm.role !== 'superadmin'" class="sm-btn danger" (click)="deleteAdmin(adm)">Remove</button>
+                <span *ngIf="adm.role === 'superadmin'" class="text-muted text-xs">Superadmin</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CREATE ADMIN MODAL -->
+    <div *ngIf="showCreateAdminModal" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header-row">
+          <h3>Create Administrator Account</h3>
+          <button class="modal-close" (click)="showCreateAdminModal = false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div class="form-group margin-top">
+          <label>Username</label>
+          <input type="text" [(ngModel)]="newAdminUsername" placeholder="e.g. admin_ops" class="styled-input" />
+        </div>
+
+        <div class="form-group margin-top">
+          <label>Phone Number (Optional)</label>
+          <input type="text" [(ngModel)]="newAdminPhone" placeholder="e.g. +254712345678" class="styled-input" />
+        </div>
+
+        <div class="form-group margin-top">
+          <label>Password (Minimum 6 characters)</label>
+          <input type="password" [(ngModel)]="newAdminPassword" placeholder="••••••••" class="styled-input" />
+        </div>
+
+        <button class="action-btn primary margin-top full-width" (click)="createAdmin()">Provision Admin Account</button>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- TAB: ACTIVE PLAYERS & WITHDRAWALS -->
+  <ng-container *ngIf="activeTab === 'active-users'">
+    <!-- SECTION 1: PENDING WITHDRAWALS REVIEW -->
+    <section class="panel margin-bottom-lg">
+      <div class="panel-title-row">
+        <div>
+          <h2>Pending Withdrawals & Wager Verification</h2>
+          <p class="panel-desc">Review pending customer withdrawal requests against wager requirements.</p>
+        </div>
+        <button class="action-btn outline-sm" (click)="fetchActiveUsers()">Refresh Queue</button>
+      </div>
+
+      <div class="table-responsive margin-top">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Player</th>
+              <th>Requested Amount</th>
+              <th>Current Balance</th>
+              <th>Total Deposits</th>
+              <th>Total Wagers</th>
+              <th>Status</th>
+              <th>Presence</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let wd of pendingWithdrawalsList">
+              <td class="mono text-muted">#{{ wd.id }}</td>
+              <td>
+                <strong>{{ wd.username }}</strong>
+                <div class="text-xs mono text-muted">{{ wd.phone_number || '--' }}</div>
+              </td>
+              <td><strong class="text-gold mono">KES {{ wd.amount | number:'1.2-2' }}</strong></td>
+              <td class="mono">KES {{ wd.user_current_balance | number:'1.2-2' }}</td>
+              <td>
+                <span [class.text-green]="wd.user_total_deposits >= 2500" [class.text-red]="wd.user_total_deposits < 2500" class="mono font-bold">
+                  KES {{ wd.user_total_deposits | number:'1.2-2' }}
+                </span>
+                <div class="text-xs text-muted" *ngIf="wd.user_total_deposits < 2500">Below KES 2,500 threshold</div>
+              </td>
+              <td>
+                <span [class.text-green]="wd.user_total_wagers >= withdrawalWagerRequirement" [class.text-red]="wd.user_total_wagers < withdrawalWagerRequirement" class="mono font-bold">
+                  KES {{ wd.user_total_wagers | number:'1.2-2' }}
+                </span>
+                <div class="text-xs text-muted" *ngIf="wd.user_total_wagers < withdrawalWagerRequirement">Req: KES {{ withdrawalWagerRequirement | number:'1.2-2' }}</div>
+              </td>
+              <td><span class="status-badge pending">PENDING</span></td>
+              <td>
+                <span class="online-indicator" [class.online]="wd.is_online">
+                  <span class="indicator-dot"></span>
+                  {{ wd.is_online ? 'Online' : 'Offline' }}
+                </span>
+              </td>
+              <td>
+                <div class="btn-group-row">
+                  <button class="sm-btn success" (click)="openWithdrawalModal(wd, 'complete')">Approve</button>
+                  <button class="sm-btn danger" (click)="openWithdrawalModal(wd, 'reject')">Decline</button>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="pendingWithdrawalsList.length === 0 && !isLoadingActiveUsers">
+              <td colspan="9" class="text-center text-muted padding-lg">
+                No pending withdrawal requests in queue.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECTION 2: ACTIVE & ONLINE PLAYERS LIST WITH PER-PLAYER WITHDRAWAL POPUP -->
+    <section class="panel">
+      <div class="panel-title-row">
+        <div>
+          <h2>Active Players, Phone Numbers & Balances</h2>
+          <p class="panel-desc">All registered player accounts with live presence, balances, and individual custom withdrawal popups.</p>
+        </div>
+        <button class="action-btn outline-sm" (click)="fetchActiveUsers()">Refresh List</button>
+      </div>
+
+      <div class="table-responsive margin-top">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Player Username</th>
+              <th>Phone Number</th>
+              <th>Wallet Balance</th>
+              <th>Total Deposits</th>
+              <th>Total Wagers</th>
+              <th>Live Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let usr of activeUsersList">
+              <td class="mono text-muted">#{{ usr.id }}</td>
+              <td><strong>{{ usr.username }}</strong></td>
+              <td class="mono font-semibold">{{ usr.phone_number || '--' }}</td>
+              <td><strong class="text-green mono">KES {{ usr.balance | number:'1.2-2' }}</strong></td>
+              <td class="mono">KES {{ usr.total_deposits | number:'1.2-2' }}</td>
+              <td class="mono">KES {{ usr.total_wagers | number:'1.2-2' }}</td>
+              <td>
+                <span class="online-indicator" [class.online]="usr.is_online">
+                  <span class="indicator-dot"></span>
+                  {{ usr.is_online ? 'Online' : 'Offline' }}
+                </span>
+              </td>
+            </tr>
+            <tr *ngIf="activeUsersList.length === 0 && !isLoadingActiveUsers">
+              <td colspan="7" class="text-center text-muted padding-lg">
+                No customer accounts found.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </ng-container>
+
+  <!-- WITHDRAWAL POPUP MODAL — rendered at root so it opens from any tab.
+       It previously sat inside the active-users tab, so the Set Withdrawal
+       Popup button on the Users tab set the flag but rendered nothing. -->
+  <div *ngIf="showNotifyModal" class="modal-backdrop">
+    <div class="modal-card width-lg">
+      <div class="modal-header-row">
+        <h3>
+          <span *ngIf="notifActionType === 'complete'">Approve Withdrawal & Dispatch Notice</span>
+          <span *ngIf="notifActionType === 'reject'">Decline Withdrawal & Dispatch Notice</span>
+          <span *ngIf="notifActionType === 'custom'">Personal Withdrawal Popup — &#64;{{ selectedUserForNotif?.username }}</span>
+        </h3>
+        <button class="modal-close" (click)="closeNotifyModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="user-summary-box margin-top" *ngIf="selectedUserForNotif">
+        <div class="summary-line">
+          <span>Target Player: <strong>{{ selectedUserForNotif.username }}</strong></span>
+          <span>Phone: <strong class="mono">{{ selectedUserForNotif.phone_number || '--' }}</strong></span>
+        </div>
+        <div class="summary-line margin-top-xs">
+          <span>Current Balance: <strong class="text-green mono">KES {{ getSelectedUserBalance() | number:'1.2-2' }}</strong></span>
+          <span>Total Deposits: <strong class="mono">KES {{ getSelectedUserDeposits() | number:'1.2-2' }}</strong></span>
+          <span>Total Wagers: <strong class="mono">KES {{ getSelectedUserWagers() | number:'1.2-2' }}</strong></span>
+        </div>
+      </div>
+
+      <div *ngIf="notifActionType === 'custom'" class="notice-info-callout margin-top">
+        <p class="template-help">
+          This custom message will <strong>ONLY appear when this specific player clicks or submits Withdrawal</strong> in their game wallet. If not set or cleared, the player will see the <strong>global default withdrawal notice</strong>.
+        </p>
+      </div>
+
+      <div class="form-group margin-top">
+        <label>Withdrawal Popup Title</label>
+        <input type="text" [(ngModel)]="notifTitle" class="styled-input" placeholder="e.g. Withdrawal Notice" />
+      </div>
+
+      <div class="form-group margin-top">
+        <label>Withdrawal Popup Message (Shown when this player attempts withdrawal)</label>
+        <textarea 
+          [(ngModel)]="notifMessage" 
+          rows="4" 
+          class="styled-textarea" 
+          placeholder="Enter custom withdrawal requirement or notice for this player..."
+        ></textarea>
+      </div>
+
+      <!-- MODAL ACTION BUTTONS -->
+      <div class="modal-actions-row margin-top-lg">
+        <button type="button" class="action-btn outline" (click)="closeNotifyModal()" [disabled]="isSendingNotif">Cancel</button>
+
+        <!-- FOR PENDING WITHDRAWAL APPROVAL/REJECTION -->
+        <button 
+          *ngIf="notifActionType === 'complete' || notifActionType === 'reject'"
+          type="button"
+          class="action-btn" 
+          [class.success]="notifActionType === 'complete'" 
+          [class.danger]="notifActionType === 'reject'"
+          (click)="submitNotificationAction()" 
+          [disabled]="isSendingNotif"
+        >
+          {{ isSendingNotif ? 'Processing...' : (notifActionType === 'complete' ? 'Confirm Approval' : 'Confirm Decline') }}
+        </button>
+
+        <!-- FOR PERSONAL WITHDRAWAL POPUP CONFIGURATION -->
+        <button 
+          *ngIf="notifActionType === 'custom' && isSelectedUserCustomPopupActive()"
+          type="button"
+          class="action-btn danger-outline"
+          (click)="clearPersonalWithdrawalPopup()"
+          [disabled]="isSendingNotif"
+          title="Remove custom popup so this player uses the global default notice"
+        >
+          Reset to Global Default
+        </button>
+
+        <button 
+          *ngIf="notifActionType === 'custom'"
+          type="button"
+          class="action-btn primary"
+          (click)="savePersonalWithdrawalPopup(true)"
+          [disabled]="isSendingNotif"
+        >
+          {{ isSendingNotif ? 'Saving...' : 'Save Personal Popup' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: AUDIT LOGS -->
+  <ng-container *ngIf="activeTab === 'logs'">
+    <section class="panel">
+      <div class="panel-title-row">
+        <div>
+          <h2>System Audit Trail</h2>
+          <p class="panel-desc">Immutable chronological log of all administrator operations and balance adjustments.</p>
+        </div>
+      </div>
+
+      <div class="table-responsive margin-top">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Administrator</th>
+              <th>Action Key</th>
+              <th>Operation Details</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let l of adminLogs">
+              <td class="mono text-muted">#{{ l.id }}</td>
+              <td><strong>{{ l.admin_username }}</strong></td>
+              <td><span class="action-tag mono">{{ l.action }}</span></td>
+              <td>{{ l.details }}</td>
+              <td class="mono text-xs">{{ l.created_at | date:'medium' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </ng-container>
+
+  <!-- RESET TOTAL DEPOSITS MODAL -->
+  <div *ngIf="showResetDepositsModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header-row">
+        <h3>Reset Total Deposits Ledger</h3>
+        <button class="modal-close" (click)="closeResetDepositsModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-body margin-top">
+        <div class="warning-callout">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="callout-icon"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div>
+            <strong>Reset Total Deposits table to 0.00 KES?</strong>
+            <p>This will reset the total deposits counter back to <strong>0.00 KES</strong> and clear deposit logs. Live M-Pesa STK deposits will continue operating normally.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions-row margin-top-lg">
+        <button class="action-btn outline" (click)="closeResetDepositsModal()" [disabled]="isResettingDeposits">Cancel</button>
+        <button class="action-btn danger" (click)="confirmResetDeposits()" [disabled]="isResettingDeposits">
+          {{ isResettingDeposits ? 'Resetting...' : 'Confirm Reset' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PREMIUM CUSTOM CONFIRMATION MODAL -->
+  <div *ngIf="confirmModal.isOpen" class="modal-backdrop" (click)="closeConfirmDialog(false)">
+    <div class="modal-card custom-dialog-card" (click)="$event.stopPropagation()">
+      <div class="modal-header-row">
+        <div class="dialog-title-group">
+          <div class="dialog-icon-badge" [class.danger]="confirmModal.type === 'danger'" [class.warning]="confirmModal.type === 'warning'" [class.primary]="confirmModal.type === 'primary'">
+            <svg *ngIf="confirmModal.type === 'danger'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            <svg *ngIf="confirmModal.type === 'warning'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <svg *ngIf="confirmModal.type === 'primary'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <h3>{{ confirmModal.title }}</h3>
+        </div>
+        <button class="modal-close" (click)="closeConfirmDialog(false)">&times;</button>
+      </div>
+
+      <div class="modal-body margin-top">
+        <p class="dialog-message">{{ confirmModal.message }}</p>
+      </div>
+
+      <div class="modal-actions-row margin-top-lg">
+        <button class="action-btn outline" (click)="closeConfirmDialog(false)">{{ confirmModal.cancelText }}</button>
+        <button class="action-btn" [class.danger]="confirmModal.type === 'danger'" [class.warning]="confirmModal.type === 'warning'" [class.primary]="confirmModal.type === 'primary'" (click)="closeConfirmDialog(true)">
+          {{ confirmModal.confirmText }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PREMIUM CUSTOM PROMPT MODAL -->
+  <div *ngIf="promptModal.isOpen" class="modal-backdrop" (click)="closePromptDialog(false)">
+    <div class="modal-card custom-dialog-card" (click)="$event.stopPropagation()">
+      <div class="modal-header-row">
+        <h3>{{ promptModal.title }}</h3>
+        <button class="modal-close" (click)="closePromptDialog(false)">&times;</button>
+      </div>
+
+      <div class="modal-body margin-top">
+        <p class="dialog-message">{{ promptModal.message }}</p>
+        <div class="form-group margin-top">
+          <input
+            [type]="promptModal.inputType"
+            class="styled-input full-width"
+            [(ngModel)]="promptModal.value"
+            [placeholder]="promptModal.placeholder"
+            (keydown.enter)="closePromptDialog(true)"
+            #promptInput
+            autofocus
+          />
+        </div>
+      </div>
+
+      <div class="modal-actions-row margin-top-lg">
+        <button class="action-btn outline" (click)="closePromptDialog(false)">Cancel</button>
+        <button class="action-btn primary" (click)="closePromptDialog(true)">
+          {{ promptModal.confirmText }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PREMIUM FLOATING GLASS TOAST NOTIFICATION -->
+  <div *ngIf="adminToast" class="admin-toast-pill" [class.success]="adminToast.type === 'success'" [class.error]="adminToast.type === 'error'" [class.info]="adminToast.type === 'info'" role="alert">
+    <div class="toast-indicator-dot"></div>
+    <div class="toast-content-group">
+      <strong class="toast-title">{{ adminToast.title }}</strong>
+      <span class="toast-desc">{{ adminToast.message }}</span>
+    </div>
+    <button class="toast-dismiss-btn" (click)="adminToast = null" aria-label="Dismiss">&times;</button>
+  </div>
+</main>

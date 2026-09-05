@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320" role="img">
+  <defs>
+    <filter id="soft" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+<radialGradient id="nbg" cx="50%" cy="54%" r="74%"><stop offset="0%" stop-color="#301004"/><stop offset="100%" stop-color="#060302"/></radialGradient>
+   <linearGradient id="flame1" x1="0%" y1="100%" x2="0%" y2="0%"><stop offset="0%" stop-color="#dc2626"/><stop offset="60%" stop-color="#f97316"/><stop offset="100%" stop-color="#fb923c"/></linearGradient>
+   <linearGradient id="flame2" x1="0%" y1="100%" x2="0%" y2="0%"><stop offset="0%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#fde047"/></linearGradient>
+  </defs>
+  <rect width="320" height="320" rx="16" fill="url(#nbg)"/>
+<g transform="translate(160 116) scale(0.7890) translate(-160 -135)">
+    <g filter="url(#soft)">
+      <path d="M160 30 C196 92 232 116 232 168 a72 72 0 0 1 -144 0 C88 124 124 106 160 30 Z" fill="url(#flame1)"/>
+      <path d="M160 96 C182 136 200 152 200 178 a40 40 0 0 1 -80 0 C120 156 140 140 160 96 Z" fill="url(#flame2)"/>
+      <path d="M160 148 C170 168 176 176 176 188 a16 16 0 0 1 -32 0 C144 176 152 168 160 148 Z" fill="#fffbeb"/>
+    </g></g><text x="160" y="248" text-anchor="middle" font-family="Impact,'Arial Black','Haettenschweiler',sans-serif" font-size="44" fill="#ffffff" >LIGI<tspan fill='#f97316'>NARE</tspan></text><rect x="116" y="262" width="88" height="7" rx="3.5" fill="#f97316"/><rect x="132" y="274" width="56" height="7" rx="3.5" fill="#f97316"/>
+</svg>

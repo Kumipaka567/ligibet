@@ -1,0 +1,345 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #0b140f;
+  color: #f1f5f9;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.ligibet-auth-viewport {
+  min-height: 100vh;
+  background: radial-gradient(circle at 50% 15%, #13271d 0%, #0b140f 75%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px 16px;
+  box-sizing: border-box;
+}
+
+.auth-mobile-container {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+/* MAIN CONTENT */
+.auth-main-content {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* BRAND LOGO */
+.brand-header {
+  text-align: center;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.brand-logo-badge {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  border: 1.5px solid rgba(246, 197, 111, 0.4);
+  margin-bottom: 10px;
+  background: #0d1712;
+}
+
+.brand-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.brand-title {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin: 0 0 4px 0;
+  line-height: 1.1;
+}
+
+.brand-ligi {
+  color: #f6c56f;
+}
+
+.brand-bet {
+  color: #48c79c;
+}
+
+.brand-tagline {
+  color: #8cb9a3;
+  font-size: 13.5px;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* VERIFICATION CARD */
+.verification-card {
+  background: #132219;
+  border: 1px solid #233b2c;
+  border-radius: 20px;
+  padding: 26px 20px;
+  box-sizing: border-box;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+.card-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.security-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(27, 163, 115, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  color: #34d399;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+}
+
+.security-badge.is-verified {
+  background: rgba(246, 197, 111, 0.15);
+  border-color: rgba(246, 197, 111, 0.5);
+  color: #f6c56f;
+}
+
+.verification-heading {
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 8px 0;
+}
+
+.verification-subtext {
+  font-size: 13.5px;
+  color: #94a3b8;
+  margin: 0 0 6px 0;
+  line-height: 1.4;
+}
+
+.phone-number-display {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f6c56f;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+/* REALISTIC INCOMING SMS NOTIFICATION PILL */
+.sms-notification-pill {
+  background: #1a2f23;
+  border: 1px solid #2d4f3b;
+  border-left: 4px solid #f6c56f;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 22px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  animation: slideInDown 0.3s ease;
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sms-pill-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.sms-sender-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sms-dot {
+  width: 7px;
+  height: 7px;
+  background: #34d399;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #34d399;
+}
+
+.sms-sender {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #f6c56f;
+  letter-spacing: 0.2px;
+}
+
+.sms-time {
+  font-size: 11px;
+  color: #7aa390;
+}
+
+.sms-body-text {
+  margin: 0;
+  font-size: 13px;
+  color: #cbd5e1;
+  line-height: 1.45;
+}
+
+.sms-code-highlight {
+  color: #f6c56f;
+  font-weight: 800;
+  font-size: 14.5px;
+  letter-spacing: 2px;
+  background: rgba(246, 197, 111, 0.15);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* 6 OTP INPUT DIGITS */
+.otp-inputs-wrapper {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.otp-digit-cell {
+  height: 56px;
+  background: #0e1a13;
+  border: 1.5px solid #284433;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.otp-digit-cell.is-active {
+  border-color: #f6c56f;
+  box-shadow: 0 0 12px rgba(246, 197, 111, 0.3);
+  background: #13241a;
+}
+
+.otp-digit-cell.is-filled {
+  border-color: #3d6a50;
+  background: #112117;
+}
+
+.otp-digit-cell.is-verified {
+  border-color: #34d399;
+  background: rgba(52, 211, 153, 0.12);
+}
+
+.digit-text {
+  font-size: 24px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.otp-digit-cell.is-verified .digit-text {
+  color: #34d399;
+}
+
+.cursor-blink {
+  width: 2px;
+  height: 24px;
+  background: #f6c56f;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* VERIFICATION ACTIONS */
+.verification-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.status-spinner-circle {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(246, 197, 111, 0.2);
+  border-top-color: #f6c56f;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.countdown-row {
+  text-align: center;
+}
+
+.countdown-text {
+  font-size: 12.5px;
+  color: #7aa390;
+}
+
+.timer-digits {
+  color: #f6c56f;
+}
+
+/* ACTION BUTTON */
+.btn-verify-action {
+  width: 100%;
+  height: 48px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1c3024;
+  color: #7aa390;
+  transition: all 0.2s ease;
+}
+
+.btn-verify-action.is-verified {
+  background: linear-gradient(135deg, #f8bf72 0%, #e6a855 100%);
+  color: #0b140f;
+  box-shadow: 0 4px 18px rgba(248, 191, 114, 0.4);
+  cursor: pointer;
+}
+
+.btn-verify-action.is-verified:hover {
+  background: linear-gradient(135deg, #fad08d 0%, #f6b661 100%);
+  transform: translateY(-1px);
+}

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320" role="img">
+  <defs>
+    <filter id="soft" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+<radialGradient id="xbg" cx="42%" cy="32%" r="82%"><stop offset="0%" stop-color="#511f84"/><stop offset="100%" stop-color="#090515"/></radialGradient>
+   <linearGradient id="xtr" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#e879f9" stop-opacity="0"/><stop offset="100%" stop-color="#e879f9"/></linearGradient>
+  </defs>
+  <rect width="320" height="320" rx="16" fill="url(#xbg)"/>
+<g transform="translate(160 116) scale(0.9760) translate(15 0)">
+    <path d="M-136 70 C-72 60 -18 26 40 -46" stroke="url(#xtr)" stroke-width="13" fill="none" stroke-linecap="round"/>
+    <g transform="rotate(-29)" filter="url(#soft)">
+      <path d="M-88 0 L30 -13 L78 -2 L78 2 L30 13 L-88 0 Z" fill="#f5d0fe"/>
+      <path d="M-22 -5 L-70 -62 L-42 -64 L14 -7 Z" fill="#e879f9"/>
+      <path d="M-22 5 L-70 62 L-42 64 L14 7 Z" fill="#c026d3"/>
+      <path d="M-82 -1 L-110 -18 L-104 5 Z" fill="#e879f9"/>
+      <circle cx="44" cy="0" r="6" fill="#2b0a3d"/>
+    </g></g><text x="160" y="246" text-anchor="middle" font-family="Impact,'Arial Black','Haettenschweiler',sans-serif" font-size="42" fill="#f5d0fe" >AVIATRIX</text><rect x="116" y="260" width="88" height="7" rx="3.5" fill="#e879f9"/><rect x="132" y="272" width="56" height="7" rx="3.5" fill="#e879f9"/>
+</svg>

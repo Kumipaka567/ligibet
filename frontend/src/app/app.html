@@ -1,0 +1,73 @@
+<router-outlet></router-outlet>
+
+<!-- FLOATING LIGIBET APP DOWNLOAD PROMPT -->
+<aside 
+  *ngIf="showDownloadPrompt() && !isPromptFreeRoute()"
+  class="ligibet-floating-download" 
+  [class.is-downloading]="isDownloading()"
+  role="complementary" 
+  aria-label="Download LigiBet App"
+>
+  <div class="download-card-wrapper">
+    <!-- Close button -->
+    <button type="button" class="btn-dismiss-app" (click)="dismissPrompt()" aria-label="Close download prompt">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+
+    <!-- App Logo Icon -->
+    <div class="app-icon-container">
+      <img 
+        src="/assets/images/ligibet-logo.png" 
+        alt="LigiBet App Icon" 
+        class="app-icon-img"
+        onerror="this.src='/favicon.svg'"
+      />
+      <div class="app-icon-glow"></div>
+    </div>
+
+    <!-- App Info Details -->
+    <div class="app-details-column">
+      <div class="app-header-row">
+        <span class="app-name"><span class="name-ligi">Ligi</span><span class="name-bet">Bet</span> App</span>
+        <span class="badge-official">OFFICIAL</span>
+      </div>
+      <div class="app-rating-row">
+        <span class="stars">★★★★★</span>
+        <span class="rating-val">4.8</span>
+        <span class="app-size">• 15MB • Free</span>
+      </div>
+      <p class="app-benefits-text">Faster Aviator • 0% Data • Instant Payouts</p>
+    </div>
+
+    <!-- Download CTA Button -->
+    <button 
+      type="button" 
+      class="btn-download-app" 
+      (click)="downloadApp()" 
+      [disabled]="isDownloading()"
+      title="Download LigiBet App & Save to Home Screen"
+    >
+      <span *ngIf="!isDownloading()" class="btn-content">
+        <svg class="download-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span>Download</span>
+      </span>
+      <span *ngIf="isDownloading()" class="btn-content downloading-state">
+        <span class="spinner-app-dl"></span>
+        <span>Downloading...</span>
+      </span>
+    </button>
+  </div>
+
+  <!-- iOS Safari Add to Home Screen Instructions Tooltip -->
+  <div *ngIf="showIosGuide()" class="ios-install-guide">
+    <p>To save to your Home Screen: Tap <strong>Share <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></strong> at the bottom of Safari, then choose <strong>"Add to Home Screen ⊞"</strong>.</p>
+    <button type="button" class="btn-got-it" (click)="dismissPrompt()">Got It</button>
+  </div>
+</aside>

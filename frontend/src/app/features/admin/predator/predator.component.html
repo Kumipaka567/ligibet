@@ -1,0 +1,82 @@
+<div class="predator-page">
+  <header class="predator-header">
+    <div class="header-identity">
+      <div class="predator-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="12" r="9" />
+          <circle cx="12" cy="12" r="3.4" />
+          <line x1="12" y1="1.5" x2="12" y2="5" />
+          <line x1="12" y1="19" x2="12" y2="22.5" />
+          <line x1="1.5" y1="12" x2="5" y2="12" />
+          <line x1="19" y1="12" x2="22.5" y2="12" />
+        </svg>
+      </div>
+      <div>
+        <h1>Predator</h1>
+        <p>Live next-crash readout for rooms 1 to 3</p>
+      </div>
+    </div>
+
+    <div class="header-status">
+      <span class="link-pill" [class.online]="isConnected()">
+        <span class="link-dot"></span>
+        {{ isConnected() ? 'Engine linked' : 'Reconnecting' }}
+      </span>
+      <button type="button" class="back-btn" (click)="backToDashboard()">Admin dashboard</button>
+    </div>
+  </header>
+
+  <p class="predator-error" *ngIf="connectionError()">{{ connectionError() }}</p>
+
+  <section class="room-grid">
+    <article
+      class="room-card"
+      *ngFor="let room of rooms(); trackBy: trackByRoom"
+      [class.is-offline]="!room.live"
+      [attr.data-phase]="room.phase">
+
+      <div class="room-card-top">
+        <div class="room-name">
+          <span class="room-number">Room {{ room.room }}</span>
+          <span class="room-kind">{{ room.isPrimary ? 'Primary engine' : 'Secondary engine' }}</span>
+        </div>
+        <span class="phase-chip" [attr.data-phase]="room.phase">{{ phaseLabel(room.phase) }}</span>
+      </div>
+
+      <div class="crash-readout" [attr.data-band]="crashBand(room.nextCrashPoint)">
+        <span class="crash-caption">Next crash point</span>
+        <span class="crash-value" *ngIf="room.nextCrashPoint !== null">
+          {{ room.nextCrashPoint | number: '1.2-2' }}<span class="crash-x">x</span>
+        </span>
+        <span class="crash-value pending" *ngIf="room.nextCrashPoint === null">—</span>
+        <span class="crash-band">{{ bandLabel(room.nextCrashPoint) }}</span>
+      </div>
+
+      <dl class="room-meta">
+        <div>
+          <dt>Live multiplier</dt>
+          <dd>{{ room.multiplier | number: '1.2-2' }}x</dd>
+        </div>
+        <div>
+          <dt>Round</dt>
+          <dd>{{ room.roundId !== null ? '#' + room.roundId : '—' }}</dd>
+        </div>
+        <div>
+          <dt>Active bets</dt>
+          <dd>{{ room.activeBets }}</dd>
+        </div>
+      </dl>
+
+      <p class="room-offline-note" *ngIf="!room.live">Awaiting the first report from this room's engine.</p>
+    </article>
+  </section>
+
+  <footer class="predator-footer">
+    <span>{{ totalActiveBets() }} active bet(s) across all three rooms</span>
+    <span *ngIf="lastUpdate()">Updated {{ lastUpdate() | date: 'HH:mm:ss' }}</span>
+  </footer>
+
+  <p class="predator-note">
+    Read-only view. Crash points are set and reset from the admin dashboard.
+  </p>
+</div>
