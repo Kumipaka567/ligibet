@@ -4556,3 +4556,44 @@
 
 
 
+
+/* Deposit lockout countdown. Amber rather than red: the player has not done
+   anything wrong and the wait is short, so this reads as a pause, not a ban. */
+.deposit-cooldown-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+
+  .deposit-cooldown-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .deposit-cooldown-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #fbbf24;
+  }
+
+  .deposit-cooldown-timer {
+    font-size: 1.35rem;
+    font-weight: 800;
+    line-height: 1;
+    color: #fbbf24;
+    /* Tabular figures stop the row shifting as the digits change each second. */
+    font-variant-numeric: tabular-nums;
+  }
+
+  .deposit-cooldown-sub {
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.65);
+  }
+}

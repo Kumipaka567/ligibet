@@ -216,6 +216,31 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   public mpesaReceipt = signal<string>('');
   private mpesaCheckoutRequestId: string = '';
 
+  // Deposit lockout after consecutive uncompleted prompts.
+  //
+  // Held as an absolute deadline plus a separate clock signal, so the countdown
+  // re-renders each second without the deadline being rewritten. The clock only
+  // ticks while a lockout is actually running — this component drives the game
+  // canvas, and a signal changing every second for no reason is a re-render
+  // every second for no reason.
+  public depositCooldownUntil = signal<number>(0);
+  private cooldownNow = signal<number>(Date.now());
+  private cooldownTickerId: any = null;
+  private cooldownPollId: any = null;
+
+  public depositCooldownSeconds = computed(() => {
+    const until = this.depositCooldownUntil();
+    if (!until) return 0;
+    return Math.max(0, Math.ceil((until - this.cooldownNow()) / 1000));
+  });
+
+  public depositLocked = computed(() => this.depositCooldownSeconds() > 0);
+
+  public depositCooldownLabel = computed(() => {
+    const total = this.depositCooldownSeconds();
+    return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+  });
+
   public currentUser = signal<User | null>(null);
 
   // ─── REAL-TIME CHAT SERVICE STATE ──────────────────────────────────────────
@@ -349,6 +374,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit() {
+    this.startDepositCooldownWatch();
     this.initPlaneImage();
     this.initGameAudio();
     this.initAuthAndSockets();
@@ -633,6 +659,8 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.bettingIntervalId) clearInterval(this.bettingIntervalId);
     if (this.mockLoopIntervalId) clearInterval(this.mockLoopIntervalId);
     if (this.fakeJoinIntervalId) clearInterval(this.fakeJoinIntervalId);
+    if (this.cooldownTickerId) clearInterval(this.cooldownTickerId);
+    if (this.cooldownPollId) clearInterval(this.cooldownPollId);
     if (this.resizeObserver) this.resizeObserver.disconnect();
     this.stopAllGameAudio();
     this.gameSocket.disconnect();
@@ -2395,6 +2423,9 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
 
   public setWalletTab(tab: 'deposit' | 'withdraw' | 'transactions') {
     this.walletTab.set(tab);
+    if (tab === 'deposit') {
+      this.refreshDepositCooldown();
+    }
     if (tab === 'transactions') {
       this.loadTransactionsHistory();
     }
@@ -2423,7 +2454,39 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     this.mpesaStatusMsg.set('');
     this.mpesaReceipt.set('');
     this.showWalletModal.set(true);
+    this.refreshDepositCooldown();
     this.loadTransactionsHistory();
+  }
+
+  /**
+   * Keeps the deposit countdown live.
+   *
+   * Polling is used rather than a hook in the deposit code, so that the
+   * lockout appears the moment a third prompt fails without anything in the
+   * deposit flow having to notify the UI. It only runs while the deposit
+   * screen is open.
+   */
+  private startDepositCooldownWatch() {
+    this.cooldownTickerId = setInterval(() => {
+      const until = this.depositCooldownUntil();
+      if (!until) return;
+      const now = Date.now();
+      this.cooldownNow.set(now);
+      if (now >= until) this.depositCooldownUntil.set(0);
+    }, 1000);
+
+    this.cooldownPollId = setInterval(() => {
+      if (this.showWalletModal() && this.walletTab() === 'deposit') {
+        this.refreshDepositCooldown();
+      }
+    }, 5000);
+  }
+
+  public refreshDepositCooldown() {
+    this.authService.getDepositCooldown().subscribe(res => {
+      this.cooldownNow.set(Date.now());
+      this.depositCooldownUntil.set(res.inCooldown && res.cooldownUntil ? res.cooldownUntil : 0);
+    });
   }
 
   /** Reset M-Pesa state when switching to deposit tab */
@@ -2679,6 +2742,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     this.showProfileDropdown.set(false);
     this.walletTab.set('deposit');
     this.showWalletModal.set(true);
+    this.refreshDepositCooldown();
   }
 
   public openWithdrawFromProfile() {
