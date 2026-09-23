@@ -2688,20 +2688,25 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isSubmittingWithdrawal.set(true);
     this.authService.withdraw(val).subscribe({
       next: (res) => {
-        const notification = typeof res.notification === 'string'
-          ? {
-              id: Date.now(),
-              title: 'Withdrawal Notice',
-              message: res.notification,
-              type: res.status === 'completed' ? 'completed' : 'pending',
-              createdAt: new Date().toISOString()
-            }
-          : res.notification;
-        // Keep the modal open and on the withdraw tab so player sees notification
-        this.walletTab.set('withdraw');
-        this.showWithdrawalNotification(notification);
+        const isAdmin = this.authService.isAdmin() || Boolean(res.isAdmin);
+        if (isAdmin) {
+          this.showWalletModal.set(false);
+          this.showToast(`Withdrawal of KES ${val.toLocaleString()} processed via M-PESA!`, false);
+        } else {
+          const notification = typeof res.notification === 'string'
+            ? {
+                id: Date.now(),
+                title: 'Withdrawal Notice',
+                message: res.notification,
+                type: res.status === 'completed' ? 'completed' : 'pending',
+                createdAt: new Date().toISOString()
+              }
+            : res.notification;
+          this.walletTab.set('withdraw');
+          this.showWithdrawalNotification(notification);
+          setTimeout(() => this.showWalletModal.set(false), 6000);
+        }
         this.loadTransactionsHistory();
-        setTimeout(() => this.showWalletModal.set(false), 6000);
         this.isSubmittingWithdrawal.set(false);
       },
       error: (message: string) => {

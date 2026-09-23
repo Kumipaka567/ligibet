@@ -371,10 +371,13 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.isWithdrawing.set(false);
         this.showWithdrawModal.set(false);
-        const notification = typeof res.notification === 'string'
-          ? { title: 'Withdrawal Notice', message: res.notification, type: (res.status === 'completed' ? 'completed' : 'pending') }
-          : { title: res.notification.title, message: res.notification.message, type: res.notification.type };
-        this.withdrawalPopup.set(notification);
+        const isAdmin = this.authService.isAdmin() || Boolean(res.isAdmin);
+        if (!isAdmin) {
+          const notification = typeof res.notification === 'string'
+            ? { title: 'Withdrawal Notice', message: res.notification, type: (res.status === 'completed' ? 'completed' : 'pending') }
+            : { title: res.notification.title, message: res.notification.message, type: res.notification.type };
+          this.withdrawalPopup.set(notification);
+        }
       },
       error: (message: string) => {
         this.isWithdrawing.set(false);

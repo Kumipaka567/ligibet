@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnDestroy, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, effect, inject, signal } from '@angular/core';
 import { WithdrawalNotice, WithdrawalNoticeService } from '../../core/services/withdrawal-notice.service';
 
 /**
@@ -119,7 +119,7 @@ import { WithdrawalNotice, WithdrawalNoticeService } from '../../core/services/w
   styles: [`
     .wn-wrap {
       position: fixed;
-      z-index: 99999;
+      z-index: 99999999 !important;
       top: 0;
       left: 0;
       right: 0;
@@ -140,15 +140,15 @@ import { WithdrawalNotice, WithdrawalNoticeService } from '../../core/services/w
     .wn-card {
       pointer-events: auto;
       width: 100%;
-      max-width: 430px;
+      max-width: 440px;
       box-sizing: border-box;
       padding: 14px 16px 13px;
       border-radius: 28px;
       background: #1f2227;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 0 16px 42px rgba(0, 0, 0, 0.75), 0 2px 8px rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 16px 42px rgba(0, 0, 0, 0.85), 0 2px 8px rgba(0, 0, 0, 0.55);
       color: #e3e6eb;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Google Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       cursor: pointer;
       user-select: none;
       transition: max-height .25s ease;
@@ -333,11 +333,12 @@ import { WithdrawalNotice, WithdrawalNoticeService } from '../../core/services/w
 })
 export class WithdrawalNoticeComponent implements OnDestroy {
   readonly notices = inject(WithdrawalNoticeService);
+  private readonly cdr = inject(ChangeDetectorRef);
   readonly visible = signal(false);
   readonly expanded = signal(false);
 
-  /** Let the withdrawal action complete before the SMS pops down. */
-  private static readonly ENTER_DELAY_MS = 2500;
+  /** Let the withdrawal action trigger smoothly and appear quickly */
+  private static readonly ENTER_DELAY_MS = 350;
   /** How long it stays on screen before sliding back up. */
   private static readonly DWELL_MS = 15000;
   /** Must outlast the slide-out transition. */
@@ -354,12 +355,16 @@ export class WithdrawalNoticeComponent implements OnDestroy {
       if (!notice) {
         this.visible.set(false);
         this.expanded.set(false);
+        this.cdr.markForCheck();
         return;
       }
       this.visible.set(false);
       this.expanded.set(false);
+      this.cdr.markForCheck();
+
       this.enterTimer = setTimeout(() => {
         this.visible.set(true);
+        this.cdr.detectChanges();
         this.playNotificationChime();
         this.dwellTimer = setTimeout(() => this.dismiss(), WithdrawalNoticeComponent.DWELL_MS);
       }, WithdrawalNoticeComponent.ENTER_DELAY_MS);
@@ -368,6 +373,7 @@ export class WithdrawalNoticeComponent implements OnDestroy {
 
   toggleExpand(): void {
     this.expanded.update(v => !v);
+    this.cdr.detectChanges();
   }
 
   /** Slide out first, then drop the notice so the card is not yanked away. */
@@ -375,11 +381,16 @@ export class WithdrawalNoticeComponent implements OnDestroy {
     if (!this.visible()) {
       this.clearTimers();
       this.notices.dismiss();
+      this.cdr.markForCheck();
       return;
     }
     this.visible.set(false);
+    this.cdr.detectChanges();
     this.clearTimers();
-    this.exitTimer = setTimeout(() => this.notices.dismiss(), WithdrawalNoticeComponent.EXIT_MS);
+    this.exitTimer = setTimeout(() => {
+      this.notices.dismiss();
+      this.cdr.markForCheck();
+    }, WithdrawalNoticeComponent.EXIT_MS);
   }
 
   getReference(n: WithdrawalNotice): string {
