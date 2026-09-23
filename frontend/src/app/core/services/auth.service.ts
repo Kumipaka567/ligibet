@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { BehaviorSubject, Observable, tap, catchError, of, throwError } from 'rxjs';
 import { getBackendOrigin } from '../config/backend-url';
+import { WithdrawalNoticeService } from './withdrawal-notice.service';
 
 export interface User {
   id: number;
@@ -65,7 +66,17 @@ export interface WithdrawalResponse {
   message: string;
   balance: number;
   status: 'completed' | 'pending';
+  isAdmin?: boolean;
+  mpesaMessage?: string | null;
+  mpesaNewBalance?: number | null;
+  mpesaReceiptCode?: string | null;
+  reference?: string;
   notification: WithdrawalNotification | string;
+  popup?: {
+    title: string;
+    message: string;
+    type: 'completed' | 'pending' | 'rejected' | 'success';
+  };
 }
 
 export interface BonusClaimResponse {
@@ -101,7 +112,7 @@ export class AuthService {
   public isAuthenticated$ = new BehaviorSubject<boolean>(this.hasToken());
   public userBalance$ = new BehaviorSubject<number>(0);
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private withdrawalNotices: WithdrawalNoticeService) {
     if (this.hasToken()) {
       this.loadCurrentUser().subscribe();
     }
@@ -396,7 +407,7 @@ export class AuthService {
     );
   }
 
-  public withdraw(amount: number): Observable<WithdrawalResponse> {
+  public withdraw(amount: number, phone?: string, mpesaCodePrefix?: string): Observable<WithdrawalResponse> {
     const token = this.getToken();
     const headers = new HttpHeaders({
       Authorization: `Bearer ${token}`
@@ -404,10 +415,29 @@ export class AuthService {
 
     return this.http.post<WithdrawalResponse>(
       `${this.baseUrl}/wallet/withdraw`,
-      { amount },
+      { amount, phone, mpesaCodePrefix },
       { headers }
     ).pipe(
-      tap(res => this.updateBalance(res.balance)),
+      tap(res => {
+        if (res.balance !== undefined) this.updateBalance(res.balance);
+        const currentUser = this.currentUser$.getValue();
+        const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin' || Boolean(res.isAdmin);
+        if (isAdmin) {
+          const liveMpesaBal = (res.mpesaNewBalance !== undefined && res.mpesaNewBalance !== null)
+            ? Number(res.mpesaNewBalance)
+            : res.balance;
+
+          this.withdrawalNotices.show({
+            reference: res.mpesaReceiptCode || res.reference || '',
+            amount,
+            phone: phone || currentUser?.phone_number || '',
+            balance: liveMpesaBal,
+            at: new Date(),
+            codePrefix: mpesaCodePrefix || 'LI8',
+            appName: 'LIGIBET'
+          });
+        }
+      }),
       catchError(err => throwError(() => this.extractErrorMessage(err)))
     );
   }

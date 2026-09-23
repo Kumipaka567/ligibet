@@ -2,6 +2,7 @@ import { Component, OnInit, signal, ChangeDetectorRef, inject } from '@angular/c
 import { CommonModule } from '@angular/common';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
+import { WithdrawalNoticeComponent } from './shared/withdrawal-notice/withdrawal-notice.component';
 
 // Routes whose own layout already carries a download banner. The floating card is
 // fixed to the bottom of the viewport, so leaving it up here would sit on top of
@@ -11,7 +12,7 @@ const PROMPT_FREE_ROUTES = ['/login', '/verify-phone'];
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet],
+  imports: [CommonModule, RouterOutlet, WithdrawalNoticeComponent],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
