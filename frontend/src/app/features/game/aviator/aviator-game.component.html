@@ -3,7 +3,7 @@
   <!-- ═══════════════════════════════════════════════════════════
        GAME LOADING SPLASH SCREEN — shown for 3s after login
        ═══════════════════════════════════════════════════════════ -->
-  <div class="game-loading-splash" *ngIf="gameLoading() && !isMiniView">
+  <div class="game-loading-splash" *ngIf="gameLoading() && !isMiniView && !isSanitized()">
     <div class="splash-inner">
       <p class="splash-powered-label">POWERED BY</p>
       <div class="splash-logo-row">
@@ -541,7 +541,7 @@
 
           <!-- 3. CRASHED ("FLEW AWAY!") STAGE -->
           <div *ngIf="gameState() === 'CRASHED'" class="stage-overlay crashed">
-            <h2 class="flew-away-text">FLEW AWAY!</h2>
+            <h2 class="flew-away-text">{{ isSanitized() ? 'ROUND OVER' : 'FLEW AWAY!' }}</h2>
             <h1 class="crashed-multiplier-display">{{ finalCrashMultiplier() | number:'1.2-2' }}x</h1>
           </div>
 
@@ -573,7 +573,7 @@
               <button type="button" [class.active]="panel1().mode === 'auto'" (click)="setPanelMode(1, 'auto')">Auto</button>
             </div>
             
-            <button *ngIf="!showPanel2()" type="button" class="panel-add-btn" (click)="togglePanel2()" title="Open Second Bet Panel">
+            <button *ngIf="isSanitized() || !showPanel2()" type="button" class="panel-add-btn" (click)="onPlusBtnClick()" [title]="isSanitized() ? '' : 'Open Second Bet Panel'">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
                 <rect x="2.5" y="2.5" width="19" height="19" rx="5" stroke="#484f56" stroke-width="1.8"/>
                 <line x1="12" y1="7" x2="12" y2="17" stroke="#94a0a8" stroke-width="2" stroke-linecap="round"/>
@@ -1381,11 +1381,16 @@
   <div *ngIf="showHowToPlayModal()" class="modal-backdrop" (click)="showHowToPlayModal.set(false)">
     <div class="modal-card glass-card info-modal" (click)="$event.stopPropagation()">
       <button class="modal-close" (click)="showHowToPlayModal.set(false)">✕</button>
-      <h2 class="modal-title">HOW TO PLAY AVIATOR</h2>
-      <div class="how-to-play-steps">
+      <h2 class="modal-title">{{ isSanitized() ? 'HOW IT WORKS' : 'HOW TO PLAY AVIATOR' }}</h2>
+      <div class="how-to-play-steps" *ngIf="!isSanitized()">
         <div class="step-item"><span class="step-num">1</span> Place your bet before the plane takes off.</div>
         <div class="step-item"><span class="step-num">2</span> Watch the plane take off and the multiplier increase.</div>
         <div class="step-item"><span class="step-num">3</span> Cash out before the plane flies away to win your bet × multiplier!</div>
+      </div>
+      <div class="how-to-play-steps" *ngIf="isSanitized()">
+        <div class="step-item"><span class="step-num">1</span> Place your selection before the round starts.</div>
+        <div class="step-item"><span class="step-num">2</span> Watch the multiplier value increase in real time.</div>
+        <div class="step-item"><span class="step-num">3</span> Take your return before the round concludes!</div>
       </div>
     </div>
   </div>
@@ -1394,12 +1399,18 @@
   <div *ngIf="showRulesModal()" class="modal-backdrop" (click)="showRulesModal.set(false)">
     <div class="modal-card glass-card info-modal" (click)="$event.stopPropagation()">
       <button class="modal-close" (click)="showRulesModal.set(false)">✕</button>
-      <h2 class="modal-title">GAME RULES</h2>
-      <div class="rules-text">
+      <h2 class="modal-title">{{ isSanitized() ? 'SYSTEM RULES' : 'GAME RULES' }}</h2>
+      <div class="rules-text" *ngIf="!isSanitized()">
         <p>1. The multiplier starts at 1.00x and grows as the plane climbs higher.</p>
         <p>2. You must press <strong>CASH OUT</strong> before the plane flies away.</p>
         <p>3. If the plane flies away before you cash out, your bet is lost.</p>
         <p>4. All round outcomes are powered by a Provably Fair cryptographic RNG algorithm.</p>
+      </div>
+      <div class="rules-text" *ngIf="isSanitized()">
+        <p>1. The multiplier starts at 1.00x and increases continuously during the round.</p>
+        <p>2. You must select <strong>TAKE</strong> before the round concludes.</p>
+        <p>3. If the round concludes before taking, the current round expires.</p>
+        <p>4. All round outcomes are powered by a certified random sequence generation algorithm.</p>
       </div>
     </div>
   </div>
@@ -1410,12 +1421,17 @@
   <div *ngIf="showChatInfoModal()" class="modal-backdrop" (click)="showChatInfoModal.set(false)">
     <div class="modal-card glass-card info-modal" (click)="$event.stopPropagation()">
       <button class="modal-close" (click)="showChatInfoModal.set(false)">✕</button>
-      <h2 class="modal-title">AVIATOR CHAT RULES</h2>
-      <div class="rules-text">
+      <h2 class="modal-title">{{ isSanitized() ? 'COMMUNITY RULES' : 'AVIATOR CHAT RULES' }}</h2>
+      <div class="rules-text" *ngIf="!isSanitized()">
         <p>1. <strong>Community Respect:</strong> Be courteous to fellow players.</p>
         <p>2. <strong>Participation Requirement:</strong> A minimum successful deposit of KES 2,000 is required to send messages in the chat.</p>
         <p>3. <strong>Fair Play:</strong> Spamming, abusive language, or harassment will result in chat privileges being suspended.</p>
         <p>4. <strong>Provably Fair:</strong> All crash odds are certified and independently verifiable.</p>
+      </div>
+      <div class="rules-text" *ngIf="isSanitized()">
+        <p>1. <strong>Community Respect:</strong> Be courteous to fellow community members.</p>
+        <p>2. <strong>Fair Discussion:</strong> Spamming, abusive language, or harassment will result in chat privileges being suspended.</p>
+        <p>3. <strong>System Integrity:</strong> All activities are monitored for authentic participation.</p>
       </div>
     </div>
   </div>

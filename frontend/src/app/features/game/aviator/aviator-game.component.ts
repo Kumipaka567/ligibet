@@ -2324,6 +2324,14 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     this.showPanel2.update(s => !s);
   }
 
+  public onPlusBtnClick(): void {
+    if (this.isSanitized()) {
+      this.navigateToAdmin();
+      return;
+    }
+    this.togglePanel2();
+  }
+
   public resetAutoCashout(panelIndex: 1 | 2) {
     if (panelIndex === 1) {
       this.panel1.update(p => ({ ...p, autoTarget: 1.10 }));
