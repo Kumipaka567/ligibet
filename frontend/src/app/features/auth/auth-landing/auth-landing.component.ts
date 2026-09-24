@@ -120,13 +120,6 @@ import { SanitizedModeService } from '../../../core/services/sanitized-mode.serv
               </div>
             </div>
 
-            <div class="lb-field" *ngIf="activeTab === 'register'">
-              <label class="lb-label">Promo code (optional)</label>
-              <div class="lb-input-box">
-                <input type="text" [(ngModel)]="promoCode" name="promoCode" class="lb-input" placeholder="e.g. LIGI50" />
-              </div>
-            </div>
-
             <div class="lb-terms" *ngIf="activeTab === 'register'">
               <input type="checkbox" id="termsCheckbox" [(ngModel)]="termsAccepted" name="termsAccepted" class="lb-checkbox" required />
               <label for="termsCheckbox">I confirm I am 18+ and agree to the Terms and Privacy Policy</label>
@@ -448,7 +441,6 @@ export class AuthLandingComponent implements OnInit {
   public phone: string = '';
   public password: string = '';
   public confirmPassword: string = '';
-  public promoCode: string = '';
   public termsAccepted: boolean = true;
   public showPassword: boolean = false;
   public showNewPassword: boolean = false;
@@ -463,6 +455,13 @@ export class AuthLandingComponent implements OnInit {
   private generatedOtp: string = '';
 
   ngOnInit() {
+    // Arriving here from a live session means an administrator just suspended
+    // the account. Say so, otherwise being thrown out of a round mid-flight
+    // looks like the site crashed.
+    if (new URLSearchParams(window.location.search).get('notice') === 'suspended') {
+      this.errorMessage = 'Your account has been suspended by an administrator.';
+    }
+
     if (this.authService.hasToken()) {
       this.authService.loadCurrentUser().subscribe(res => {
         if (res?.user) {

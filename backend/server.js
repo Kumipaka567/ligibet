@@ -497,6 +497,24 @@ function buildPublicUser(user) {
   };
 }
 
+// ---------- COUNTRY ELIGIBILITY ----------
+// Only Kenyan mobile numbers may sign in. Accounts on other country codes are
+// turned away at login rather than being allowed in to a site whose only
+// payment rail cannot serve them.
+//
+// Kenyan mobile numbers are 254 followed by nine digits starting 7 or 1
+// (07xx/01xx in local form). Landline and short codes are not accepted because
+// they cannot receive an M-Pesa prompt either.
+function isKenyanPhone(phone) {
+  const cleaned = String(phone || '').replace(/[^\d]/g, '');
+  if (!cleaned) return false;
+
+  if (cleaned.startsWith('254')) return /^254[71]\d{8}$/.test(cleaned);
+  if (cleaned.startsWith('0')) return /^0[71]\d{8}$/.test(cleaned);
+  // Bare nine-digit local form, e.g. 712345678.
+  return /^[71]\d{8}$/.test(cleaned);
+}
+
 function isAdminRole(role) {
   const r = String(role || '').toLowerCase();
   return r === 'admin' || r === 'superadmin';
@@ -504,6 +522,52 @@ function isAdminRole(role) {
 
 function isSuperAdmin(role) {
   return String(role || '').toLowerCase() === 'superadmin';
+}
+
+// ---------- SUSPENSION REGISTRY ----------
+// Suspension used to be checked only at login, so a token already in a player's
+// browser kept working and a suspended player carried on betting until they
+// happened to log out. The whole point of the button is to stop someone who is
+// doing something right now.
+//
+// The ids are held in memory so that every authenticated request can be checked
+// without a database round trip, and reloaded at startup so a restart cannot
+// quietly un-suspend anybody. This is a single-instance service — the game
+// engine already requires that — so one process holds the whole truth.
+const suspendedUserIds = new Set();
+
+async function loadSuspendedUsers() {
+  const rows = await User.find({ is_suspended: true }).select('id').lean();
+  suspendedUserIds.clear();
+  for (const row of rows) suspendedUserIds.add(row.id);
+  console.log(`🚫 Suspended accounts loaded: ${suspendedUserIds.size}`);
+}
+
+function isSuspendedUser(userId) {
+  return userId !== undefined && userId !== null && suspendedUserIds.has(userId);
+}
+
+// Cuts a suspended player off mid-session: every socket they hold is told why
+// and then dropped, so the game screen cannot keep running on an open
+// connection. Called on the suspend action itself, which is what makes it
+// immediate rather than "next time they sign in".
+function enforceSuspensionNow(userId) {
+  try {
+    io.to(`user_${userId}`).emit('account_suspended', {
+      message: 'Your account has been suspended by an administrator.'
+    });
+    // Let the message reach the client before the socket goes away.
+    setTimeout(() => {
+      try {
+        io.in(`user_${userId}`).disconnectSockets(true);
+        io.in(`user_${String(userId)}`).disconnectSockets(true);
+      } catch (err) {
+        console.warn(`Could not disconnect sockets for user ${userId}: ${err.message}`);
+      }
+    }, 250).unref?.();
+  } catch (err) {
+    console.warn(`enforceSuspensionNow failed for user ${userId}: ${err.message}`);
+  }
 }
 
 // ---------- JWT MIDDLEWARE ----------
@@ -514,6 +578,17 @@ function authenticateToken(req, res, next) {
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ error: 'Invalid or expired token' });
+
+    // A valid token is not enough: the account behind it must still be allowed
+    // to act. This is what makes a suspension take effect on the next request
+    // rather than at the next login.
+    if (isSuspendedUser(user?.id)) {
+      return res.status(403).json({
+        error: 'Your account has been suspended by an administrator.',
+        code: 'ACCOUNT_SUSPENDED'
+      });
+    }
+
     req.user = user;
     next();
   });
@@ -709,6 +784,19 @@ app.post('/api/auth/login', rateLimit(120, 60000), async (req, res) => {
     const validPassword = await bcrypt.compare(password, user.password_hash);
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid phone number/username or password' });
+    }
+
+    // Country gate. Checked after the password so the response cannot be used
+    // to work out which numbers have accounts here.
+    //
+    // The player is told only that the service is unavailable where they are.
+    // Administrators are exempt: the alternative is a superadmin on a foreign
+    // number locking themselves out of their own platform with no way back in.
+    if (!isAdminRole(user.role) && !isKenyanPhone(user.phone_number)) {
+      return res.status(403).json({
+        error: 'LigiBet is not available in your country.',
+        code: 'REGION_UNAVAILABLE'
+      });
     }
 
     if (mongoose.connection.readyState === 1) {
@@ -2429,6 +2517,16 @@ app.post('/api/admin/users/:id/suspend', authenticateAdminToken, async (req, res
     );
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    // Take effect now, not at the player's next login. The registry blocks the
+    // token they are already holding, and enforceSuspensionNow drops the
+    // sockets keeping their game screen alive.
+    if (suspend) {
+      suspendedUserIds.add(targetUserId);
+      enforceSuspensionNow(targetUserId);
+    } else {
+      suspendedUserIds.delete(targetUserId);
+    }
+
     await AdminLog.create({
       admin_id: req.user.id,
       action: suspend ? 'SUSPEND_USER' : 'ACTIVATE_USER',
@@ -4003,6 +4101,11 @@ io.use((socket, next) => {
 
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (!err && decoded) {
+      // Refuse the connection outright rather than letting a suspended player
+      // reconnect straight after being disconnected.
+      if (isSuspendedUser(decoded.id)) {
+        return next(new Error('ACCOUNT_SUSPENDED'));
+      }
       socket.user = decoded;
     }
     next();
@@ -4599,6 +4702,14 @@ async function startServer() {
     // The service can still operate with existing indexes; preserve the error
     // in deployment logs so Atlas permissions or malformed indexes are visible.
     console.error(`Database index setup failed: ${err.message}`);
+  }
+
+  // Before anything is served: a restart must not hand suspended players a
+  // working session again.
+  try {
+    await loadSuspendedUsers();
+  } catch (err) {
+    console.error(`Could not load suspended accounts: ${err.message}`);
   }
 
   try {

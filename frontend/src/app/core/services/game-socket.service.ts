@@ -131,6 +131,15 @@ export class GameSocketService {
   public betCancelled$ = new BehaviorSubject<{ betId: number; amount: number; slot?: 1 | 2; room?: GameRoom } | null>(null);
   public cashOutSuccess$ = new BehaviorSubject<CashOutSuccess | null>(null);
   public errorNotification$ = new BehaviorSubject<GameErrorNotification | null>(null);
+
+  /**
+   * Emits when the server cuts this account off mid-session.
+   *
+   * The socket is dropped immediately afterwards, so this is the only warning
+   * the player gets. Exposed as a stream rather than handled here because this
+   * service deliberately knows nothing about auth or routing.
+   */
+  public accountSuspended$ = new BehaviorSubject<string | null>(null);
   public withdrawalNotification$ = new BehaviorSubject<WithdrawalNotificationPayload | null>(null);
   public isConnected$ = new BehaviorSubject<boolean>(false);
 
@@ -190,7 +199,19 @@ export class GameSocketService {
     this.socket.on('connect_error', (err) => {
       console.error('[SOCKET] Socket connection error:', err.message);
       this.isConnected$.next(false);
+
+      // A suspended account is refused at the handshake. Without this it would
+      // retry forever behind a generic "failed to connect" banner.
+      if (err.message === 'ACCOUNT_SUSPENDED') {
+        this.accountSuspended$.next('Your account has been suspended by an administrator.');
+        return;
+      }
+
       this.errorNotification$.next({ message: err.message || 'Failed to connect to real-time game server.' });
+    });
+
+    this.socket.on('account_suspended', (data: { message?: string }) => {
+      this.accountSuspended$.next(data?.message || 'Your account has been suspended by an administrator.');
     });
 
     this.socket.on('phase_update', (data: PhaseUpdate) => {
