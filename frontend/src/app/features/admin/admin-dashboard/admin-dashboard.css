@@ -163,6 +163,74 @@
   transition: all 0.15s ease;
 }
 
+.sanitized-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.sanitized-toggle-btn:hover {
+  background: rgba(51, 65, 85, 0.95);
+  color: #f1f5f9;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.sanitized-toggle-btn.is-sanitized {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #10b981;
+  color: #34d399;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+}
+
+.sanitized-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.sanitized-pill-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #64748b;
+  transition: background 0.2s;
+}
+
+.sanitized-toggle-btn.is-sanitized .sanitized-pill-indicator {
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.sanitized-mobile-btn {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  text-align: left;
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.sanitized-mobile-btn.is-sanitized {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  color: #34d399;
+}
+
 .game-view-btn {
   background: #e51b24;
   color: #ffffff;

@@ -13,6 +13,7 @@ import {
 import { getBackendOrigin } from '../../../core/config/backend-url';
 import { AuthService } from '../../../core/services/auth.service';
 import { AviatorGameComponent } from '../../game/aviator/aviator-game.component';
+import { SanitizedModeService } from '../../../core/services/sanitized-mode.service';
 
 export interface AdminUser {
   id: number;
@@ -95,9 +96,19 @@ export interface PendingWithdrawal {
 export class AdminDashboardComponent implements OnInit, OnDestroy {
   private adminSocket = inject(AdminSocketService);
   private authService = inject(AuthService);
+  public sanitizedMode = inject(SanitizedModeService);
   private http = inject(HttpClient);
   private router = inject(Router);
   private cdr = inject(ChangeDetectorRef);
+
+  public toggleSanitizedMode(): void {
+    this.sanitizedMode.toggleSanitizedMode();
+    const next = this.sanitizedMode.isSanitizedMode();
+    this.showAdminToast(
+      next ? '🛡️ Sanitized View Mode activated for Game tab' : 'Normal View Mode restored for Game tab',
+      next ? 'success' : 'info'
+    );
+  }
 
   public activeTab: 'game' | 'monitor' | 'withdrawal-settings' | 'active-users' | 'transactions' | 'users' | 'admins' | 'logs' = 'monitor';
   public mobileMenuOpen: boolean = false;
@@ -321,6 +332,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
     this.adminSocket.connect(token);
     this.fetchOverview();
+    this.sanitizedMode.fetchStatus();
     // Load expensive lists only when their tab is opened. Previously every
     // dashboard visit fetched users, transactions, admins, logs, and settings
     // even though the monitor is the default screen.

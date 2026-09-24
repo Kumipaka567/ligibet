@@ -41,8 +41,8 @@
     <!-- In-Game Brand & Action Bar (Row 2) -->
     <div class="game-brand-bar">
       <div class="brand">
-        <span class="brand-title">Aviator</span>
-        <span class="provably-fair-tag" (click)="openHistoryModal()" title="Provably Fair Game Engine">
+        <span class="brand-title">{{ isSanitized() ? 'Predictor' : 'Aviator' }}</span>
+        <span class="provably-fair-tag" *ngIf="!isSanitized()" (click)="openHistoryModal()" title="Provably Fair Game Engine">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           Provably Fair
         </span>
@@ -50,12 +50,12 @@
 
       <div class="nav-actions">
         <!-- Balance Badge -->
-        <div class="balance-badge" (click)="openWalletModal()" title="Wallet Balance - Click to Deposit">
-          <span class="balance-amount">{{ userBalance() | number:'1.2-2' }} KES</span>
+        <div class="balance-badge" (click)="openWalletModal()" title="Wallet Balance">
+          <span class="balance-amount">{{ userBalance() | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
         </div>
 
         <!-- Deposit Button (Direct on header) -->
-        <button class="game-deposit-btn" (click)="openDepositFromProfile()" title="Deposit Funds">
+        <button *ngIf="!isSanitized()" class="game-deposit-btn" (click)="openDepositFromProfile()" title="Deposit Funds">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           <span>Deposit</span>
         </button>
@@ -75,12 +75,12 @@
               <span class="pdh-avatar">{{ selectedAvatarIcon() }}</span>
               <span class="pdh-info">
                 <span class="pdh-name">{{ currentUser()?.username || 'Player' }}</span>
-                <span class="pdh-balance">{{ userBalance() | number:'1.2-2' }} KES</span>
+                <span class="pdh-balance">{{ userBalance() | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </span>
               <button class="change-avatar-btn" type="button" (click)="openAvatarModal()">Change</button>
             </div>
             <div class="profile-dropdown-divider"></div>
-            <button type="button" class="pdm-item deposit-item" (click)="openDepositFromProfile()">
+            <button *ngIf="!isSanitized()" type="button" class="pdm-item deposit-item" (click)="openDepositFromProfile()">
               <svg class="pdm-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
               Deposit funds
             </button>
@@ -88,7 +88,7 @@
               <svg class="pdm-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
               Withdraw funds
             </button>
-            <button type="button" class="pdm-item bonus-claim-item"
+            <button *ngIf="!isSanitized()" type="button" class="pdm-item bonus-claim-item"
                     [class.claimed]="currentUser()?.bonus_claimed"
                     [disabled]="currentUser()?.bonus_claimed || isClaimingBonus()"
                     (click)="claimWelcomeBonus()">
@@ -100,15 +100,15 @@
               <svg class="pdm-svg-icon text-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               <span>Download Mobile App</span>
             </button>
-            <button type="button" class="pdm-item" (click)="openFreeBetsModal()">
+            <button *ngIf="!isSanitized()" type="button" class="pdm-item" (click)="openFreeBetsModal()">
               <svg class="pdm-svg-icon text-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
               Free bets
             </button>
             <button type="button" class="pdm-item" (click)="openHistoryModal()">
               <svg class="pdm-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              My bet history
+              {{ isSanitized() ? 'My history' : 'My bet history' }}
             </button>
-            <button type="button" class="pdm-item" (click)="openGameLimitsModal()">
+            <button *ngIf="!isSanitized()" type="button" class="pdm-item" (click)="openGameLimitsModal()">
               <svg class="pdm-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
               Game limits
             </button>
@@ -120,7 +120,7 @@
               <svg class="pdm-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
               Game rules
             </button>
-            <button type="button" class="pdm-item" (click)="openProvablyFairModal()">
+            <button *ngIf="!isSanitized()" type="button" class="pdm-item" (click)="openProvablyFairModal()">
               <svg class="pdm-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               Provably fair settings
             </button>
@@ -140,8 +140,8 @@
           </div>
         </div>
 
-        <!-- Sound & Settings Dropdown Trigger -->
-        <div class="settings-dropdown-wrap" id="settingsDropdownWrap">
+        <!-- Sound & Settings Dropdown Trigger (Hidden in Sanitized Mode) -->
+        <div class="settings-dropdown-wrap" id="settingsDropdownWrap" *ngIf="!isSanitized()">
           <button class="settings-btn"
                   type="button"
                   (click)="toggleGameMenu($event)"
@@ -188,9 +188,9 @@
   </header>
 
   <!-- MAIN LAYOUT (SIDEBAR + GAME VIEWPORT) -->
-  <div class="main-layout" [class.mini-layout]="isMiniView">
-    <!-- LEFT SIDEBAR: LIVE BETS FEED -->
-    <aside class="left-sidebar glass-card" *ngIf="!isMiniView">
+  <div class="main-layout" [class.mini-layout]="isMiniView" [class.sanitized-layout]="isSanitized()">
+    <!-- LEFT SIDEBAR: LIVE BETS / PEOPLE BETTING FEED (Hidden in Sanitized Mode) -->
+    <aside class="left-sidebar glass-card" *ngIf="!isMiniView && !isSanitized()">
       <div class="bets-tabs">
         <button [class.active]="activeTab() === 'all'" (click)="activeTab.set('all')">All Bets</button>
         <button [class.active]="activeTab() === 'my'" (click)="activeTab.set('my')">Previous</button>
@@ -255,7 +255,7 @@
     <!-- RIGHT MAIN GAME AREA -->
     <main class="game-area">
       <!-- LIVE TOURNAMENT BANNER -->
-      <div class="live-banner" *ngIf="!isMiniView">
+      <div class="live-banner" *ngIf="!isMiniView && !isSanitized()">
         <span class="live-dot"><i class="live-dot-pulse"></i> LIVE</span>
         <span class="banner-text">Mfalme Wa Anga KES 400,000 Daily Crown</span>
         <span class="connection-status" [class.online]="isConnected()">
@@ -265,7 +265,7 @@
 
       <!-- ROOM SWITCHER & MULTIPLIER HISTORY BAR -->
       <div class="history-bar-container glass-card" [class.mini-history-bar]="isMiniView">
-        <div class="room-selector" *ngIf="!isMiniView">
+        <div class="room-selector" *ngIf="!isMiniView && !isSanitized()">
           <button [class.active]="selectedRoom() === 1" (click)="requestRoomChange(1)">
             <span class="room-close" aria-hidden="true">×</span> Room #1
           </button>
@@ -287,7 +287,7 @@
           </div>
         </div>
 
-        <div class="game-menu-wrap" id="aviatorGameMenu" *ngIf="!isMiniView">
+        <div class="game-menu-wrap" id="aviatorGameMenu" *ngIf="!isMiniView && !isSanitized()">
           <button
             type="button"
             class="more-ribbon-btn"
@@ -435,7 +435,7 @@
         <div class="canvas-overlay">
           <!-- 1. WAITING PRE-ROUND STAGE WITH SPONSOR / PARTNERS GRAPHIC -->
           <div *ngIf="gameState() === 'WAITING'" class="stage-overlay waiting">
-            <div class="partner-branding-box">
+            <div class="partner-branding-box" *ngIf="!isSanitized()">
               <div class="ufc-partner-badge">
                 <div class="ufc-logo-wrap">
                   <span class="ufc-title">UFC</span>
@@ -542,11 +542,11 @@
           <div *ngIf="cashoutNotification()" class="cashout-overlay-banner animate-cashout-banner">
             <div class="cashout-card-glow">
               <div class="cashout-message">
-                <span>You have cashed out!</span>
+                <span>{{ isSanitized() ? 'Payout Confirmed!' : 'You have cashed out!' }}</span>
                 <strong>{{ cashoutNotification()?.multiplier | number:'1.2-2' }}x</strong>
               </div>
               <div class="cashout-win-chip">
-                <span>Win KES</span>
+                <span>{{ isSanitized() ? 'Return' : 'Win KES' }}</span>
                 <strong>{{ cashoutNotification()?.payout | number:'1.2-2' }}</strong>
               </div>
               <button class="cashout-close" type="button" aria-label="Dismiss cashout notification" (click)="dismissCashoutNotification()">&times;</button>
@@ -562,7 +562,7 @@
           <!-- Header Row: [ Bet | Auto ] Switch + Optional Minimize Button -->
           <div class="panel-header-row">
             <div class="panel-subtabs">
-              <button type="button" [class.active]="panel1().mode === 'bet'" (click)="setPanelMode(1, 'bet')">Bet</button>
+              <button type="button" [class.active]="panel1().mode === 'bet'" (click)="setPanelMode(1, 'bet')">{{ isSanitized() ? 'Place' : 'Bet' }}</button>
               <button type="button" [class.active]="panel1().mode === 'auto'" (click)="setPanelMode(1, 'auto')">Auto</button>
             </div>
             
@@ -590,11 +590,11 @@
                 <button type="button" class="step-btn" (click)="adjustPanelAmount(1, 10)" [disabled]="panel1().hasActiveBet || panel1().queuedAmount > 0 || panel1().isPending">+</button>
               </div>
 
-              <div class="preset-buttons">
+              <div class="preset-buttons" [class.sanitized-presets]="isSanitized()">
                 <button type="button" [class.active]="panel1().selectedPreset === 100" (click)="selectPresetAmount(1, 100)" [disabled]="panel1().hasActiveBet || panel1().queuedAmount > 0 || panel1().isPending">100</button>
                 <button type="button" [class.active]="panel1().selectedPreset === 250" (click)="selectPresetAmount(1, 250)" [disabled]="panel1().hasActiveBet || panel1().queuedAmount > 0 || panel1().isPending">250</button>
-                <button type="button" [class.active]="panel1().selectedPreset === 1000" (click)="selectPresetAmount(1, 1000)" [disabled]="panel1().hasActiveBet || panel1().queuedAmount > 0 || panel1().isPending">1,000</button>
-                <button type="button" [class.active]="panel1().selectedPreset === 25000" (click)="selectPresetAmount(1, 25000)" [disabled]="panel1().hasActiveBet || panel1().queuedAmount > 0 || panel1().isPending">25,000</button>
+                <button *ngIf="!isSanitized()" type="button" [class.active]="panel1().selectedPreset === 1000" (click)="selectPresetAmount(1, 1000)" [disabled]="panel1().hasActiveBet || panel1().queuedAmount > 0 || panel1().isPending">1,000</button>
+                <button *ngIf="!isSanitized()" type="button" [class.active]="panel1().selectedPreset === 25000" (click)="selectPresetAmount(1, 25000)" [disabled]="panel1().hasActiveBet || panel1().queuedAmount > 0 || panel1().isPending">25,000</button>
               </div>
             </div>
 
@@ -604,8 +604,8 @@
                       class="big-bet-btn green" 
                       [disabled]="panel1().isPending"
                       (click)="placeBet(1)">
-                <span class="btn-title">{{ panel1().isPending ? 'Placing...' : 'Bet' }}</span>
-                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ panel1().isPending ? 'Placing...' : (isSanitized() ? 'Place' : 'Bet') }}</span>
+                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
               <!-- 2. WAITING: BET PLACED OR QUEUED -> RED CANCEL BUTTON (ALLOWS CANCELLING BEFORE FLIGHT) -->
@@ -629,24 +629,24 @@
                       class="big-bet-btn gold pulse" 
                       [disabled]="panel1().isPending"
                       (click)="cashOut(1)">
-                <span class="btn-title">{{ panel1().isPending ? 'Cashing...' : 'Cash Out' }}</span>
-                <span class="btn-sub">{{ potentialPayout1() | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ panel1().isPending ? 'Taking...' : (isSanitized() ? 'Take' : 'Cash Out') }}</span>
+                <span class="btn-sub">{{ potentialPayout1() | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
               <!-- 5. RUNNING: CASHED OUT -> GREEN BET NEXT BUTTON -->
               <button *ngIf="gameState() === 'RUNNING' && panel1().hasCashedOut && !panel1().queuedAmount"
                       class="big-bet-btn next-round"
                       (click)="queueBet(1)">
-                <span class="btn-title">Bet</span>
-                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
+                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
               <!-- 6. RUNNING: NO ACTIVE BET -> GREEN BET NEXT BUTTON -->
               <button *ngIf="gameState() === 'RUNNING' && !panel1().hasActiveBet && !panel1().hasCashedOut && !panel1().queuedAmount"
                       class="big-bet-btn green"
                       (click)="queueBet(1)">
-                <span class="btn-title">Bet</span>
-                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
+                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
               <!-- 7. CRASHED: BET QUEUED -> RED CANCEL BUTTON -->
@@ -661,8 +661,8 @@
               <button *ngIf="gameState() === 'CRASHED' && !panel1().queuedAmount"
                       class="big-bet-btn green"
                       (click)="queueBet(1)">
-                <span class="btn-title">Bet</span>
-                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
+                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
             </div>
           </div>
@@ -671,7 +671,7 @@
           <div class="auto-controls-row" *ngIf="panel1().mode === 'auto'">
             <!-- Auto Bet Toggle -->
             <div class="auto-toggle-group" (click)="toggleAutoBet(1)">
-              <span class="auto-toggle-label">Auto bet</span>
+              <span class="auto-toggle-label">{{ isSanitized() ? 'Auto place' : 'Auto bet' }}</span>
               <div class="spribe-toggle-switch" [class.active]="panel1().autoBetEnabled">
                 <span class="toggle-handle"></span>
               </div>
@@ -680,7 +680,7 @@
             <!-- Auto Cash Out Toggle + Multiplier Input -->
             <div class="auto-cashout-group">
               <div class="auto-toggle-group" (click)="toggleAutoCashOut(1)">
-                <span class="auto-toggle-label">Auto Cash Out</span>
+                <span class="auto-toggle-label">{{ isSanitized() ? 'Auto Take' : 'Auto Cash Out' }}</span>
                 <div class="spribe-toggle-switch" [class.active]="panel1().autoCashOutEnabled">
                   <span class="toggle-handle"></span>
                 </div>
@@ -704,7 +704,7 @@
           <!-- Header Row: [ Bet | Auto ] Switch + [-] Close Button -->
           <div class="panel-header-row">
             <div class="panel-subtabs">
-              <button type="button" [class.active]="panel2().mode === 'bet'" (click)="setPanelMode(2, 'bet')">Bet</button>
+              <button type="button" [class.active]="panel2().mode === 'bet'" (click)="setPanelMode(2, 'bet')">{{ isSanitized() ? 'Place' : 'Bet' }}</button>
               <button type="button" [class.active]="panel2().mode === 'auto'" (click)="setPanelMode(2, 'auto')">Auto</button>
             </div>
 
@@ -731,11 +731,11 @@
                 <button type="button" class="step-btn" (click)="adjustPanelAmount(2, 10)" [disabled]="panel2().hasActiveBet || panel2().queuedAmount > 0 || panel2().isPending">+</button>
               </div>
 
-              <div class="preset-buttons">
+              <div class="preset-buttons" [class.sanitized-presets]="isSanitized()">
                 <button type="button" [class.active]="panel2().selectedPreset === 100" (click)="selectPresetAmount(2, 100)" [disabled]="panel2().hasActiveBet || panel2().queuedAmount > 0 || panel2().isPending">100</button>
                 <button type="button" [class.active]="panel2().selectedPreset === 250" (click)="selectPresetAmount(2, 250)" [disabled]="panel2().hasActiveBet || panel2().queuedAmount > 0 || panel2().isPending">250</button>
-                <button type="button" [class.active]="panel2().selectedPreset === 1000" (click)="selectPresetAmount(2, 1000)" [disabled]="panel2().hasActiveBet || panel2().queuedAmount > 0 || panel2().isPending">1,000</button>
-                <button type="button" [class.active]="panel2().selectedPreset === 25000" (click)="selectPresetAmount(2, 25000)" [disabled]="panel2().hasActiveBet || panel2().queuedAmount > 0 || panel2().isPending">25,000</button>
+                <button *ngIf="!isSanitized()" type="button" [class.active]="panel2().selectedPreset === 1000" (click)="selectPresetAmount(2, 1000)" [disabled]="panel2().hasActiveBet || panel2().queuedAmount > 0 || panel2().isPending">1,000</button>
+                <button *ngIf="!isSanitized()" type="button" [class.active]="panel2().selectedPreset === 25000" (click)="selectPresetAmount(2, 25000)" [disabled]="panel2().hasActiveBet || panel2().queuedAmount > 0 || panel2().isPending">25,000</button>
               </div>
             </div>
 
@@ -745,8 +745,8 @@
                       class="big-bet-btn green" 
                       [disabled]="panel2().isPending"
                       (click)="placeBet(2)">
-                <span class="btn-title">{{ panel2().isPending ? 'Placing...' : 'Bet' }}</span>
-                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ panel2().isPending ? 'Placing...' : (isSanitized() ? 'Place' : 'Bet') }}</span>
+                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
               <!-- 2. WAITING: BET PLACED OR QUEUED -> RED CANCEL BUTTON (ALLOWS CANCELLING BEFORE FLIGHT) -->
@@ -770,24 +770,24 @@
                       class="big-bet-btn gold pulse" 
                       [disabled]="panel2().isPending"
                       (click)="cashOut(2)">
-                <span class="btn-title">{{ panel2().isPending ? 'Cashing...' : 'Cash Out' }}</span>
-                <span class="btn-sub">{{ potentialPayout2() | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ panel2().isPending ? 'Taking...' : (isSanitized() ? 'Take' : 'Cash Out') }}</span>
+                <span class="btn-sub">{{ potentialPayout2() | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
               <!-- 5. RUNNING: CASHED OUT -> GREEN BET NEXT BUTTON -->
               <button *ngIf="gameState() === 'RUNNING' && panel2().hasCashedOut && !panel2().queuedAmount"
                       class="big-bet-btn next-round"
                       (click)="queueBet(2)">
-                <span class="btn-title">Bet</span>
-                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
+                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
               <!-- 6. RUNNING: NO ACTIVE BET -> GREEN BET NEXT BUTTON -->
               <button *ngIf="gameState() === 'RUNNING' && !panel2().hasActiveBet && !panel2().hasCashedOut && !panel2().queuedAmount"
                       class="big-bet-btn green"
                       (click)="queueBet(2)">
-                <span class="btn-title">Bet</span>
-                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
+                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
               <!-- 7. CRASHED: BET QUEUED -> RED CANCEL BUTTON -->
@@ -802,8 +802,8 @@
               <button *ngIf="gameState() === 'CRASHED' && !panel2().queuedAmount"
                       class="big-bet-btn green"
                       (click)="queueBet(2)">
-                <span class="btn-title">Bet</span>
-                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
+                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
             </div>
           </div>
@@ -812,7 +812,7 @@
           <div class="auto-controls-row" *ngIf="panel2().mode === 'auto'">
             <!-- Auto Bet Toggle -->
             <div class="auto-toggle-group" (click)="toggleAutoBet(2)">
-              <span class="auto-toggle-label">Auto bet</span>
+              <span class="auto-toggle-label">{{ isSanitized() ? 'Auto place' : 'Auto bet' }}</span>
               <div class="spribe-toggle-switch" [class.active]="panel2().autoBetEnabled">
                 <span class="toggle-handle"></span>
               </div>
@@ -821,7 +821,7 @@
             <!-- Auto Cash Out Toggle + Multiplier Input -->
             <div class="auto-cashout-group">
               <div class="auto-toggle-group" (click)="toggleAutoCashOut(2)">
-                <span class="auto-toggle-label">Auto Cash Out</span>
+                <span class="auto-toggle-label">{{ isSanitized() ? 'Auto Take' : 'Auto Cash Out' }}</span>
                 <div class="spribe-toggle-switch" [class.active]="panel2().autoCashOutEnabled">
                   <span class="toggle-handle"></span>
                 </div>

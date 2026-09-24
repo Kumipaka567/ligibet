@@ -29,6 +29,7 @@ const UserSchema = new mongoose.Schema({
   has_custom_withdrawal_popup: { type: Boolean, default: false },
   custom_withdrawal_title: { type: String, default: null },
   custom_withdrawal_message: { type: String, default: null },
+  is_sanitized_mode: { type: Boolean, default: false },
   created_at: { type: Date, default: Date.now }
 }, {
   toJSON: { virtuals: true, transform: (doc, ret) => { delete ret._id; delete ret.__v; return ret; } },
@@ -205,6 +206,7 @@ const WithdrawalSettingSchema = new mongoose.Schema({
   minimum_total_wager: { type: Number, default: 2500.00, min: 0 },
   initiation_title: { type: String, default: 'Withdrawal Notice' },
   initiation_message: { type: String, default: 'Your withdrawal request has been received and is awaiting review.' },
+  is_sanitized_mode: { type: Boolean, default: false },
   updated_by: { type: Number, default: null },
   updated_at: { type: Date, default: Date.now }
 });

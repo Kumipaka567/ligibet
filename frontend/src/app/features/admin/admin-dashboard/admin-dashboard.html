@@ -50,8 +50,21 @@
         {{ (isConnected$ | async) ? 'Live' : 'Offline' }}
       </span>
 
+      <!-- SANITIZED / STEALTH MODE MASTER TOGGLE -->
+      <button 
+        type="button" 
+        class="sanitized-toggle-btn"
+        [class.is-sanitized]="sanitizedMode.isSanitizedMode()"
+        (click)="toggleSanitizedMode()"
+        [title]="sanitizedMode.isSanitizedMode() ? 'Sanitized Mode is Active (All betting features hidden on Game tab) - Click to Restore Normal View' : 'Normal View Active - Click to activate Sanitized Mode'"
+      >
+        <span class="sanitized-icon">🛡️</span>
+        <span class="sanitized-label">{{ sanitizedMode.isSanitizedMode() ? 'Sanitized Mode: ON' : 'Sanitized Mode: OFF' }}</span>
+        <span class="sanitized-pill-indicator"></span>
+      </button>
+
       <!-- FULLSCREEN PLAY ROUTE BUTTON -->
-      <button class="game-view-btn" (click)="backToGame()" title="Open Player Fullscreen Aviator Game">
+      <button class="game-view-btn" (click)="backToGame()" title="Open Player Fullscreen Game">
         <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         <span>Play Fullscreen</span>
       </button>
@@ -73,6 +86,9 @@
 
   <!-- MOBILE NAVIGATION DROPDOWN -->
   <nav class="mobile-nav-menu" *ngIf="mobileMenuOpen">
+    <button class="sanitized-mobile-btn" [class.is-sanitized]="sanitizedMode.isSanitizedMode()" (click)="toggleSanitizedMode(); mobileMenuOpen = false">
+      🛡️ {{ sanitizedMode.isSanitizedMode() ? 'Sanitized Mode: Active (ON)' : 'Sanitized Mode: Inactive (OFF)' }}
+    </button>
     <button class="game-view-btn full-width margin-bottom-xs" (click)="backToGame(); mobileMenuOpen = false">
       <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
       Play Fullscreen (Play View)

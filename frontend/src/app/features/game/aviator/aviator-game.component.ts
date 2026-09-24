@@ -19,6 +19,7 @@ import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ChatMessage, GameRoom, GameSocketService, LiveBetBroadcast, RoomState } from '../../../core/services/game-socket.service';
 import { AuthService, User, TransactionRecord } from '../../../core/services/auth.service';
+import { SanitizedModeService } from '../../../core/services/sanitized-mode.service';
 import { getBackendOrigin } from '../../../core/config/backend-url';
 
 export type GameState = 'WAITING' | 'RUNNING' | 'CRASHED';
@@ -79,8 +80,12 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private gameSocket = inject(GameSocketService);
   private authService = inject(AuthService);
+  public sanitizedModeService = inject(SanitizedModeService);
   private http = inject(HttpClient);
   private router = inject(Router);
+
+  /** True when current user is Admin/Superadmin AND Sanitized Mode is switched ON */
+  public isSanitized = computed(() => this.authService.isAdmin() && this.sanitizedModeService.isSanitizedMode());
 
   private subs: Subscription[] = [];
   private animationFrameId: number | null = null;
@@ -1960,7 +1965,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
       const ctrlY = h;
 
       // ─── 1 & 2. TRANSLUCENT RED TRAIL FILL & CURVE (ONLY DURING ACTIVE FLIGHT) ───
-      if (state === 'RUNNING') {
+      if (state === 'RUNNING' && !this.isSanitized()) {
         const fill = this.ctx.createLinearGradient(0, tailY, 0, h);
         fill.addColorStop(0, 'rgba(215, 12, 45, 0.55)');
         fill.addColorStop(0.5, 'rgba(150, 8, 30, 0.36)');
@@ -1989,14 +1994,16 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
 
       // ─── 3. PLANE SPRITE (WITH NATURAL DYNAMIC PITCH & PROPELLER) ───────────
       if (state === 'RUNNING') {
-        this.drawAirplaneSprite(planeX, planeY, dynamicPitch, spriteScale);
+        if (!this.isSanitized()) {
+          this.drawAirplaneSprite(planeX, planeY, dynamicPitch, spriteScale);
+        }
       } else if (state === 'CRASHED') {
         const crashStartedAt = this.crashStartedAt ?? frameTime;
         const crashProgress = Math.max(0, Math.min(1, (frameTime - crashStartedAt) / this.crashExitDurationMs));
         const exitDistance = 1 - Math.pow(1 - crashProgress, 2);
         const crashedX = planeX + (w * 0.45 + planeDrawW) * exitDistance;
         const crashedY = planeY - (h * 0.42 + planeDrawH) * exitDistance;
-        if (crashProgress < 1) {
+        if (crashProgress < 1 && !this.isSanitized()) {
           this.drawAirplaneSprite(crashedX, crashedY, -0.12 - crashProgress * 0.35, spriteScale);
         }
       }

@@ -4597,3 +4597,21 @@
     color: rgba(255, 255, 255, 0.65);
   }
 }
+
+/* ─── SANITIZED MODE ENHANCEMENTS ─── */
+.sanitized-layout {
+  .game-area {
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 100%;
+  }
+}
+
+.preset-buttons.sanitized-presets {
+  grid-template-columns: repeat(2, 1fr) !important;
+  button {
+    height: 25px !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+  }
+}

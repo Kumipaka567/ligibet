@@ -400,13 +400,15 @@ async function getWithdrawalSettings() {
     return {
       minimumTotalWager: settings.minimum_total_wager ?? DEFAULT_MINIMUM_TOTAL_WAGER,
       initiationTitle: settings.initiation_title || DEFAULT_WITHDRAWAL_INITIATION_TITLE,
-      initiationMessage: settings.initiation_message || DEFAULT_WITHDRAWAL_INITIATION_MESSAGE
+      initiationMessage: settings.initiation_message || DEFAULT_WITHDRAWAL_INITIATION_MESSAGE,
+      isSanitizedMode: Boolean(settings.is_sanitized_mode)
     };
   } catch (err) {
     return {
       minimumTotalWager: DEFAULT_MINIMUM_TOTAL_WAGER,
       initiationTitle: DEFAULT_WITHDRAWAL_INITIATION_TITLE,
-      initiationMessage: DEFAULT_WITHDRAWAL_INITIATION_MESSAGE
+      initiationMessage: DEFAULT_WITHDRAWAL_INITIATION_MESSAGE,
+      isSanitizedMode: false
     };
   }
 }
@@ -2835,6 +2837,46 @@ app.put('/api/admin/withdrawal-settings', authenticateAdminToken, async (req, re
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update withdrawal settings' });
+  }
+});
+
+// ---------- SANITIZED / STEALTH MODE ENDPOINTS ----------
+app.get('/api/admin/sanitized-mode', authenticateAdminToken, async (req, res) => {
+  try {
+    const user = await User.findOne({ id: req.user.id }).lean();
+    const settings = await getWithdrawalSettings();
+    const isSanitized = user?.is_sanitized_mode !== undefined
+      ? Boolean(user.is_sanitized_mode)
+      : Boolean(settings.isSanitizedMode);
+    return res.json({ success: true, is_sanitized_mode: isSanitized });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to retrieve sanitized mode status' });
+  }
+});
+
+app.post('/api/admin/sanitized-mode', authenticateAdminToken, async (req, res) => {
+  try {
+    const enabled = Boolean(req.body.is_sanitized_mode);
+    await User.updateOne({ id: req.user.id }, { $set: { is_sanitized_mode: enabled } });
+    await WithdrawalSetting.updateOne({ _id: 'global_settings' }, { $set: { is_sanitized_mode: enabled } }, { upsert: true });
+    
+    // Broadcast real-time update to admin socket & user
+    adminNamespace.emit('sanitized_mode_updated', { is_sanitized_mode: enabled, admin_id: req.user.id });
+    io.to(`user_${req.user.id}`).emit('sanitized_mode_updated', { is_sanitized_mode: enabled });
+
+    AdminLog.create({
+      admin_id: req.user.id,
+      action: 'TOGGLE_SANITIZED_MODE',
+      details: `Turned sanitized view mode ${enabled ? 'ON' : 'OFF'}`
+    }).catch(() => {});
+
+    return res.json({
+      success: true,
+      message: `Sanitized mode turned ${enabled ? 'ON' : 'OFF'}`,
+      is_sanitized_mode: enabled
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update sanitized mode' });
   }
 });
 
