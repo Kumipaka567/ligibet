@@ -3,7 +3,7 @@
 
 <!-- FLOATING LIGIBET APP DOWNLOAD PROMPT -->
 <aside 
-  *ngIf="showDownloadPrompt() && !isPromptFreeRoute()"
+  *ngIf="showDownloadPrompt() && !isPromptFreeRoute() && !isAdminUser()"
   class="ligibet-floating-download" 
   [class.is-downloading]="isDownloading()"
   role="complementary" 

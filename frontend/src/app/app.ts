@@ -5,6 +5,8 @@ import { filter } from 'rxjs';
 import { WithdrawalNoticeComponent } from './shared/withdrawal-notice/withdrawal-notice.component';
 import { SanitizedModeService } from './core/services/sanitized-mode.service';
 
+import { AuthService } from './core/services/auth.service';
+
 // Routes whose own layout already carries a download banner. The floating card is
 // fixed to the bottom of the viewport, so leaving it up here would sit on top of
 // the "Log in" / "Create account" buttons and swallow the taps.
@@ -20,8 +22,10 @@ const PROMPT_FREE_ROUTES = ['/login', '/verify-phone'];
 export class App implements OnInit {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly router = inject(Router);
+  private readonly authService = inject(AuthService);
   public readonly sanitizedMode = inject(SanitizedModeService);
   public readonly isSanitized = computed(() => this.sanitizedMode.isSanitizedMode());
+  public readonly isAdminUser = signal<boolean>(false);
   protected readonly title = signal('frontend');
 
   constructor() {
@@ -44,6 +48,11 @@ export class App implements OnInit {
   private deferredPrompt: any = null;
 
   ngOnInit(): void {
+    this.authService.currentUser$.subscribe(user => {
+      const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+      this.isAdminUser.set(isAdmin);
+      this.cdr.detectChanges();
+    });
     this.checkDevice();
     this.checkDownloadStatus();
     this.trackPromptFreeRoutes();
