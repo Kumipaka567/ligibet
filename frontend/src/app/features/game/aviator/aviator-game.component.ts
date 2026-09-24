@@ -2595,6 +2595,16 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   private mpesaPollingInterval: any = null;
 
   public submitDeposit() {
+    // Refused before the deposit is attempted, so pressing the button tells the
+    // player why and starts the countdown in front of them. The button is left
+    // enabled on purpose: a dead button reads as the site being broken, where a
+    // button that answers reads as a wait.
+    if (this.depositLocked()) {
+      this.showToast('Too many unsuccessful payments. Try again after 10 minutes.', true);
+      this.refreshDepositCooldown();
+      return;
+    }
+
     const amount = this.depositVal();
     const minimum = this.minimumDeposit();
     if (isNaN(amount) || amount < minimum) {

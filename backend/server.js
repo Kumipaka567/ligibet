@@ -1584,7 +1584,7 @@ app.post([
     if (cooldown) {
       const minutes = Math.ceil(cooldown.retryAfterSeconds / 60);
       return res.status(429).json({
-        error: `Too many unsuccessful prompts. Nothing has been charged — please try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`,
+        error: `Too many unsuccessful payments. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`,
         code: 'RATE_LIMIT_COOLDOWN',
         cooldownUntil: cooldown.cooldownUntil,
         retryAfterSeconds: cooldown.retryAfterSeconds

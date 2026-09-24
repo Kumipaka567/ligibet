@@ -1128,22 +1128,14 @@
           <!-- DEPOSIT LOCKOUT COUNTDOWN -->
           <div *ngIf="depositLocked()" class="deposit-cooldown-card">
             <div class="deposit-cooldown-head">
-              <span class="deposit-cooldown-title">Too many unsuccessful prompts</span>
+              <span class="deposit-cooldown-title">Too many unsuccessful payments</span>
               <span class="deposit-cooldown-timer">{{ depositCooldownLabel() }}</span>
             </div>
-            <span class="deposit-cooldown-sub">
-              Your last 3 M-Pesa prompts were not completed, so deposits are paused for a short while.
-              <strong>Nothing has been charged</strong> and your account is fine. You can deposit again as
-              soon as the timer above reaches zero.
-            </span>
-            <span class="deposit-cooldown-tip">
-              Tip: keep your phone unlocked with your M-Pesa PIN ready, and enter it as soon as the prompt
-              appears so the next one goes through.
-            </span>
+            <span class="deposit-cooldown-sub">Try again after 10 minutes.</span>
           </div>
 
           <button class="main-green-action-btn"
-                  [disabled]="depositLocked() || mpesaStatus() === 'sending' || mpesaStatus() === 'waiting'"
+                  [disabled]="mpesaStatus() === 'sending' || mpesaStatus() === 'waiting'"
                   (click)="submitDeposit()">
             {{ depositLocked()
                 ? 'Try again in ' + depositCooldownLabel()
