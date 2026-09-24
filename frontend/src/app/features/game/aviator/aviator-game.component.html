@@ -567,9 +567,9 @@
         <div class="bet-panel-box" [class.panel-active]="gameState() === 'RUNNING' && panel1().hasActiveBet && !panel1().hasCashedOut">
           <!-- Header Row: [ Bet | Auto ] Switch + Optional Minimize Button -->
           <div class="panel-header-row">
-            <div class="panel-subtabs" *ngIf="!isSanitized()">
-              <button type="button" [class.active]="panel1().mode === 'bet'" (click)="setPanelMode(1, 'bet')">Bet</button>
-              <button type="button" [class.active]="panel1().mode === 'auto'" (click)="setPanelMode(1, 'auto')">Auto</button>
+            <div class="panel-subtabs">
+              <button type="button" [class.active]="panel1().mode === 'bet'" (click)="setPanelMode(1, 'bet')">{{ isSanitized() ? 'Place' : 'Bet' }}</button>
+              <button *ngIf="!isSanitized()" type="button" [class.active]="panel1().mode === 'auto'" (click)="setPanelMode(1, 'auto')">Auto</button>
             </div>
             
             <div class="panel-add-btn-wrap">
@@ -629,13 +629,13 @@
             </div>
 
             <div class="action-col">
-              <!-- 1. WAITING: NO BET PLACED YET -> GREEN BET BUTTON (SOLID GREEN IN SANITIZED MODE) -->
+              <!-- 1. WAITING: NO BET PLACED YET -> GREEN BET BUTTON -->
               <button *ngIf="gameState() === 'WAITING' && !panel1().hasActiveBet && !panel1().queuedAmount" 
                       class="big-bet-btn green" 
                       [disabled]="panel1().isPending"
                       (click)="placeBet(1)">
-                <span class="btn-title" *ngIf="!isSanitized()">{{ panel1().isPending ? 'Placing...' : 'Bet' }}</span>
-                <span class="btn-sub" *ngIf="!isSanitized()">{{ panel1().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ panel1().isPending ? 'Placing...' : (isSanitized() ? 'Place' : 'Bet') }}</span>
+                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
               <!-- 2. WAITING: BET PLACED OR QUEUED -> RED CANCEL BUTTON (ALLOWS CANCELLING BEFORE FLIGHT) -->
@@ -663,20 +663,20 @@
                 <span class="btn-sub">{{ potentialPayout1() | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
-              <!-- 5. RUNNING: CASHED OUT -> GREEN BET NEXT BUTTON (SOLID GREEN IN SANITIZED MODE) -->
+              <!-- 5. RUNNING: CASHED OUT -> GREEN BET NEXT BUTTON -->
               <button *ngIf="gameState() === 'RUNNING' && panel1().hasCashedOut && !panel1().queuedAmount"
                       class="big-bet-btn next-round"
                       (click)="queueBet(1)">
-                <span class="btn-title" *ngIf="!isSanitized()">Bet</span>
-                <span class="btn-sub" *ngIf="!isSanitized()">{{ panel1().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
+                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
-              <!-- 6. RUNNING: NO ACTIVE BET -> GREEN BET NEXT BUTTON (SOLID GREEN IN SANITIZED MODE) -->
+              <!-- 6. RUNNING: NO ACTIVE BET -> GREEN BET NEXT BUTTON -->
               <button *ngIf="gameState() === 'RUNNING' && !panel1().hasActiveBet && !panel1().hasCashedOut && !panel1().queuedAmount"
                       class="big-bet-btn green"
                       (click)="queueBet(1)">
-                <span class="btn-title" *ngIf="!isSanitized()">Bet</span>
-                <span class="btn-sub" *ngIf="!isSanitized()">{{ panel1().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
+                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
               <!-- 7. CRASHED: BET QUEUED -> RED CANCEL BUTTON -->
@@ -687,12 +687,12 @@
                 <span class="btn-sub">{{ isSanitized() ? 'Starting soon...' : 'Waiting for next round' }}</span>
               </button>
 
-              <!-- 8. CRASHED: NO QUEUED BET -> GREEN BET BUTTON (SOLID GREEN IN SANITIZED MODE) -->
+              <!-- 8. CRASHED: NO QUEUED BET -> GREEN BET BUTTON -->
               <button *ngIf="gameState() === 'CRASHED' && !panel1().queuedAmount"
                       class="big-bet-btn green"
                       (click)="queueBet(1)">
-                <span class="btn-title" *ngIf="!isSanitized()">Bet</span>
-                <span class="btn-sub" *ngIf="!isSanitized()">{{ panel1().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
+                <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
             </div>
           </div>
@@ -733,9 +733,9 @@
         <div class="bet-panel-box" *ngIf="showPanel2()" [class.panel-active]="gameState() === 'RUNNING' && panel2().hasActiveBet && !panel2().hasCashedOut">
           <!-- Header Row: [ Bet | Auto ] Switch + [-] Close Button -->
           <div class="panel-header-row">
-            <div class="panel-subtabs" *ngIf="!isSanitized()">
-              <button type="button" [class.active]="panel2().mode === 'bet'" (click)="setPanelMode(2, 'bet')">Bet</button>
-              <button type="button" [class.active]="panel2().mode === 'auto'" (click)="setPanelMode(2, 'auto')">Auto</button>
+            <div class="panel-subtabs">
+              <button type="button" [class.active]="panel2().mode === 'bet'" (click)="setPanelMode(2, 'bet')">{{ isSanitized() ? 'Place' : 'Bet' }}</button>
+              <button *ngIf="!isSanitized()" type="button" [class.active]="panel2().mode === 'auto'" (click)="setPanelMode(2, 'auto')">Auto</button>
             </div>
 
             <button type="button" class="panel-close-btn" (click)="togglePanel2()" title="Close Second Bet Panel">
@@ -770,13 +770,13 @@
             </div>
 
             <div class="action-col">
-              <!-- 1. WAITING: NO BET PLACED YET -> GREEN BET BUTTON (SOLID GREEN IN SANITIZED MODE) -->
+              <!-- 1. WAITING: NO BET PLACED YET -> GREEN BET BUTTON -->
               <button *ngIf="gameState() === 'WAITING' && !panel2().hasActiveBet && !panel2().queuedAmount" 
                       class="big-bet-btn green" 
                       [disabled]="panel2().isPending"
                       (click)="placeBet(2)">
-                <span class="btn-title" *ngIf="!isSanitized()">{{ panel2().isPending ? 'Placing...' : 'Bet' }}</span>
-                <span class="btn-sub" *ngIf="!isSanitized()">{{ panel2().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ panel2().isPending ? 'Placing...' : (isSanitized() ? 'Place' : 'Bet') }}</span>
+                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
               <!-- 2. WAITING: BET PLACED OR QUEUED -> RED CANCEL BUTTON (ALLOWS CANCELLING BEFORE FLIGHT) -->
@@ -804,20 +804,20 @@
                 <span class="btn-sub">{{ potentialPayout2() | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
-              <!-- 5. RUNNING: CASHED OUT -> GREEN BET NEXT BUTTON (SOLID GREEN IN SANITIZED MODE) -->
+              <!-- 5. RUNNING: CASHED OUT -> GREEN BET NEXT BUTTON -->
               <button *ngIf="gameState() === 'RUNNING' && panel2().hasCashedOut && !panel2().queuedAmount"
                       class="big-bet-btn next-round"
                       (click)="queueBet(2)">
-                <span class="btn-title" *ngIf="!isSanitized()">Bet</span>
-                <span class="btn-sub" *ngIf="!isSanitized()">{{ panel2().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
+                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
-              <!-- 6. RUNNING: NO ACTIVE BET -> GREEN BET NEXT BUTTON (SOLID GREEN IN SANITIZED MODE) -->
+              <!-- 6. RUNNING: NO ACTIVE BET -> GREEN BET NEXT BUTTON -->
               <button *ngIf="gameState() === 'RUNNING' && !panel2().hasActiveBet && !panel2().hasCashedOut && !panel2().queuedAmount"
                       class="big-bet-btn green"
                       (click)="queueBet(2)">
-                <span class="btn-title" *ngIf="!isSanitized()">Bet</span>
-                <span class="btn-sub" *ngIf="!isSanitized()">{{ panel2().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
+                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
               <!-- 7. CRASHED: BET QUEUED -> RED CANCEL BUTTON -->
@@ -828,12 +828,12 @@
                 <span class="btn-sub">{{ isSanitized() ? 'Starting soon...' : 'Waiting for next round' }}</span>
               </button>
 
-              <!-- 8. CRASHED: NO QUEUED BET -> GREEN BET BUTTON (SOLID GREEN IN SANITIZED MODE) -->
+              <!-- 8. CRASHED: NO QUEUED BET -> GREEN BET BUTTON -->
               <button *ngIf="gameState() === 'CRASHED' && !panel2().queuedAmount"
                       class="big-bet-btn green"
                       (click)="queueBet(2)">
-                <span class="btn-title" *ngIf="!isSanitized()">Bet</span>
-                <span class="btn-sub" *ngIf="!isSanitized()">{{ panel2().amount | number:'1.2-2' }} KES</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
+                <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
             </div>
           </div>
