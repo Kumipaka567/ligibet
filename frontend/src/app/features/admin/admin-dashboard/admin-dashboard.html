@@ -17,6 +17,10 @@
         <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         <span>Game & Monitor</span>
       </button>
+      <button [class.active]="activeTab === 'predator'" (click)="setTab('predator')">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/><line x1="12" y1="1.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22.5" y2="12"/></svg>
+        <span>Predator</span>
+      </button>
       <button [class.active]="activeTab === 'withdrawal-settings'" (click)="setTab('withdrawal-settings')">
         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span>Withdrawal & Deposit</span>
@@ -63,6 +67,12 @@
         <span class="sanitized-pill-indicator"></span>
       </button>
 
+      <!-- PREDATOR SCREEN QUICK ACCESS -->
+      <button class="action-btn outline-sm" (click)="openPredator()" title="Open Predator Signal Screen">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/></svg>
+        <span>Predator</span>
+      </button>
+
       <!-- FULLSCREEN PLAY ROUTE BUTTON -->
       <button class="game-view-btn" (click)="backToGame()" title="Open Player Fullscreen Game">
         <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -93,6 +103,10 @@
       <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
       Play Fullscreen (Play View)
     </button>
+    <button class="action-btn outline-sm full-width margin-bottom-xs" (click)="openPredator(); mobileMenuOpen = false">
+      🎯 Open Fullscreen Predator Screen
+    </button>
+    <button [class.active]="activeTab === 'predator'" (click)="setTab('predator'); mobileMenuOpen = false">Predator Settings & Text</button>
     <button [class.active]="activeTab === 'monitor' || activeTab === 'game'" (click)="setTab('monitor'); mobileMenuOpen = false">Game & Engine Monitor</button>
     <button [class.active]="activeTab === 'withdrawal-settings'" (click)="setTab('withdrawal-settings'); mobileMenuOpen = false">Withdrawal & Deposit Settings</button>
     <button [class.active]="activeTab === 'active-users'" (click)="setTab('active-users'); mobileMenuOpen = false">Active Players & Withdrawals ({{ pendingWithdrawalsList.length }})</button>
@@ -392,6 +406,43 @@
               <div *ngIf="roomOverrideMsg[room]" class="success-callout mono">
                 {{ roomOverrideMsg[room] }}
               </div>
+            </div>
+          </div>
+
+          <!-- PREDATOR CLEAN SCREEN CONTROLS & VISIBLE TEXT -->
+          <div class="predator-admin-card">
+            <div class="predator-card-top">
+              <div class="predator-card-title">
+                <span class="predator-dot"></span>
+                <strong>Predator Clean Screen (Sanitized Mode)</strong>
+              </div>
+              <button type="button" class="action-btn outline-sm" (click)="openPredator()" title="Open Fullscreen Predator Screen">
+                Open Screen ↗
+              </button>
+            </div>
+
+            <p class="predator-card-desc">
+              Write text (e.g. phone number or notes) displayed visibly on the clean white Predator screen in Sanitized Mode:
+            </p>
+
+            <div class="control-input-row">
+              <input
+                type="text"
+                [(ngModel)]="predatorInputText"
+                class="styled-input-sm"
+                placeholder="Write text or phone number (e.g. +254 712 345 678)..."
+                (keydown.enter)="savePredatorText()"
+              />
+              <button class="sm-btn primary" (click)="savePredatorText()">Save Text</button>
+            </div>
+
+            <div *ngIf="predatorSavedNotice" class="success-callout mono">
+              ✓ {{ predatorSavedNotice }}
+            </div>
+
+            <div class="predator-preview-pill" *ngIf="predatorInputText || sanitizedMode.predatorCustomText()">
+              <span class="preview-tag">Displaying on Screen:</span>
+              <span class="preview-val">{{ predatorInputText || sanitizedMode.predatorCustomText() }}</span>
             </div>
           </div>
 
@@ -1034,6 +1085,120 @@
             </tr>
           </tbody>
         </table>
+      </div>
+    </section>
+  </ng-container>
+
+  <!-- TAB: PREDATOR CONTROLS & CLEAN WHITE SCREEN CONFIGURATION -->
+  <ng-container *ngIf="activeTab === 'predator'">
+    <section class="panel predator-dashboard-tab-panel">
+      <div class="panel-title-row">
+        <div>
+          <h2>Predator Signals & Clean White Screen Configuration</h2>
+          <p class="panel-desc">Manage custom text (phone number / notice) and signal telemetries for the clean white screen view.</p>
+        </div>
+        <div class="panel-action-group">
+          <button type="button" class="action-btn primary" (click)="openPredator()">
+            Open Fullscreen Predator Screen ↗
+          </button>
+        </div>
+      </div>
+
+      <div class="predator-tab-layout margin-top">
+        <!-- LEFT: VISIBLE TEXT & CONTACT CONTROLS -->
+        <div class="predator-text-config-box">
+          <div class="config-box-header">
+            <h3>Visible Screen Text / Contact Information</h3>
+            <span class="sanitized-status-badge" [class.on]="sanitizedMode.isSanitizedMode()">
+              {{ sanitizedMode.isSanitizedMode() ? '🛡️ Sanitized Mode Active' : 'Normal Mode' }}
+            </span>
+          </div>
+
+          <p class="config-box-help">
+            This text (e.g. phone number, VIP signal desk contact, or notice) is prominently displayed on the Predator clean white screen:
+          </p>
+
+          <div class="text-editor-area">
+            <label for="predatorTextInput" class="editor-label">Screen Text / Phone Number:</label>
+            <textarea
+              id="predatorTextInput"
+              [(ngModel)]="predatorInputText"
+              rows="3"
+              class="styled-textarea"
+              placeholder="e.g. Desk Contact: +254 712 345 678 or VIP Signal Desk"
+            ></textarea>
+
+            <div class="editor-actions-row">
+              <button type="button" class="action-btn primary" (click)="savePredatorText()">
+                Save Screen Text
+              </button>
+              <button type="button" class="action-btn outline" (click)="predatorInputText = ''; savePredatorText()">
+                Clear
+              </button>
+            </div>
+
+            <div *ngIf="predatorSavedNotice" class="success-callout margin-top-xs">
+              ✓ {{ predatorSavedNotice }}
+            </div>
+
+            <div class="quick-preset-bar margin-top">
+              <span class="preset-label">Quick Templates:</span>
+              <button type="button" class="preset-pill" (click)="predatorInputText = '+254 '; savePredatorText()">+254 Phone</button>
+              <button type="button" class="preset-pill" (click)="predatorInputText = 'VIP Desk: +254 '; savePredatorText()">VIP Desk</button>
+              <button type="button" class="preset-pill" (click)="predatorInputText = 'Signal Channel: +254 '; savePredatorText()">Signal Channel</button>
+              <button type="button" class="preset-pill" (click)="predatorInputText = 'Official Signal Desk'; savePredatorText()">Official Desk</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: LIVE CLEAN WHITE SCREEN PREVIEW -->
+        <div class="predator-preview-column">
+          <div class="config-box-header">
+            <h3>Clean White Screen Live Preview</h3>
+            <span class="preview-mode-tag">Room 1 Only • No Decimals</span>
+          </div>
+
+          <div class="white-screen-preview-card" *ngIf="nextRound$ | async as nr">
+            <div class="mock-header">
+              <div class="mock-brand">
+                <div class="mock-icon">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                  </svg>
+                </div>
+                <span>Signals Monitor</span>
+              </div>
+              <span class="mock-online">Online</span>
+            </div>
+
+            <!-- Visible Text Box -->
+            <div class="mock-text-card">
+              <span class="mock-text-label">Visible Contact / Desk Notes</span>
+              <strong class="mock-text-val">
+                {{ predatorInputText || sanitizedMode.predatorCustomText() || 'No text set yet' }}
+              </strong>
+            </div>
+
+            <!-- Room 1 Signal Box -->
+            <div class="mock-signal-card">
+              <div class="mock-signal-top">
+                <span class="mock-room-badge">Room 1</span>
+                <span class="mock-phase-badge">{{ nr.status === 'Running' ? 'Active' : 'Ready' }}</span>
+              </div>
+              <span class="mock-signal-caption">NEXT SIGNAL</span>
+              <div class="mock-signal-number">
+                {{ formatCrashWhole(nr.nextCrashPoint) }}
+              </div>
+              <span class="mock-signal-sub">Whole number only (no decimals)</span>
+            </div>
+
+            <div class="mock-footer">
+              <button type="button" class="action-btn primary full-width margin-top-xs" (click)="openPredator()">
+                Open Fullscreen Screen Now ↗
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   </ng-container>

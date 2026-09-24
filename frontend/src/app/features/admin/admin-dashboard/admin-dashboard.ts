@@ -110,9 +110,33 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     );
   }
 
-  public activeTab: 'game' | 'monitor' | 'withdrawal-settings' | 'active-users' | 'transactions' | 'users' | 'admins' | 'logs' = 'monitor';
+  public activeTab: 'game' | 'monitor' | 'predator' | 'withdrawal-settings' | 'active-users' | 'transactions' | 'users' | 'admins' | 'logs' = 'monitor';
   public mobileMenuOpen: boolean = false;
   public selectedMiniRoom: number = 1;
+
+  // Predator Screen Settings & Custom Text
+  public predatorInputText: string = '';
+  public predatorSavedNotice: string | null = null;
+
+  public savePredatorText(): void {
+    this.sanitizedMode.setPredatorCustomText(this.predatorInputText);
+    this.predatorSavedNotice = 'Screen text saved successfully!';
+    this.showAdminToast('Predator screen text updated', 'success');
+    setTimeout(() => {
+      this.predatorSavedNotice = null;
+      this.cdr.markForCheck();
+    }, 3500);
+    this.cdr.markForCheck();
+  }
+
+  public openPredator(): void {
+    this.router.navigate(['/predator']);
+  }
+
+  public formatCrashWhole(val: number | null | undefined): string {
+    if (val === null || val === undefined) return '—';
+    return String(Math.floor(Number(val)));
+  }
 
   public switchMiniRoom(room: number): void {
     if (room === 1 || room === 2 || room === 3) {
@@ -333,6 +357,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.adminSocket.connect(token);
     this.fetchOverview();
     this.sanitizedMode.fetchStatus();
+    this.predatorInputText = this.sanitizedMode.predatorCustomText();
     // Load expensive lists only when their tab is opened. Previously every
     // dashboard visit fetched users, transactions, admins, logs, and settings
     // even though the monitor is the default screen.
@@ -408,11 +433,14 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.mobileMenuOpen = !this.mobileMenuOpen;
   }
 
-  public setTab(tab: 'game' | 'monitor' | 'withdrawal-settings' | 'active-users' | 'transactions' | 'users' | 'admins' | 'logs'): void {
+  public setTab(tab: 'game' | 'monitor' | 'predator' | 'withdrawal-settings' | 'active-users' | 'transactions' | 'users' | 'admins' | 'logs'): void {
     // Admins tab is superadmin-only
     if (tab === 'admins' && !this.isSuperAdmin) return;
     this.activeTab = tab;
     this.mobileMenuOpen = false;
+    if (tab === 'predator') {
+      this.predatorInputText = this.sanitizedMode.predatorCustomText();
+    }
     // Rows already held render immediately and a refresh only goes out once the
     // data has aged, so switching tabs no longer waits on a network round trip.
     if (tab === 'monitor' && this.isStale('dashboard')) this.fetchOverviewStats();

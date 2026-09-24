@@ -1,82 +1,177 @@
-<div class="predator-page">
-  <header class="predator-header">
-    <div class="header-identity">
-      <div class="predator-mark">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-          <circle cx="12" cy="12" r="9" />
-          <circle cx="12" cy="12" r="3.4" />
-          <line x1="12" y1="1.5" x2="12" y2="5" />
-          <line x1="12" y1="19" x2="12" y2="22.5" />
-          <line x1="1.5" y1="12" x2="5" y2="12" />
-          <line x1="19" y1="12" x2="22.5" y2="12" />
-        </svg>
-      </div>
-      <div>
-        <h1>Predator</h1>
-        <p>Live next-crash readout for rooms 1 to 3</p>
-      </div>
-    </div>
+<div class="predator-page" [class.sanitized-white-mode]="isSanitized()">
 
-    <div class="header-status">
-      <span class="link-pill" [class.online]="isConnected()">
-        <span class="link-dot"></span>
-        {{ isConnected() ? 'Engine linked' : 'Reconnecting' }}
-      </span>
-      <button type="button" class="back-btn" (click)="backToDashboard()">Admin dashboard</button>
-    </div>
-  </header>
-
-  <p class="predator-error" *ngIf="connectionError()">{{ connectionError() }}</p>
-
-  <section class="room-grid">
-    <article
-      class="room-card"
-      *ngFor="let room of rooms(); trackBy: trackByRoom"
-      [class.is-offline]="!room.live"
-      [attr.data-phase]="room.phase">
-
-      <div class="room-card-top">
-        <div class="room-name">
-          <span class="room-number">Room {{ room.room }}</span>
-          <span class="room-kind">{{ room.isPrimary ? 'Primary engine' : 'Secondary engine' }}</span>
+  <!-- SANITIZED WHITE MODE: Clean white screen, room 1 only, no decimals, visible custom text -->
+  <ng-container *ngIf="isSanitized(); else normalPredatorView">
+    <div class="sanitized-container">
+      <!-- CLEAN HEADER -->
+      <header class="sanitized-header">
+        <div class="sanitized-brand">
+          <div class="sanitized-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="sanitized-title">Signals Monitor</h1>
+            <p class="sanitized-sub">Room 1 Live Signal Feed</p>
+          </div>
         </div>
-        <span class="phase-chip" [attr.data-phase]="room.phase">{{ phaseLabel(room.phase) }}</span>
+
+        <div class="sanitized-nav">
+          <span class="sanitized-status-pill" [class.online]="isConnected()">
+            <span class="status-dot"></span>
+            {{ isConnected() ? 'Online' : 'Connecting…' }}
+          </span>
+          <button type="button" class="sanitized-dash-btn" (click)="backToDashboard()">
+            Admin Dashboard
+          </button>
+        </div>
+      </header>
+
+      <!-- VISIBLE TEXT / PHONE NUMBER CARD -->
+      <section class="sanitized-text-card">
+        <div class="text-card-header">
+          <span class="text-card-label">Visible Contact / Desk Notes</span>
+          <button *ngIf="!isEditingText()" type="button" class="text-edit-btn" (click)="startEditText()" title="Edit note or phone number">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            Edit
+          </button>
+        </div>
+
+        <!-- VIEWING VISIBLE TEXT -->
+        <div *ngIf="!isEditingText()" class="text-display-box" (click)="startEditText()">
+          <p class="visible-text-content" *ngIf="predatorText()">{{ predatorText() }}</p>
+          <p class="visible-text-empty" *ngIf="!predatorText()">
+            <em>No text set yet. Click here or configure in Admin Dashboard to add a phone number or notice.</em>
+          </p>
+        </div>
+
+        <!-- EDITING VISIBLE TEXT INLINE -->
+        <div *ngIf="isEditingText()" class="text-edit-box">
+          <input 
+            type="text" 
+            [(ngModel)]="editTextVal" 
+            class="text-edit-input" 
+            placeholder="e.g. +254 712 345 678 or VIP Signal Desk"
+            (keydown.enter)="saveEditText()"
+          />
+          <div class="text-edit-actions">
+            <button type="button" class="btn-save" (click)="saveEditText()">Save</button>
+            <button type="button" class="btn-cancel" (click)="cancelEditText()">Cancel</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ROOM 1 SIGNAL (NO DECIMALS, SINGLE DIGIT / WHOLE INTEGER ONLY) -->
+      <section class="sanitized-signal-section" *ngFor="let room of rooms(); trackBy: trackByRoom">
+        <div class="sanitized-signal-card">
+          <div class="signal-header">
+            <span class="signal-badge">Room 1</span>
+            <span class="signal-phase-badge" [attr.data-phase]="room.phase">{{ phaseLabel(room.phase) }}</span>
+          </div>
+
+          <div class="signal-readout">
+            <span class="signal-label">NEXT SIGNAL</span>
+            <div class="signal-number">
+              {{ formatCrashValue(room.nextCrashPoint) }}
+            </div>
+            <span class="signal-subtext">Live Room 1 Indicator</span>
+          </div>
+
+          <div class="signal-footer">
+            <span class="signal-timestamp" *ngIf="lastUpdate()">Updated {{ lastUpdate() | date: 'HH:mm:ss' }}</span>
+            <span class="signal-room-info">Channel 1</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </ng-container>
+
+  <!-- NORMAL PREDATOR VIEW (DARK TELEMETRY WITH ROOMS 1, 2, 3) -->
+  <ng-template #normalPredatorView>
+    <header class="predator-header">
+      <div class="header-identity">
+        <div class="predator-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="12" cy="12" r="9" />
+            <circle cx="12" cy="12" r="3.4" />
+            <line x1="12" y1="1.5" x2="12" y2="5" />
+            <line x1="12" y1="19" x2="12" y2="22.5" />
+            <line x1="1.5" y1="12" x2="5" y2="12" />
+            <line x1="19" y1="12" x2="22.5" y2="12" />
+          </svg>
+        </div>
+        <div>
+          <h1>Predator</h1>
+          <p>Live next-crash readout for rooms 1 to 3</p>
+        </div>
       </div>
 
-      <div class="crash-readout" [attr.data-band]="crashBand(room.nextCrashPoint)">
-        <span class="crash-caption">Next crash point</span>
-        <span class="crash-value" *ngIf="room.nextCrashPoint !== null">
-          {{ room.nextCrashPoint | number: '1.2-2' }}<span class="crash-x">x</span>
+      <div class="header-status">
+        <span class="link-pill" [class.online]="isConnected()">
+          <span class="link-dot"></span>
+          {{ isConnected() ? 'Engine linked' : 'Reconnecting' }}
         </span>
-        <span class="crash-value pending" *ngIf="room.nextCrashPoint === null">—</span>
-        <span class="crash-band">{{ bandLabel(room.nextCrashPoint) }}</span>
+        <button type="button" class="back-btn" (click)="backToDashboard()">Admin dashboard</button>
       </div>
+    </header>
 
-      <dl class="room-meta">
-        <div>
-          <dt>Live multiplier</dt>
-          <dd>{{ room.multiplier | number: '1.2-2' }}x</dd>
+    <p class="predator-error" *ngIf="connectionError()">{{ connectionError() }}</p>
+
+    <section class="room-grid">
+      <article
+        class="room-card"
+        *ngFor="let room of rooms(); trackBy: trackByRoom"
+        [class.is-offline]="!room.live"
+        [attr.data-phase]="room.phase">
+
+        <div class="room-card-top">
+          <div class="room-name">
+            <span class="room-number">Room {{ room.room }}</span>
+            <span class="room-kind">{{ room.isPrimary ? 'Primary engine' : 'Secondary engine' }}</span>
+          </div>
+          <span class="phase-chip" [attr.data-phase]="room.phase">{{ phaseLabel(room.phase) }}</span>
         </div>
-        <div>
-          <dt>Round</dt>
-          <dd>{{ room.roundId !== null ? '#' + room.roundId : '—' }}</dd>
+
+        <div class="crash-readout" [attr.data-band]="crashBand(room.nextCrashPoint)">
+          <span class="crash-caption">Next crash point</span>
+          <span class="crash-value" *ngIf="room.nextCrashPoint !== null">
+            {{ room.nextCrashPoint | number: '1.2-2' }}<span class="crash-x">x</span>
+          </span>
+          <span class="crash-value pending" *ngIf="room.nextCrashPoint === null">—</span>
+          <span class="crash-band">{{ bandLabel(room.nextCrashPoint) }}</span>
         </div>
-        <div>
-          <dt>Active bets</dt>
-          <dd>{{ room.activeBets }}</dd>
-        </div>
-      </dl>
 
-      <p class="room-offline-note" *ngIf="!room.live">Awaiting the first report from this room's engine.</p>
-    </article>
-  </section>
+        <dl class="room-meta">
+          <div>
+            <dt>Live multiplier</dt>
+            <dd>{{ room.multiplier | number: '1.2-2' }}x</dd>
+          </div>
+          <div>
+            <dt>Round</dt>
+            <dd>{{ room.roundId !== null ? '#' + room.roundId : '—' }}</dd>
+          </div>
+          <div>
+            <dt>Active bets</dt>
+            <dd>{{ room.activeBets }}</dd>
+          </div>
+        </dl>
 
-  <footer class="predator-footer">
-    <span>{{ totalActiveBets() }} active bet(s) across all three rooms</span>
-    <span *ngIf="lastUpdate()">Updated {{ lastUpdate() | date: 'HH:mm:ss' }}</span>
-  </footer>
+        <p class="room-offline-note" *ngIf="!room.live">Awaiting the first report from this room's engine.</p>
+      </article>
+    </section>
 
-  <p class="predator-note">
-    Read-only view. Crash points are set and reset from the admin dashboard.
-  </p>
+    <footer class="predator-footer">
+      <span>{{ totalActiveBets() }} active bet(s) across all three rooms</span>
+      <span *ngIf="lastUpdate()">Updated {{ lastUpdate() | date: 'HH:mm:ss' }}</span>
+    </footer>
+
+    <p class="predator-note">
+      Read-only view. Crash points are set and reset from the admin dashboard.
+    </p>
+  </ng-template>
+
 </div>

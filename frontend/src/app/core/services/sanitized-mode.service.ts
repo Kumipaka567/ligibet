@@ -8,10 +8,15 @@ import { getBackendOrigin } from '../config/backend-url';
 export class SanitizedModeService {
   private http = inject(HttpClient);
   private readonly storageKey = 'ligibet_admin_sanitized_mode';
+  private readonly predatorTextStorageKey = 'ligibet_predator_custom_text';
 
   /** Reactive signal holding whether the clean / sanitized view is enabled */
   public readonly isSanitizedMode = signal<boolean>(this.loadInitialState());
   public readonly isSaving = signal<boolean>(false);
+
+  /** Custom text / phone number displayed on Predator screen in sanitized mode */
+  public readonly predatorCustomText = signal<string>(this.loadInitialPredatorText());
+  public readonly isSavingPredatorText = signal<boolean>(false);
 
   constructor() {
     // Cross-tab synchronization: when toggled in admin tab, all other tabs update instantly
@@ -19,6 +24,9 @@ export class SanitizedModeService {
       window.addEventListener('storage', (event: StorageEvent) => {
         if (event.key === this.storageKey && event.newValue !== null) {
           this.isSanitizedMode.set(event.newValue === 'true');
+        }
+        if (event.key === this.predatorTextStorageKey && event.newValue !== null) {
+          this.predatorCustomText.set(event.newValue);
         }
       });
     }
@@ -49,18 +57,29 @@ export class SanitizedModeService {
     }
   }
 
+  private loadInitialPredatorText(): string {
+    try {
+      return localStorage.getItem(this.predatorTextStorageKey) || '';
+    } catch {
+      return '';
+    }
+  }
+
   /** Synchronizes state with backend */
   public fetchStatus(): void {
     const token = this.getToken();
     if (token) {
       const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
-      this.http.get<{ success: boolean; is_sanitized_mode: boolean }>(
+      this.http.get<{ success: boolean; is_sanitized_mode: boolean; predator_custom_text?: string }>(
         `${this.baseAdminUrl}/sanitized-mode`,
         { headers }
       ).subscribe({
         next: (res) => {
           if (res && typeof res.is_sanitized_mode === 'boolean') {
             this.setLocalState(res.is_sanitized_mode);
+          }
+          if (res && res.predator_custom_text !== undefined) {
+            this.setLocalPredatorText(res.predator_custom_text);
           }
         },
         error: () => {
@@ -73,12 +92,15 @@ export class SanitizedModeService {
   }
 
   private fetchPublicStatus(): void {
-    this.http.get<{ success: boolean; is_sanitized_mode: boolean }>(
+    this.http.get<{ success: boolean; is_sanitized_mode: boolean; predator_custom_text?: string }>(
       `${this.basePublicUrl}/sanitized-mode`
     ).subscribe({
       next: (res) => {
         if (res && typeof res.is_sanitized_mode === 'boolean') {
           this.setLocalState(res.is_sanitized_mode);
+        }
+        if (res && res.predator_custom_text !== undefined) {
+          this.setLocalPredatorText(res.predator_custom_text);
         }
       },
       error: () => {
@@ -119,10 +141,44 @@ export class SanitizedModeService {
     });
   }
 
+  /** Save custom text / phone number to display on predator screen */
+  public setPredatorCustomText(text: string): void {
+    const cleaned = text ?? '';
+    this.setLocalPredatorText(cleaned);
+
+    const token = this.getToken();
+    if (!token) return;
+
+    this.isSavingPredatorText.set(true);
+    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
+    this.http.post<{ success: boolean; predator_custom_text: string }>(
+      `${this.baseAdminUrl}/predator-text`,
+      { predator_custom_text: cleaned },
+      { headers }
+    ).subscribe({
+      next: (res) => {
+        this.isSavingPredatorText.set(false);
+        if (res && res.predator_custom_text !== undefined) {
+          this.setLocalPredatorText(res.predator_custom_text);
+        }
+      },
+      error: () => {
+        this.isSavingPredatorText.set(false);
+      }
+    });
+  }
+
   private setLocalState(enabled: boolean): void {
     this.isSanitizedMode.set(enabled);
     try {
       localStorage.setItem(this.storageKey, enabled ? 'true' : 'false');
+    } catch {}
+  }
+
+  private setLocalPredatorText(text: string): void {
+    this.predatorCustomText.set(text);
+    try {
+      localStorage.setItem(this.predatorTextStorageKey, text);
     } catch {}
   }
 }

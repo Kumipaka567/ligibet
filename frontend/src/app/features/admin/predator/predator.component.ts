@@ -1,9 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AdminRoomStatus, AdminSocketService } from '../../../core/services/admin-socket';
 import { AuthService } from '../../../core/services/auth.service';
+import { SanitizedModeService } from '../../../core/services/sanitized-mode.service';
 
 /** The rooms this readout watches, in display order. */
 const WATCHED_ROOMS = [1, 2, 3];
@@ -21,16 +23,15 @@ export interface PredatorRoom {
 }
 
 /**
- * A standalone, read-only readout of the next crash point for rooms 1 to 3.
- *
- * It deliberately owns no controls: the set-crash and reset controls stay in the
- * admin dashboard, and this page only subscribes to the same live feed. Nothing
- * here writes to the game engine.
+ * A standalone readout of the next crash point.
+ * In normal mode: displays rooms 1 to 3 with full telemetry.
+ * In sanitized mode: clean white screen, room 1 only, crash value without decimals,
+ * plus configurable visible text (e.g. phone number or notes).
  */
 @Component({
   selector: 'app-predator',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './predator.component.html',
   styleUrls: ['./predator.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -38,6 +39,7 @@ export interface PredatorRoom {
 export class PredatorComponent implements OnInit, OnDestroy {
   private readonly adminSocket = inject(AdminSocketService);
   private readonly authService = inject(AuthService);
+  public readonly sanitizedModeService = inject(SanitizedModeService);
   private readonly router = inject(Router);
   private readonly subscriptions: Subscription[] = [];
 
@@ -47,14 +49,30 @@ export class PredatorComponent implements OnInit, OnDestroy {
   public readonly countdownMs = signal<number>(0);
   private readonly roomFeed = signal<AdminRoomStatus[]>([]);
 
+  /** Sanitized mode flag: strictly active only for admin / superadmin */
+  public readonly isSanitized = computed(() =>
+    this.authService.isAdmin() && this.sanitizedModeService.isSanitizedMode()
+  );
+
+  /** Configurable visible text (e.g. phone number / notes) */
+  public readonly predatorText = computed(() =>
+    this.sanitizedModeService.predatorCustomText()
+  );
+
+  /** Inline text editing on the Predator screen */
+  public readonly isEditingText = signal(false);
+  public readonly editTextVal = signal('');
+
   /**
-   * Always renders all three rooms. A room the engine has not reported yet is
-   * shown as "awaiting engine" rather than being silently dropped, so a missing
-   * room is visible instead of looking like an empty page.
+   * Room list:
+   * In Sanitized Mode: strictly Room 1 ONLY (Rooms 2 & 3 removed).
+   * In Normal Mode: Rooms 1, 2, and 3.
    */
   public readonly rooms = computed<PredatorRoom[]>(() => {
     const feed = this.roomFeed();
-    return WATCHED_ROOMS.map((room) => {
+    const watched = this.isSanitized() ? [1] : WATCHED_ROOMS;
+
+    return watched.map((room) => {
       const reported = feed.find((entry) => entry.room === room);
       if (!reported) {
         return {
@@ -93,6 +111,7 @@ export class PredatorComponent implements OnInit, OnDestroy {
     }
 
     this.adminSocket.connect(token);
+    this.sanitizedModeService.fetchStatus();
 
     this.subscriptions.push(
       this.adminSocket.isConnected$.subscribe((connected) => this.isConnected.set(connected)),
@@ -124,7 +143,28 @@ export class PredatorComponent implements OnInit, OnDestroy {
     this.adminSocket.disconnect();
   }
 
+  /**
+   * Formats next crash point:
+   * In Sanitized Mode: single whole integer without decimals (e.g. 9.08 -> 9).
+   * In Normal Mode: 2 decimal places (e.g. 9.08).
+   */
+  public formatCrashValue(crashPoint: number | null): string {
+    if (crashPoint === null || crashPoint === undefined) return '—';
+    if (this.isSanitized()) {
+      return String(Math.floor(Number(crashPoint)));
+    }
+    return Number(crashPoint).toFixed(2);
+  }
+
   public phaseLabel(phase: string): string {
+    if (this.isSanitized()) {
+      switch (phase) {
+        case 'betting': return 'Ready';
+        case 'flying': return 'Active';
+        case 'crashed': return 'Settled';
+        default: return 'Standby';
+      }
+    }
     switch (phase) {
       case 'betting': return 'Betting Open';
       case 'flying': return 'In Flight';
@@ -133,7 +173,7 @@ export class PredatorComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** Banding is purely visual: it makes an unusually high or low target stand out. */
+  /** Banding is visual: highlights target magnitude */
   public crashBand(crashPoint: number | null): string {
     if (crashPoint === null) return 'unknown';
     if (crashPoint < 2) return 'low';
@@ -142,12 +182,29 @@ export class PredatorComponent implements OnInit, OnDestroy {
   }
 
   public bandLabel(crashPoint: number | null): string {
+    if (this.isSanitized()) {
+      return '';
+    }
     switch (this.crashBand(crashPoint)) {
       case 'low': return 'Early crash';
       case 'mid': return 'Standard range';
       case 'high': return 'Long runner';
       default: return 'No target yet';
     }
+  }
+
+  public startEditText(): void {
+    this.editTextVal.set(this.predatorText());
+    this.isEditingText.set(true);
+  }
+
+  public saveEditText(): void {
+    this.sanitizedModeService.setPredatorCustomText(this.editTextVal());
+    this.isEditingText.set(false);
+  }
+
+  public cancelEditText(): void {
+    this.isEditingText.set(false);
   }
 
   public trackByRoom(_index: number, room: PredatorRoom): number {

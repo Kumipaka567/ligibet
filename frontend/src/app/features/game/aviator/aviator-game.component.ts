@@ -381,6 +381,15 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
         this.evaluateAutoCashouts(mult);
       }
     });
+
+    // Effect to ensure ALL audio is instantly killed if sanitized mode is active
+    effect(() => {
+      if (this.isSanitized()) {
+        this.soundEnabled.set(false);
+        this.musicEnabled.set(false);
+        this.stopAllGameAudio();
+      }
+    });
   }
 
   ngOnInit() {
@@ -419,7 +428,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   private initGameAudio(): void {
     if (typeof window === 'undefined') return;
 
-    if (this.muteAudio || this.isMiniView) {
+    if (this.muteAudio || this.isMiniView || this.isSanitized()) {
       this.soundEnabled.set(false);
       this.musicEnabled.set(false);
       return;
@@ -469,12 +478,12 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private canPlayGameAudio(): boolean {
-    if (this.muteAudio || this.isMiniView) return false;
+    if (this.muteAudio || this.isMiniView || this.isSanitized()) return false;
     return typeof document === 'undefined' || !document.hidden;
   }
 
   private armAudioAfterInteraction(): void {
-    if (this.muteAudio || this.isMiniView || this.audioWasArmed || !this.soundEnabled()) return;
+    if (this.muteAudio || this.isMiniView || this.audioWasArmed || !this.soundEnabled() || this.isSanitized()) return;
 
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
       void this.audioCtx.resume();
@@ -495,7 +504,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private startFlightAudio(): void {
-    if (!this.soundEnabled() || !this.canPlayGameAudio()) return;
+    if (!this.soundEnabled() || !this.canPlayGameAudio() || this.isSanitized()) return;
 
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
       void this.audioCtx.resume();
@@ -561,7 +570,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private playFlyAwayAudio(fadeInSeconds = 0): void {
-    if (!this.soundEnabled() || !this.canPlayGameAudio()) return;
+    if (!this.soundEnabled() || !this.canPlayGameAudio() || this.isSanitized()) return;
 
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
       void this.audioCtx.resume();
@@ -600,7 +609,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private transitionToFlyAwayAudio(): void {
-    if (!this.soundEnabled() || !this.canPlayGameAudio()) {
+    if (!this.soundEnabled() || !this.canPlayGameAudio() || this.isSanitized()) {
       this.stopAllGameAudio();
       return;
     }
@@ -2365,6 +2374,11 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   public toggleSound(): void {
+    if (this.isSanitized()) {
+      this.soundEnabled.set(false);
+      this.stopAllGameAudio();
+      return;
+    }
     const enabled = !this.soundEnabled();
     this.soundEnabled.set(enabled);
     try {

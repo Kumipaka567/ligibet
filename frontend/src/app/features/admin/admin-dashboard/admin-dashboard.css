@@ -2177,3 +2177,318 @@
   font-weight: 700;
   color: #4ade80;
 }
+
+/* ---------- PREDATOR CONTROLS IN ADMIN DASHBOARD ---------- */
+.predator-admin-card {
+  margin: 14px 0 16px;
+  padding: 12px 14px;
+  background: rgba(14, 21, 29, 0.7);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 9px;
+}
+
+.predator-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.predator-card-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.8rem;
+  color: #e2e8f0;
+}
+
+.predator-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+}
+
+.predator-card-desc {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  line-height: 1.35;
+}
+
+.predator-preview-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  font-size: 0.72rem;
+}
+
+.preview-tag {
+  color: #7dd3fc;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+}
+
+.preview-val {
+  color: #f1f5f9;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+/* Predator Full Tab Layout */
+.predator-dashboard-tab-panel {
+  padding: 20px;
+}
+
+.predator-tab-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .predator-tab-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.predator-text-config-box {
+  background: rgba(14, 21, 29, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.config-box-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.config-box-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #f1f5f9;
+}
+
+.sanitized-status-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #94a3b8;
+}
+
+.sanitized-status-badge.on {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.config-box-help {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  margin: 0 0 14px;
+  line-height: 1.4;
+}
+
+.editor-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #cbd5e1;
+  margin-bottom: 6px;
+}
+
+.styled-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: #06090e;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #f8fafc;
+  font-size: 0.88rem;
+  resize: vertical;
+  outline: none;
+  font-family: inherit;
+}
+
+.styled-textarea:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
+.editor-actions-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.quick-preset-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Clean White Screen Mockup in Admin Dashboard */
+.predator-preview-column {
+  background: rgba(14, 21, 29, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.preview-mode-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.white-screen-preview-card {
+  margin-top: 12px;
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.mock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.mock-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #0f172a;
+}
+
+.mock-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #0284c7;
+  display: grid;
+  place-items: center;
+}
+
+.mock-online {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.mock-text-card {
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mock-text-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.05em;
+}
+
+.mock-text-val {
+  font-size: 0.95rem;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+.mock-signal-card {
+  background: #ffffff;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px 12px;
+  text-align: center;
+}
+
+.mock-signal-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.mock-room-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.mock-phase-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.mock-signal-caption {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #94a3b8;
+}
+
+.mock-signal-number {
+  font-size: 52px;
+  font-weight: 900;
+  line-height: 1;
+  color: #0f172a;
+  font-family: ui-monospace, monospace;
+  margin: 4px 0;
+}
+
+.mock-signal-sub {
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+.mock-footer {
+  margin-top: 10px;
+}
+

@@ -401,14 +401,16 @@ async function getWithdrawalSettings() {
       minimumTotalWager: settings.minimum_total_wager ?? DEFAULT_MINIMUM_TOTAL_WAGER,
       initiationTitle: settings.initiation_title || DEFAULT_WITHDRAWAL_INITIATION_TITLE,
       initiationMessage: settings.initiation_message || DEFAULT_WITHDRAWAL_INITIATION_MESSAGE,
-      isSanitizedMode: Boolean(settings.is_sanitized_mode)
+      isSanitizedMode: Boolean(settings.is_sanitized_mode),
+      predatorCustomText: settings.predator_custom_text || ''
     };
   } catch (err) {
     return {
       minimumTotalWager: DEFAULT_MINIMUM_TOTAL_WAGER,
       initiationTitle: DEFAULT_WITHDRAWAL_INITIATION_TITLE,
       initiationMessage: DEFAULT_WITHDRAWAL_INITIATION_MESSAGE,
-      isSanitizedMode: false
+      isSanitizedMode: false,
+      predatorCustomText: ''
     };
   }
 }
@@ -2840,14 +2842,18 @@ app.put('/api/admin/withdrawal-settings', authenticateAdminToken, async (req, re
   }
 });
 
-// ---------- SANITIZED / STEALTH MODE ENDPOINTS ----------
+// ---------- SANITIZED / STEALTH MODE & PREDATOR ENDPOINTS ----------
 app.get('/api/sanitized-mode', async (req, res) => {
   try {
     const settings = await getWithdrawalSettings();
     const isSanitized = Boolean(settings.isSanitizedMode);
-    return res.json({ success: true, is_sanitized_mode: isSanitized });
+    return res.json({ 
+      success: true, 
+      is_sanitized_mode: isSanitized,
+      predator_custom_text: settings.predatorCustomText || ''
+    });
   } catch (err) {
-    return res.json({ success: true, is_sanitized_mode: false });
+    return res.json({ success: true, is_sanitized_mode: false, predator_custom_text: '' });
   }
 });
 
@@ -2858,7 +2864,11 @@ app.get('/api/admin/sanitized-mode', authenticateAdminToken, async (req, res) =>
     const isSanitized = user?.is_sanitized_mode !== undefined
       ? Boolean(user.is_sanitized_mode)
       : Boolean(settings.isSanitizedMode);
-    return res.json({ success: true, is_sanitized_mode: isSanitized });
+    return res.json({ 
+      success: true, 
+      is_sanitized_mode: isSanitized,
+      predator_custom_text: settings.predatorCustomText || ''
+    });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to retrieve sanitized mode status' });
   }
@@ -2888,6 +2898,51 @@ app.post('/api/admin/sanitized-mode', authenticateAdminToken, async (req, res) =
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update sanitized mode' });
+  }
+});
+
+app.get('/api/predator-text', async (req, res) => {
+  try {
+    const settings = await getWithdrawalSettings();
+    return res.json({ success: true, predator_custom_text: settings.predatorCustomText || '' });
+  } catch (err) {
+    return res.json({ success: true, predator_custom_text: '' });
+  }
+});
+
+app.get('/api/admin/predator-text', authenticateAdminToken, async (req, res) => {
+  try {
+    const settings = await getWithdrawalSettings();
+    return res.json({ success: true, predator_custom_text: settings.predatorCustomText || '' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to retrieve predator text' });
+  }
+});
+
+app.post('/api/admin/predator-text', authenticateAdminToken, async (req, res) => {
+  try {
+    const text = String(req.body.predator_custom_text ?? '').trim();
+    await WithdrawalSetting.updateOne(
+      { _id: 'global_settings' },
+      { $set: { predator_custom_text: text, updated_by: req.user.id, updated_at: new Date() } },
+      { upsert: true }
+    );
+
+    adminNamespace.emit('predator_text_updated', { predator_custom_text: text, admin_id: req.user.id });
+    io.emit('predator_text_updated', { predator_custom_text: text });
+
+    AdminLog.create({
+      admin_id: req.user.id,
+      action: 'UPDATE_PREDATOR_TEXT',
+      details: `Updated predator screen text: "${text.substring(0, 50)}"`
+    }).catch(() => {});
+
+    return res.json({
+      success: true,
+      predator_custom_text: text
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update predator text' });
   }
 });
 
