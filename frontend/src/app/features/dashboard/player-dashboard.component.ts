@@ -29,7 +29,8 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
   readonly sports = inject(SportsMarketService);
   private readonly subscriptions: Subscription[] = [];
 
-  readonly isSanitized = computed(() => this.sanitizedModeService.isSanitizedMode());
+  /** Sanitized mode is strictly active ONLY for Admin / Superadmin accounts */
+  readonly isSanitized = computed(() => this.authService.isAdmin() && this.sanitizedModeService.isSanitizedMode());
 
   readonly currentUser = signal<User | null>(null);
   readonly userBalance = signal(0);

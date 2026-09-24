@@ -441,7 +441,8 @@ export class AuthLandingComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly sanitizedModeService = inject(SanitizedModeService);
 
-  readonly isSanitized = computed(() => this.sanitizedModeService.isSanitizedMode());
+  /** Sanitized mode is strictly active ONLY for Admin / Superadmin accounts */
+  readonly isSanitized = computed(() => this.authService.isAdmin() && this.sanitizedModeService.isSanitizedMode());
 
   public activeTab: 'login' | 'register' | 'forgot' = 'login';
   public phone: string = '';

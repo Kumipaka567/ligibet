@@ -84,8 +84,8 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   private http = inject(HttpClient);
   private router = inject(Router);
 
-  /** True when Sanitized Mode is switched ON on the admin dashboard */
-  public isSanitized = computed(() => this.sanitizedModeService.isSanitizedMode());
+  /** True when current user is Admin/Superadmin AND Sanitized Mode is switched ON on the admin dashboard */
+  public isSanitized = computed(() => this.authService.isAdmin() && this.sanitizedModeService.isSanitizedMode());
 
   private subs: Subscription[] = [];
   private animationFrameId: number | null = null;
@@ -176,8 +176,8 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   public showAvatarModal = signal<boolean>(false);
   public showPlusMenu = signal<boolean>(false);
   public isAdminUser = computed(() => {
-    const user = this.currentUser();
-    return Boolean(user?.role === 'admin' || user?.role === 'superadmin' || this.authService.isAdmin());
+    const role = this.currentUser()?.role || this.authService.currentUser$.getValue()?.role;
+    return role === 'admin' || role === 'superadmin';
   });
   public selectedAvatarIcon = signal<string>('😎');
   public avatarOptions = ['😎', '🚀', '🔥', '⚡', '👑', '🏆', '💎', '🎯', '🦁', '🌟', '🦊', '🐯', '🐼', '🐺', '🎲'];
@@ -2334,6 +2334,14 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     this.showProfileDropdown.set(false);
     this.showGameMenu.set(false);
     this.showPlusMenu.update(v => !v);
+  }
+
+  public onPlusBtnClick(event?: Event): void {
+    if (this.isAdminUser()) {
+      this.togglePlusMenu(event);
+      return;
+    }
+    this.togglePanel2();
   }
 
   public resetAutoCashout(panelIndex: 1 | 2) {

@@ -24,7 +24,7 @@ export class App implements OnInit {
   private readonly router = inject(Router);
   private readonly authService = inject(AuthService);
   public readonly sanitizedMode = inject(SanitizedModeService);
-  public readonly isSanitized = computed(() => this.sanitizedMode.isSanitizedMode());
+  public readonly isSanitized = computed(() => this.isAdminUser() && this.sanitizedMode.isSanitizedMode());
   public readonly isAdminUser = signal<boolean>(false);
   protected readonly title = signal('frontend');
 

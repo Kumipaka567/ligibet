@@ -574,7 +574,7 @@
             </div>
             
             <div class="panel-add-btn-wrap">
-              <button type="button" class="panel-add-btn" (click)="togglePlusMenu($event)" title="Options">
+              <button type="button" class="panel-add-btn" (click)="onPlusBtnClick($event)" title="Options">
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
                   <rect x="2.5" y="2.5" width="19" height="19" rx="5" stroke="#484f56" stroke-width="1.8"/>
                   <line x1="12" y1="7" x2="12" y2="17" stroke="#94a0a8" stroke-width="2" stroke-linecap="round"/>
@@ -582,8 +582,8 @@
                 </svg>
               </button>
 
-              <!-- PLUS BUTTON POPUP MENU -->
-              <div class="panel-plus-dropdown" *ngIf="showPlusMenu()" (click)="$event.stopPropagation()">
+              <!-- PLUS BUTTON POPUP MENU (VISIBLE ONLY FOR ADMIN USERS) -->
+              <div class="panel-plus-dropdown" *ngIf="showPlusMenu() && isAdminUser()" (click)="$event.stopPropagation()">
                 <button type="button" class="plus-dropdown-item" (click)="togglePanel2(); showPlusMenu.set(false)">
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
@@ -594,8 +594,7 @@
                 </button>
 
                 <!-- ADMIN MENU ITEM (RED FONT - VISIBLE ONLY TO ADMINS) -->
-                <button *ngIf="isAdminUser()" 
-                        type="button" 
+                <button type="button" 
                         class="plus-dropdown-item admin-red-item" 
                         (click)="navigateToAdmin(); showPlusMenu.set(false)">
                   <svg class="admin-red-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
