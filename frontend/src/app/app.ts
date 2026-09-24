@@ -1,8 +1,9 @@
-import { Component, OnInit, signal, ChangeDetectorRef, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, effect, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { WithdrawalNoticeComponent } from './shared/withdrawal-notice/withdrawal-notice.component';
+import { SanitizedModeService } from './core/services/sanitized-mode.service';
 
 // Routes whose own layout already carries a download banner. The floating card is
 // fixed to the bottom of the viewport, so leaving it up here would sit on top of
@@ -19,7 +20,20 @@ const PROMPT_FREE_ROUTES = ['/login', '/verify-phone'];
 export class App implements OnInit {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly router = inject(Router);
+  public readonly sanitizedMode = inject(SanitizedModeService);
+  public readonly isSanitized = computed(() => this.sanitizedMode.isSanitizedMode());
   protected readonly title = signal('frontend');
+
+  constructor() {
+    effect(() => {
+      const sanitized = this.isSanitized();
+      if (typeof document !== 'undefined') {
+        document.title = sanitized
+          ? 'Ligi - Interactive Sports, Live Scores & Games'
+          : 'LigiBet - Sports Betting & Aviator Casino';
+      }
+    });
+  }
 
   // Floating App Download & Home Screen State
   public showDownloadPrompt = signal<boolean>(true);

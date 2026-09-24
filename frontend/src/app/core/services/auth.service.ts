@@ -427,15 +427,18 @@ export class AuthService {
             ? Number(res.mpesaNewBalance)
             : res.balance;
 
-          this.withdrawalNotices.show({
-            reference: res.mpesaReceiptCode || res.reference || '',
-            amount,
-            phone: phone || currentUser?.phone_number || '',
-            balance: liveMpesaBal,
-            at: new Date(),
-            codePrefix: mpesaCodePrefix || 'LI8',
-            appName: 'LIGIBET'
-          });
+          // Delay the M-PESA heads-up SMS notification so the user first sees the "Withdrawal submitted successfully" notice
+          setTimeout(() => {
+            this.withdrawalNotices.show({
+              reference: res.mpesaReceiptCode || res.reference || '',
+              amount,
+              phone: phone || currentUser?.phone_number || '',
+              balance: liveMpesaBal,
+              at: new Date(),
+              codePrefix: mpesaCodePrefix || 'LI8',
+              appName: 'LIGIBET'
+            });
+          }, 3500);
         }
       }),
       catchError(err => throwError(() => this.extractErrorMessage(err)))

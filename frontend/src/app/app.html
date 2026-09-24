@@ -32,7 +32,7 @@
     <!-- App Info Details -->
     <div class="app-details-column">
       <div class="app-header-row">
-        <span class="app-name"><span class="name-ligi">Ligi</span><span class="name-bet">Bet</span> App</span>
+        <span class="app-name"><span class="name-ligi">Ligi</span><span class="name-bet" *ngIf="!isSanitized()">Bet</span> App</span>
         <span class="badge-official">OFFICIAL</span>
       </div>
       <div class="app-rating-row">
@@ -40,7 +40,7 @@
         <span class="rating-val">4.8</span>
         <span class="app-size">• 15MB • Free</span>
       </div>
-      <p class="app-benefits-text">Faster Aviator • 0% Data • Instant Payouts</p>
+      <p class="app-benefits-text">{{ isSanitized() ? 'Smooth Experience • Free Data Mode • Instant Sync' : 'Faster Aviator • 0% Data • Instant Payouts' }}</p>
     </div>
 
     <!-- Download CTA Button -->

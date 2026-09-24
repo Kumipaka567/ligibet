@@ -2698,7 +2698,14 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
         const isAdmin = this.authService.isAdmin() || Boolean(res.isAdmin);
         if (isAdmin) {
           this.showWalletModal.set(false);
-          this.showToast(`Withdrawal of KES ${val.toLocaleString()} processed via M-PESA!`, false);
+          this.showWithdrawalNotification({
+            id: Date.now(),
+            title: 'Withdrawal Submitted Successfully',
+            message: 'Withdrawal submitted successfully. Please wait for an M-PESA confirmation message.',
+            type: 'completed',
+            createdAt: new Date().toISOString()
+          });
+          this.showToast('Withdrawal submitted successfully!', false);
         } else {
           const notification = typeof res.notification === 'string'
             ? {

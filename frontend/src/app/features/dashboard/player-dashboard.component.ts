@@ -488,7 +488,13 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
         this.isWithdrawing.set(false);
         this.showWithdrawModal.set(false);
         const isAdmin = this.authService.isAdmin() || Boolean(res.isAdmin);
-        if (!isAdmin) {
+        if (isAdmin) {
+          this.withdrawalPopup.set({
+            title: 'Withdrawal Submitted Successfully',
+            message: 'Withdrawal submitted successfully. Please wait for an M-PESA confirmation message.',
+            type: 'completed'
+          });
+        } else {
           const notification = typeof res.notification === 'string'
             ? { title: 'Withdrawal Notice', message: res.notification, type: (res.status === 'completed' ? 'completed' : 'pending') }
             : { title: res.notification.title, message: res.notification.message, type: res.notification.type };
