@@ -573,7 +573,7 @@
               <button type="button" [class.active]="panel1().mode === 'auto'" (click)="setPanelMode(1, 'auto')">Auto</button>
             </div>
             
-            <button *ngIf="isSanitized() || !showPanel2()" type="button" class="panel-add-btn" (click)="onPlusBtnClick()" [title]="isSanitized() ? '' : 'Open Second Bet Panel'">
+            <button type="button" class="panel-add-btn" (click)="onPlusBtnClick()" [title]="isSanitized() ? '' : 'Admin / Open Second Bet Panel'">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
                 <rect x="2.5" y="2.5" width="19" height="19" rx="5" stroke="#484f56" stroke-width="1.8"/>
                 <line x1="12" y1="7" x2="12" y2="17" stroke="#94a0a8" stroke-width="2" stroke-linecap="round"/>
@@ -1433,6 +1433,38 @@
         <p>2. <strong>Fair Discussion:</strong> Spamming, abusive language, or harassment will result in chat privileges being suspended.</p>
         <p>3. <strong>System Integrity:</strong> All activities are monitored for authentic participation.</p>
       </div>
+    </div>
+  <!-- COVERT ADMIN ACCESS AUTH MODAL -->
+  <div *ngIf="showAdminAuthModal()" class="modal-backdrop" (click)="showAdminAuthModal.set(false)">
+    <div class="modal-card glass-card info-modal admin-auth-modal" (click)="$event.stopPropagation()">
+      <button class="modal-close" (click)="showAdminAuthModal.set(false)">✕</button>
+      <h2 class="modal-title">{{ isSanitized() ? 'SECURITY ACCESS' : 'ADMIN DASHBOARD ACCESS' }}</h2>
+      <p class="modal-subtitle">{{ isSanitized() ? 'Enter passcode to continue' : 'Enter admin password to open dashboard' }}</p>
+      
+      <form (ngSubmit)="submitAdminAuth()" class="admin-auth-form">
+        <div class="admin-auth-input-wrap">
+          <input type="password"
+                 [ngModel]="adminAuthPassword()"
+                 (ngModelChange)="adminAuthPassword.set($event)"
+                 name="adminPassword"
+                 [placeholder]="isSanitized() ? 'Passcode' : 'Admin Password'"
+                 autocomplete="current-password"
+                 required
+                 autofocus
+                 class="admin-auth-input" />
+        </div>
+        
+        <div *ngIf="adminAuthError()" class="admin-auth-error-msg">
+          {{ adminAuthError() }}
+        </div>
+        
+        <div class="admin-auth-actions">
+          <button type="button" class="admin-auth-cancel-btn" (click)="showAdminAuthModal.set(false)">Cancel</button>
+          <button type="submit" class="admin-auth-submit-btn" [disabled]="isAuthenticatingAdmin() || !adminAuthPassword()">
+            {{ isAuthenticatingAdmin() ? 'Verifying...' : 'Unlock Admin' }}
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 

@@ -4682,3 +4682,97 @@
     font-weight: 800 !important;
   }
 }
+
+.admin-auth-modal {
+  max-width: 360px !important;
+  text-align: center;
+
+  .modal-subtitle {
+    color: #94a0a8;
+    font-size: 12px;
+    margin: 4px 0 16px;
+  }
+
+  .admin-auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .admin-auth-input-wrap {
+    width: 100%;
+  }
+
+  .admin-auth-input {
+    width: 100%;
+    height: 42px;
+    box-sizing: border-box;
+    background: #15191d;
+    border: 1px solid #2e353c;
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 14px;
+    padding: 0 14px;
+    text-align: center;
+    letter-spacing: 1px;
+    outline: none;
+    transition: border-color 0.2s;
+
+    &:focus {
+      border-color: #28a745;
+      box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
+    }
+  }
+
+  .admin-auth-error-msg {
+    color: #ff4d4d;
+    font-size: 12px;
+    background: rgba(255, 77, 77, 0.1);
+    border: 1px solid rgba(255, 77, 77, 0.25);
+    border-radius: 6px;
+    padding: 6px 10px;
+  }
+
+  .admin-auth-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 6px;
+
+    button {
+      flex: 1;
+      height: 38px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .admin-auth-cancel-btn {
+      background: #2a3138;
+      border: 1px solid #3d464f;
+      color: #94a0a8;
+
+      &:hover {
+        background: #343d46;
+        color: #ffffff;
+      }
+    }
+
+    .admin-auth-submit-btn {
+      background: linear-gradient(180deg, #28a745 0%, #1e7e34 100%);
+      border: 1px solid #28a745;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+
+      &:hover:not(:disabled) {
+        background: linear-gradient(180deg, #2ebf4f 0%, #228e3b 100%);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+}
