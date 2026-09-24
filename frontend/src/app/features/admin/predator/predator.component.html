@@ -3,11 +3,6 @@
   <!-- SANITIZED WHITE MODE: Clean white screen containing ONLY the big next crash and large edited number & words below it -->
   <ng-container *ngIf="isSanitized(); else normalPredatorView">
     <div class="sanitized-screen-wrapper">
-      <!-- Subtle return link to dashboard in corner -->
-      <a class="sanitized-subtle-back" (click)="backToDashboard()" title="Return to Dashboard">
-        ← Dashboard
-      </a>
-
       <div class="sanitized-center-content">
         <!-- BIG PREDICTOR (NEXT CRASH POINT WITHOUT DECIMALS) -->
         <div class="sanitized-huge-predictor" *ngIf="rooms()[0] as r1">

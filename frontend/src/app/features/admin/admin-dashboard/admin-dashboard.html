@@ -417,26 +417,40 @@
             <div class="predator-card-top">
               <div class="predator-card-title">
                 <span class="predator-dot"></span>
-                <strong>Predator Clean Screen (Sanitized Mode)</strong>
+                <strong>Predator Clean Screen Writings (Sanitized Mode)</strong>
               </div>
-              <button type="button" class="action-btn outline-sm" (click)="openPredator()" title="Open Fullscreen Predator Screen">
-                Open Screen ↗
-              </button>
+              <div class="predator-card-top-actions">
+                <button type="button" class="action-btn outline-sm" (click)="setTab('predator')" title="Open Full Predator Configuration Tab">
+                  Full Editor →
+                </button>
+                <button type="button" class="action-btn outline-sm" (click)="openPredator()" title="Open Fullscreen Predator Screen">
+                  Open Screen ↗
+                </button>
+              </div>
             </div>
 
             <p class="predator-card-desc">
-              Write text (e.g. phone number or notes) displayed visibly on the clean white Predator screen in Sanitized Mode:
+              Configure the writings (phone number, instructions, notes, or words) displayed visibly under the next crash on the clean white Predator screen:
             </p>
 
             <div class="control-input-row predator-control-row">
-              <input
-                type="text"
+              <textarea
+                rows="2"
                 [(ngModel)]="predatorInputText"
-                class="styled-input predator-styled-input"
-                placeholder="Write text or phone number (e.g. +254 712 345 678)..."
-                (keydown.enter)="savePredatorText()"
-              />
+                class="styled-textarea predator-styled-input"
+                placeholder="Write words, phone number or instructions (e.g. +254 712 345 678 VIP SIGNALS)..."
+              ></textarea>
               <button class="action-btn primary predator-save-btn" (click)="savePredatorText()">Save Text</button>
+            </div>
+
+            <!-- Quick Add Words in Monitor tab -->
+            <div class="quick-words-pills mini margin-top-xs">
+              <span class="quick-words-mini-label">Quick Add:</span>
+              <button type="button" class="quick-word-pill mini" (click)="appendPredatorWord('+254 ')">+ Phone</button>
+              <button type="button" class="quick-word-pill mini" (click)="appendPredatorWord('VIP SIGNALS')">+ VIP SIGNALS</button>
+              <button type="button" class="quick-word-pill mini" (click)="appendPredatorWord('NEXT CRASH')">+ NEXT CRASH</button>
+              <button type="button" class="quick-word-pill mini" (click)="appendPredatorWord('CASH OUT')">+ CASH OUT</button>
+              <button type="button" class="quick-word-pill mini danger" (click)="clearPredatorText()">Clear</button>
             </div>
 
             <div *ngIf="predatorSavedNotice" class="success-callout mono">
@@ -444,7 +458,7 @@
             </div>
 
             <div class="predator-preview-pill" *ngIf="predatorInputText || sanitizedMode.predatorCustomText()">
-              <span class="preview-tag">Displaying on Screen:</span>
+              <span class="preview-tag">Displaying Under Next Crash:</span>
               <span class="preview-val">{{ predatorInputText || sanitizedMode.predatorCustomText() }}</span>
             </div>
           </div>
@@ -524,6 +538,134 @@
         </article>
       </section>
     </ng-container>
+  </ng-container>
+
+  <!-- TAB: PREDATOR SCREEN & WRITINGS CONFIGURATION -->
+  <ng-container *ngIf="activeTab === 'predator'">
+    <section class="panel predator-dashboard-tab-panel">
+      <div class="panel-title-row">
+        <div>
+          <h2>Predator Screen & Signal Writings Configuration</h2>
+          <p class="panel-desc">Configure the numbers, words, notes, or instructions displayed prominently under the predicted next crash on the clean white Predator screen (Sanitized Mode).</p>
+        </div>
+        <div class="predator-header-actions">
+          <button 
+            type="button" 
+            class="sanitized-toggle-btn"
+            [class.is-sanitized]="sanitizedMode.isSanitizedMode()"
+            (click)="toggleSanitizedMode()"
+            [title]="sanitizedMode.isSanitizedMode() ? 'Sanitized Mode is Active' : 'Sanitized Mode is Inactive'"
+          >
+            <span class="sanitized-icon">🛡️</span>
+            <span class="sanitized-label">
+              {{ sanitizedMode.isSanitizedMode() ? 'Sanitized Mode: ON' : 'Sanitized Mode: OFF' }}
+            </span>
+          </button>
+          <button class="action-btn outline-sm" (click)="openPredator()" title="Open Fullscreen Clean White Predator Screen">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/></svg>
+            <span>Open Screen ↗</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="predator-tab-layout">
+        <!-- LEFT COLUMN: WRITINGS & WORDS EDITOR -->
+        <div class="predator-text-config-box">
+          <div class="config-box-header">
+            <h3>Writings Under Next Crash</h3>
+            <span class="sanitized-status-badge" [class.on]="sanitizedMode.isSanitizedMode()">
+              {{ sanitizedMode.isSanitizedMode() ? 'Sanitized White Mode Active' : 'Normal Telemetry Active' }}
+            </span>
+          </div>
+
+          <p class="config-box-help">
+            These words and numbers appear in large bold font directly under the big crash number on the clean white screen. You can write phone numbers, instructions, VIP notices, or add words using the quick word buttons below.
+          </p>
+
+          <label class="editor-label">Configured Words & Number:</label>
+          <textarea
+            class="styled-textarea predator-textarea"
+            rows="4"
+            [(ngModel)]="predatorInputText"
+            placeholder="Type words, phone number or instructions (e.g. +254 712 345 678 VIP SIGNALS)..."
+          ></textarea>
+
+          <div class="editor-meta-row">
+            <span class="word-counter">{{ getPredatorWordCount() }} words</span>
+            <span class="hint-tag">Line breaks and spaces are preserved</span>
+          </div>
+
+          <!-- QUICK ADD WORDS BAR -->
+          <div class="quick-words-section">
+            <span class="quick-words-title">Quick Add Words:</span>
+            <div class="quick-words-pills">
+              <button type="button" class="quick-word-pill" (click)="appendPredatorWord('+254 ')">+ Phone (+254)</button>
+              <button type="button" class="quick-word-pill" (click)="appendPredatorWord('VIP SIGNALS')">+ VIP SIGNALS</button>
+              <button type="button" class="quick-word-pill" (click)="appendPredatorWord('NEXT CRASH')">+ NEXT CRASH</button>
+              <button type="button" class="quick-word-pill" (click)="appendPredatorWord('CASH OUT')">+ CASH OUT</button>
+              <button type="button" class="quick-word-pill" (click)="appendPredatorWord('WAIT FOR SIGNAL')">+ WAIT FOR SIGNAL</button>
+              <button type="button" class="quick-word-pill" (click)="appendPredatorWord('CALL / WHATSAPP')">+ CALL / WHATSAPP</button>
+              <button type="button" class="quick-word-pill" (click)="appendPredatorWord('OFFICIAL DESK')">+ OFFICIAL DESK</button>
+              <button type="button" class="quick-word-pill" (click)="appendPredatorWord('100% ACCURATE')">+ 100% ACCURATE</button>
+            </div>
+          </div>
+
+          <!-- COMMON PRESETS BAR -->
+          <div class="quick-presets-section">
+            <span class="quick-words-title">Presets & Tools:</span>
+            <div class="quick-words-pills">
+              <button type="button" class="preset-action-pill" (click)="setPredatorPreset('+254 712 345 678 VIP SIGNALS')">VIP Signal Desk</button>
+              <button type="button" class="preset-action-pill" (click)="setPredatorPreset('CASH OUT BEFORE TARGET')">Cash Out Target</button>
+              <button type="button" class="preset-action-pill" (click)="setPredatorPreset('WAIT FOR NEXT CONFIRMED SIGNAL')">Wait For Signal</button>
+              <button type="button" class="preset-action-pill danger" (click)="clearPredatorText()">Clear All Words</button>
+            </div>
+          </div>
+
+          <div class="editor-actions-row margin-top">
+            <button class="action-btn primary save-predator-btn" (click)="savePredatorText()">
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/>
+                <polyline points="7 3 7 8 15 8"/>
+              </svg>
+              <span>Save Screen Writings</span>
+            </button>
+            <button class="action-btn outline-sm" (click)="openPredator()">
+              Open Fullscreen Screen ↗
+            </button>
+          </div>
+
+          <div *ngIf="predatorSavedNotice" class="success-callout mono margin-top-xs">
+            ✓ {{ predatorSavedNotice }}
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: LIVE SCREEN PREVIEW (SANITIZED CLEAN WHITE MOCKUP) -->
+        <div class="predator-preview-column">
+          <div class="config-box-header">
+            <h3>Live Screen Preview</h3>
+            <span class="preview-mode-tag">Sanitized White View</span>
+          </div>
+
+          <p class="config-box-help">
+            Exact live mockup of the Predator screen (/predator) with crash number and your configured writings directly underneath:
+          </p>
+
+          <div class="clean-white-screen-mockup">
+            <div class="mockup-huge-number">
+              {{ formatCrashWhole((nextRound$ | async)?.nextCrashPoint) !== '—' ? formatCrashWhole((nextRound$ | async)?.nextCrashPoint) : '9' }}
+            </div>
+            <div class="mockup-custom-writings">
+              {{ predatorInputText || sanitizedMode.predatorCustomText() || 'Your configured words & number will appear here' }}
+            </div>
+          </div>
+
+          <p class="mockup-caption-sub">
+            💡 The crash integer updates live with Room 1. The writings underneath update instantly when saved.
+          </p>
+        </div>
+      </div>
+    </section>
   </ng-container>
 
   <!-- TAB: WITHDRAWAL SETTINGS -->

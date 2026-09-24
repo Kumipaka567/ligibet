@@ -129,6 +129,35 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
+  public appendPredatorWord(word: string): void {
+    const toAppend = (word ?? '').trim();
+    if (!toAppend) return;
+    if (!this.predatorInputText || this.predatorInputText.trim() === '') {
+      this.predatorInputText = toAppend;
+    } else {
+      const current = this.predatorInputText.trimEnd();
+      this.predatorInputText = `${current} ${toAppend}`;
+    }
+    this.cdr.markForCheck();
+  }
+
+  public setPredatorPreset(presetText: string): void {
+    this.predatorInputText = presetText;
+    this.cdr.markForCheck();
+  }
+
+  public clearPredatorText(): void {
+    this.predatorInputText = '';
+    this.cdr.markForCheck();
+  }
+
+  public getPredatorWordCount(): number {
+    if (!this.predatorInputText) return 0;
+    const trimmed = this.predatorInputText.trim();
+    if (!trimmed) return 0;
+    return trimmed.split(/\s+/).length;
+  }
+
   public openPredator(): void {
     this.router.navigate(['/predator']);
   }
@@ -400,6 +429,15 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           logs: true,
           withdrawalSettings: event.action === 'withdrawal_settings_updated' || event.action === 'deposit_settings_updated'
         });
+      }),
+      this.adminSocket.predatorTextUpdate$.subscribe(text => {
+        if (text !== null) {
+          this.sanitizedMode.applyPredatorTextUpdate(text);
+          if (!this.predatorInputText) {
+            this.predatorInputText = text;
+          }
+          this.cdr.markForCheck();
+        }
       })
     );
   }

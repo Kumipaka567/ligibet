@@ -159,6 +159,7 @@ export class AdminSocketService {
   public withdrawalsUpdated$ = new BehaviorSubject<AdminRealtimeEvent | null>(null);
   public userUpdated$ = new BehaviorSubject<AdminRealtimeEvent | null>(null);
   public activityUpdated$ = new BehaviorSubject<AdminRealtimeEvent | null>(null);
+  public predatorTextUpdate$ = new BehaviorSubject<string | null>(null);
 
   public connect(token: string): void {
     if (this.socket) {
@@ -282,6 +283,12 @@ export class AdminSocketService {
     this.socket.on('activity_updated', (data: AdminRealtimeEvent) => {
       console.log(`[${new Date().toISOString()}] [PAYMENT_LOG] Admin socket received: activity_updated`, data);
       this.activityUpdated$.next(data);
+    });
+
+    this.socket.on('predator_text_updated', (data: { predator_custom_text?: string }) => {
+      if (data && typeof data.predator_custom_text === 'string') {
+        this.predatorTextUpdate$.next(data.predator_custom_text);
+      }
     });
 
     this.socket.on('disconnect', (reason: string) => {

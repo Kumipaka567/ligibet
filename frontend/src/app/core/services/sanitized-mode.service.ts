@@ -168,6 +168,11 @@ export class SanitizedModeService {
     });
   }
 
+  /** Update local state from socket event or external sync without pushing HTTP POST */
+  public applyPredatorTextUpdate(text: string): void {
+    this.setLocalPredatorText(text ?? '');
+  }
+
   private setLocalState(enabled: boolean): void {
     this.isSanitizedMode.set(enabled);
     try {

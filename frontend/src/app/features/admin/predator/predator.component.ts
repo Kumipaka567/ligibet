@@ -129,6 +129,11 @@ export class PredatorComponent implements OnInit, OnDestroy {
         }
         this.countdownMs.set(Number(next?.countdownMs) || 0);
         this.lastUpdate.set(new Date());
+      }),
+      this.adminSocket.predatorTextUpdate$.subscribe((text) => {
+        if (text !== null) {
+          this.sanitizedModeService.applyPredatorTextUpdate(text);
+        }
       })
     );
   }
