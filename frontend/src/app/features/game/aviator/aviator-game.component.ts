@@ -393,17 +393,8 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit() {
-    // A suspension lands while the player is mid-round, so this has to take the
-    // screen away rather than just show a message they can dismiss.
-    this.subs.push(
-      this.gameSocket.accountSuspended$.subscribe(message => {
-        if (!message) return;
-        this.gameSocket.disconnect();
-        this.authService.logout();
-        this.router.navigate(['/login'], { queryParams: { notice: 'suspended' } });
-      })
-    );
-
+    // Account suspension is handled by the root component, so that it reaches a
+    // player sitting on any screen rather than only this one.
     this.startDepositCooldownWatch();
     this.initPlaneImage();
     this.initGameAudio();
@@ -693,7 +684,9 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.cooldownPollId) clearInterval(this.cooldownPollId);
     if (this.resizeObserver) this.resizeObserver.disconnect();
     this.stopAllGameAudio();
-    this.gameSocket.disconnect();
+    // The socket is deliberately left open. It is shared, and the root
+    // component keeps it alive for the whole session so that an administrator
+    // suspending this player still reaches them once they leave the game.
   }
 
   @HostListener('window:resize')

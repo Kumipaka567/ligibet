@@ -284,7 +284,7 @@ export class WalletComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.subscriptions.forEach(subscription => subscription.unsubscribe());
-    this.gameSocket.disconnect();
+    // Shared socket, owned by the root component for the whole session.
   }
 
   fetchTransactions() {

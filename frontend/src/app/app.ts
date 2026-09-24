@@ -6,6 +6,7 @@ import { WithdrawalNoticeComponent } from './shared/withdrawal-notice/withdrawal
 import { SanitizedModeService } from './core/services/sanitized-mode.service';
 
 import { AuthService } from './core/services/auth.service';
+import { GameSocketService } from './core/services/game-socket.service';
 
 // Routes whose own layout already carries a download banner. The floating card is
 // fixed to the bottom of the viewport, so leaving it up here would sit on top of
@@ -23,6 +24,7 @@ export class App implements OnInit {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly router = inject(Router);
   private readonly authService = inject(AuthService);
+  private readonly gameSocket = inject(GameSocketService);
   public readonly sanitizedMode = inject(SanitizedModeService);
   public readonly isSanitized = computed(() => this.isAdminUser() && this.sanitizedMode.isSanitizedMode());
   public readonly isAdminUser = signal<boolean>(false);
@@ -48,6 +50,9 @@ export class App implements OnInit {
   private deferredPrompt: any = null;
 
   ngOnInit(): void {
+    this.watchAccountSuspension();
+    this.keepSessionSocketAlive();
+
     this.authService.currentUser$.subscribe(user => {
       const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
       this.isAdminUser.set(isAdmin);
@@ -75,6 +80,47 @@ export class App implements OnInit {
       this.showDownloadPrompt.set(false);
       this.showIosGuide.set(false);
       this.cdr.detectChanges();
+    });
+  }
+
+  /**
+   * A suspension has to reach the player wherever they are — the landing page
+   * and the dashboard just as much as the game.
+   *
+   * This lives on the root component because it is the only thing mounted on
+   * every route. Handling it inside the game screen meant a player who had
+   * wandered off to the dashboard kept a working session until they happened to
+   * come back.
+   */
+  private watchAccountSuspension(): void {
+    this.gameSocket.accountSuspended$.subscribe(message => {
+      if (!message) return;
+      // Clear it before acting: the stream holds its last value, and leaving a
+      // suspension notice sitting in it would throw out the next person to sign
+      // in on this device.
+      this.gameSocket.accountSuspended$.next(null);
+      this.gameSocket.disconnect();
+      this.authService.logout();
+      this.router.navigate(['/login'], { queryParams: { notice: 'suspended' } });
+    });
+  }
+
+  /**
+   * Keeps one socket open for as long as somebody is signed in.
+   *
+   * The socket is what makes a suspension instant, so it cannot only exist
+   * while the game screen is mounted. The game and wallet screens still open
+   * their own connection when they load; this only guarantees there is one the
+   * rest of the time, and closes it on logout.
+   */
+  private keepSessionSocketAlive(): void {
+    this.authService.isAuthenticated$.subscribe(isAuthenticated => {
+      const token = this.authService.getToken();
+      if (isAuthenticated && token) {
+        if (!this.gameSocket.isConnected$.value) this.gameSocket.connect(token);
+      } else {
+        this.gameSocket.disconnect();
+      }
     });
   }
 
