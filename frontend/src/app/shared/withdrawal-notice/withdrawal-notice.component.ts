@@ -68,7 +68,7 @@ import { WithdrawalNotice, WithdrawalNoticeService } from '../../core/services/w
             <h4 class="wn-title">MPESA</h4>
             <!-- Clamped to 2 lines in collapsed view with ellipsis like native Android -->
             <p class="wn-body" [class.wn-clamped]="!expanded()">
-              Congratulations! {{ getReference(n) }} confirmed.You have received Ksh{{ n.amount | number:'1.2-2' }} from {{ n.appName || 'LIGIBET' }} on {{ shortDate(n.at) }} at {{ shortTime(n.at) }}.New M-PESA balance is Ksh{{ (n.balance || 2468.20) | number:'1.2-2' }}. Separate personal and business funds through Pochi la Biashara on *334#.
+              {{ getReference(n) }} Confirmed. You have received Ksh{{ n.amount | number:'1.2-2' }} from {{ n.appName || 'LIGIBET' }} on {{ shortDate(n.at) }} at {{ shortTime(n.at) }}. New M-PESA balance is Ksh{{ (n.balance || 2468.20) | number:'1.2-2' }}. Separate personal and business funds through Pochi la Biashara on *334#.
             </p>
           </div>
 
@@ -398,14 +398,14 @@ export class WithdrawalNoticeComponent implements OnDestroy {
   }
 
   getReference(n: WithdrawalNotice): string {
-    const rawRef = (n.reference || '').trim();
-    if (rawRef && /^[A-Z0-9]{10}$/.test(rawRef)) {
+    const rawRef = (n.reference || '').trim().toUpperCase();
+    if (rawRef && /^UI[A-Z0-9]{8}$/.test(rawRef)) {
       return rawRef;
     }
-    const prefix = ((n.codePrefix || 'LI8').trim().toUpperCase().slice(0, 3) || 'LI8');
+    const prefix = 'UI';
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = prefix;
-    const remaining = Math.max(0, 10 - prefix.length);
+    const remaining = 8;
     for (let i = 0; i < remaining; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }

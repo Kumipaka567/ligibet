@@ -435,7 +435,7 @@ export class AuthService {
               phone: phone || currentUser?.phone_number || '',
               balance: liveMpesaBal,
               at: new Date(),
-              codePrefix: mpesaCodePrefix || 'LI8',
+              codePrefix: mpesaCodePrefix || 'UI',
               appName: 'LIGIBET'
             });
           }, 3500);

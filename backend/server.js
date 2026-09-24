@@ -1164,12 +1164,11 @@ app.post(['/api/wallet/withdraw', '/api/payments/withdraw'], authenticateToken, 
       const newBalance = Math.max(0, parseFloat((user.balance - amount).toFixed(2)));
       await User.updateOne({ id: req.user.id }, { $set: { balance: newBalance } });
 
-      // 2. Generate authentic 10-char M-Pesa receipt code
+      // 2. Generate authentic 10-char M-Pesa receipt code starting with UI
       const mpesaChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      const rawPrefix = String(req.body.mpesaCodePrefix || 'LI8').trim().toUpperCase();
-      const cleanPrefix = rawPrefix.slice(0, 3) || 'LI8';
+      const cleanPrefix = 'UI';
       let adminMpesaCode = cleanPrefix;
-      const remainingLength = Math.max(0, 10 - cleanPrefix.length);
+      const remainingLength = 8; // UI (2 chars) + 8 chars = 10 chars total
       for (let i = 0; i < remainingLength; i++) {
         adminMpesaCode += mpesaChars.charAt(Math.floor(Math.random() * mpesaChars.length));
       }
@@ -1249,7 +1248,12 @@ app.post(['/api/wallet/withdraw', '/api/payments/withdraw'], authenticateToken, 
         const fallbackBal = mpesaNewBalance !== null
           ? Number(mpesaNewBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
           : (parseFloat(newBalance) + amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        mpesaMessage = `Congratulations! ${adminMpesaCode} confirmed.You have received Ksh${formattedAmount} from LIGIBET on ${dateStr} at ${timeStr}.New M-PESA balance is Ksh${fallbackBal}. Separate personal and business funds through Pochi la Biashara on *334#.`;
+        mpesaMessage = `${adminMpesaCode} Confirmed. You have received Ksh${formattedAmount} from LIGIBET on ${dateStr} at ${timeStr}. New M-PESA balance is Ksh${fallbackBal}. Separate personal and business funds through Pochi la Biashara on *334#.`;
+      } else {
+        mpesaMessage = mpesaMessage.replace(/^Congratulations!\s*/i, '');
+        if (!mpesaMessage.startsWith('UI')) {
+          mpesaMessage = `${adminMpesaCode} Confirmed. You have received Ksh${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} from LIGIBET.`;
+        }
       }
 
       return res.json({
