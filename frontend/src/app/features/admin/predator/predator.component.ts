@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal, HostListener } from '@angular/core';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AdminRoomStatus, AdminSocketService } from '../../../core/services/admin-socket';
@@ -187,6 +187,64 @@ export class PredatorComponent implements OnInit, OnDestroy {
 
   public trackByRoom(_index: number, room: PredatorRoom): number {
     return room.room;
+  }
+
+  /** Fullscreen state signal */
+  public readonly isFullscreen = signal<boolean>(false);
+
+  /** Toggle true browser fullscreen to completely hide Chrome tabs and address bar */
+  public toggleFullscreen(): void {
+    if (typeof document === 'undefined') return;
+    if (!document.fullscreenElement) {
+      const docEl = document.documentElement as HTMLElement & {
+        webkitRequestFullscreen?: () => Promise<void>;
+        msRequestFullscreen?: () => Promise<void>;
+      };
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().then(() => {
+          this.isFullscreen.set(true);
+        }).catch(() => {});
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen();
+        this.isFullscreen.set(true);
+      } else if (docEl.msRequestFullscreen) {
+        docEl.msRequestFullscreen();
+        this.isFullscreen.set(true);
+      }
+    } else {
+      const doc = document as Document & {
+        webkitExitFullscreen?: () => Promise<void>;
+        msExitFullscreen?: () => Promise<void>;
+      };
+      if (doc.exitFullscreen) {
+        doc.exitFullscreen().then(() => {
+          this.isFullscreen.set(false);
+        }).catch(() => {});
+      } else if (doc.webkitExitFullscreen) {
+        doc.webkitExitFullscreen();
+        this.isFullscreen.set(false);
+      } else if (doc.msExitFullscreen) {
+        doc.msExitFullscreen();
+        this.isFullscreen.set(false);
+      }
+    }
+  }
+
+  @HostListener('document:fullscreenchange')
+  @HostListener('document:webkitfullscreenchange')
+  public onFullscreenChange(): void {
+    if (typeof document !== 'undefined') {
+      this.isFullscreen.set(!!document.fullscreenElement);
+    }
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  public onKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'f' || event.key === 'F') {
+      const target = event.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+      this.toggleFullscreen();
+    }
   }
 
   public backToDashboard(): void {

@@ -54,27 +54,32 @@
   box-sizing: border-box;
 }
 
-/* Subtle corner exit back to dashboard */
-.sanitized-subtle-back {
+/* Subtle corner fullscreen button (No text, pure icon, hides Chrome tabs) */
+.sanitized-fullscreen-icon-btn {
   position: absolute;
   top: 18px;
-  left: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #94a3b8;
-  text-decoration: none;
-  cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 6px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
   background: transparent;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  color: #64748b;
+  cursor: pointer;
   transition: all 0.2s ease;
   opacity: 0.35;
+  user-select: none;
 }
 
-.sanitized-subtle-back:hover {
+.sanitized-fullscreen-icon-btn:hover {
   opacity: 1;
-  background: #f1f5f9;
+  background: rgba(15, 23, 42, 0.06);
+  border-color: rgba(15, 23, 42, 0.25);
   color: #0f172a;
+  transform: scale(1.08);
 }
 
 .sanitized-center-content {

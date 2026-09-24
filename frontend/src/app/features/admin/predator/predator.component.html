@@ -2,7 +2,23 @@
 
   <!-- SANITIZED WHITE MODE: Clean white screen containing ONLY the big next crash and large edited number & words below it -->
   <ng-container *ngIf="isSanitized(); else normalPredatorView">
-    <div class="sanitized-screen-wrapper">
+    <div class="sanitized-screen-wrapper" (dblclick)="toggleFullscreen()">
+      <!-- Discreet Fullscreen Button (No words, pure minimalist icon, hides Chrome tabs) -->
+      <button 
+        type="button" 
+        class="sanitized-fullscreen-icon-btn" 
+        (click)="toggleFullscreen()" 
+        [title]="isFullscreen() ? 'Exit Fullscreen' : 'Enter Fullscreen (Hide Chrome tabs)'"
+        aria-label="Toggle Fullscreen"
+      >
+        <svg *ngIf="!isFullscreen()" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+        </svg>
+        <svg *ngIf="isFullscreen()" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+        </svg>
+      </button>
+
       <div class="sanitized-center-content">
         <!-- BIG PREDICTOR (NEXT CRASH POINT WITHOUT DECIMALS) -->
         <div class="sanitized-huge-predictor" *ngIf="rooms()[0] as r1">
@@ -42,6 +58,9 @@
           <span class="link-dot"></span>
           {{ isConnected() ? 'Engine linked' : 'Reconnecting' }}
         </span>
+        <button type="button" class="back-btn fullscreen-toggle" (click)="toggleFullscreen()" title="Toggle Fullscreen">
+          {{ isFullscreen() ? 'Exit Fullscreen' : '⛶ Fullscreen' }}
+        </button>
         <button type="button" class="back-btn" (click)="backToDashboard()">Admin dashboard</button>
       </div>
     </header>

@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, ChangeDetectorRef, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, ChangeDetectorRef, inject, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -156,6 +156,50 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     const trimmed = this.predatorInputText.trim();
     if (!trimmed) return 0;
     return trimmed.split(/\s+/).length;
+  }
+
+  public isPredatorPreviewFullscreen: boolean = false;
+
+  public togglePredatorPreviewFullscreen(): void {
+    this.isPredatorPreviewFullscreen = !this.isPredatorPreviewFullscreen;
+    if (this.isPredatorPreviewFullscreen) {
+      setTimeout(() => {
+        const overlay = document.getElementById('predatorFullscreenPreviewOverlay');
+        if (overlay && overlay.requestFullscreen) {
+          overlay.requestFullscreen().catch(() => {});
+        } else if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      }, 50);
+    } else {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+    this.cdr.markForCheck();
+  }
+
+  public closePredatorPreviewFullscreen(): void {
+    this.isPredatorPreviewFullscreen = false;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+    this.cdr.markForCheck();
+  }
+
+  @HostListener('document:fullscreenchange')
+  public onFullscreenChange(): void {
+    if (!document.fullscreenElement && this.isPredatorPreviewFullscreen) {
+      this.isPredatorPreviewFullscreen = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  @HostListener('document:keydown.escape')
+  public onEscapeKey(): void {
+    if (this.isPredatorPreviewFullscreen) {
+      this.closePredatorPreviewFullscreen();
+    }
   }
 
   public openPredator(): void {

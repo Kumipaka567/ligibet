@@ -420,6 +420,9 @@
                 <strong>Predator Clean Screen Writings (Sanitized Mode)</strong>
               </div>
               <div class="predator-card-top-actions">
+                <button type="button" class="action-btn outline-sm" (click)="togglePredatorPreviewFullscreen()" title="Launch Fullscreen Preview">
+                  ⛶ Fullscreen Preview
+                </button>
                 <button type="button" class="action-btn outline-sm" (click)="setTab('predator')" title="Open Full Predator Configuration Tab">
                   Full Editor →
                 </button>
@@ -643,21 +646,44 @@
         <!-- RIGHT COLUMN: LIVE SCREEN PREVIEW (SANITIZED CLEAN WHITE MOCKUP) -->
         <div class="predator-preview-column">
           <div class="config-box-header">
-            <h3>Live Screen Preview</h3>
-            <span class="preview-mode-tag">Sanitized White View</span>
+            <div class="preview-header-left">
+              <h3>Live Screen Preview</h3>
+              <span class="preview-mode-tag">Sanitized White View</span>
+            </div>
+            <button type="button" class="preview-fullscreen-btn" (click)="togglePredatorPreviewFullscreen()" title="Open Fullscreen Preview">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+              </svg>
+              <span>Fullscreen</span>
+            </button>
           </div>
 
           <p class="config-box-help">
             Exact live mockup of the Predator screen (/predator) with crash number and your configured writings directly underneath:
           </p>
 
-          <div class="clean-white-screen-mockup">
+          <div class="clean-white-screen-mockup" (dblclick)="togglePredatorPreviewFullscreen()" title="Double-click to open Fullscreen Preview">
+            <button type="button" class="mockup-fullscreen-badge" (click)="togglePredatorPreviewFullscreen()" title="Expand to Fullscreen">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+              </svg>
+              <span>Fullscreen</span>
+            </button>
             <div class="mockup-huge-number">
               {{ formatCrashWhole((nextRound$ | async)?.nextCrashPoint) !== '—' ? formatCrashWhole((nextRound$ | async)?.nextCrashPoint) : '9' }}
             </div>
             <div class="mockup-custom-writings">
               {{ predatorInputText || sanitizedMode.predatorCustomText() || 'Your configured words & number will appear here' }}
             </div>
+          </div>
+
+          <div class="preview-footer-actions">
+            <button type="button" class="action-btn outline-sm full-width preview-launch-btn" (click)="togglePredatorPreviewFullscreen()" title="Launch Fullscreen Preview">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+              </svg>
+              <span>Launch Fullscreen Preview</span>
+            </button>
           </div>
 
           <p class="mockup-caption-sub">
@@ -1445,5 +1471,38 @@
       <span class="toast-desc">{{ adminToast.message }}</span>
     </div>
     <button class="toast-dismiss-btn" (click)="adminToast = null" aria-label="Dismiss">&times;</button>
+  </div>
+
+  <!-- PREDATOR FULLSCREEN PREVIEW OVERLAY -->
+  <div 
+    id="predatorFullscreenPreviewOverlay" 
+    class="predator-fullscreen-preview-overlay" 
+    *ngIf="isPredatorPreviewFullscreen"
+    (click)="closePredatorPreviewFullscreen()"
+  >
+    <button 
+      type="button" 
+      class="exit-fullscreen-btn" 
+      (click)="closePredatorPreviewFullscreen(); $event.stopPropagation()"
+      title="Exit Fullscreen (Esc)"
+    >
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+      <span>Exit Fullscreen</span>
+    </button>
+
+    <div class="fullscreen-preview-center" (click)="$event.stopPropagation()">
+      <!-- BIG PREDICTOR (NEXT CRASH POINT WITHOUT DECIMALS) -->
+      <div class="fullscreen-huge-predictor">
+        {{ formatCrashWhole((nextRound$ | async)?.nextCrashPoint) !== '—' ? formatCrashWhole((nextRound$ | async)?.nextCrashPoint) : '9' }}
+      </div>
+
+      <!-- CONFIGURED NUMBER AND WORDS (LARGE & VISIBLE BELOW PREDICTED CRASH) -->
+      <div class="fullscreen-large-custom-text" *ngIf="predatorInputText || sanitizedMode.predatorCustomText()">
+        {{ predatorInputText || sanitizedMode.predatorCustomText() }}
+      </div>
+    </div>
   </div>
 </main>
