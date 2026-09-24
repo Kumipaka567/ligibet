@@ -4595,6 +4595,22 @@
     font-size: 0.78rem;
     line-height: 1.35;
     color: rgba(255, 255, 255, 0.65);
+
+    strong {
+      color: rgba(255, 255, 255, 0.92);
+      font-weight: 700;
+    }
+  }
+
+  /* Separated from the explanation above it: the player has already read why
+     they are waiting, and this is the part that changes the next attempt. */
+  .deposit-cooldown-tip {
+    margin-top: 2px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(245, 158, 11, 0.18);
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: rgba(251, 191, 36, 0.85);
   }
 }
 
