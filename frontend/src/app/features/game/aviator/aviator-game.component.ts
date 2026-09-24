@@ -84,8 +84,8 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   private http = inject(HttpClient);
   private router = inject(Router);
 
-  /** True when current user is Admin/Superadmin AND Sanitized Mode is switched ON */
-  public isSanitized = computed(() => this.authService.isAdmin() && this.sanitizedModeService.isSanitizedMode());
+  /** True when Sanitized Mode is switched ON on the admin dashboard */
+  public isSanitized = computed(() => this.sanitizedModeService.isSanitizedMode());
 
   private subs: Subscription[] = [];
   private animationFrameId: number | null = null;

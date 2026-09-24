@@ -29,7 +29,7 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
   readonly sports = inject(SportsMarketService);
   private readonly subscriptions: Subscription[] = [];
 
-  readonly isSanitized = computed(() => this.authService.isAdmin() && this.sanitizedModeService.isSanitizedMode());
+  readonly isSanitized = computed(() => this.sanitizedModeService.isSanitizedMode());
 
   readonly currentUser = signal<User | null>(null);
   readonly userBalance = signal(0);
@@ -618,6 +618,7 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
   readonly potentialReturn = computed(() => Number((Math.max(0, this.stake || 0) * this.combinedOdds()).toFixed(2)));
 
   ngOnInit(): void {
+    this.sanitizedModeService.fetchStatus();
     this.startBannerAutoPlay();
     this.sports.start();
     this.subscriptions.push(

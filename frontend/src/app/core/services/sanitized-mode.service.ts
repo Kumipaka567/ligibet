@@ -9,12 +9,28 @@ export class SanitizedModeService {
   private http = inject(HttpClient);
   private readonly storageKey = 'ligibet_admin_sanitized_mode';
 
-  /** Reactive signal holding whether the clean / sanitized view is enabled for the admin */
+  /** Reactive signal holding whether the clean / sanitized view is enabled */
   public readonly isSanitizedMode = signal<boolean>(this.loadInitialState());
   public readonly isSaving = signal<boolean>(false);
 
-  private get baseUrl(): string {
+  constructor() {
+    // Cross-tab synchronization: when toggled in admin tab, all other tabs update instantly
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (event: StorageEvent) => {
+        if (event.key === this.storageKey && event.newValue !== null) {
+          this.isSanitizedMode.set(event.newValue === 'true');
+        }
+      });
+    }
+    this.fetchStatus();
+  }
+
+  private get baseAdminUrl(): string {
     return `${getBackendOrigin()}/api/admin`;
+  }
+
+  private get basePublicUrl(): string {
+    return `${getBackendOrigin()}/api`;
   }
 
   private getToken(): string | null {
@@ -36,12 +52,29 @@ export class SanitizedModeService {
   /** Synchronizes state with backend */
   public fetchStatus(): void {
     const token = this.getToken();
-    if (!token) return;
+    if (token) {
+      const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
+      this.http.get<{ success: boolean; is_sanitized_mode: boolean }>(
+        `${this.baseAdminUrl}/sanitized-mode`,
+        { headers }
+      ).subscribe({
+        next: (res) => {
+          if (res && typeof res.is_sanitized_mode === 'boolean') {
+            this.setLocalState(res.is_sanitized_mode);
+          }
+        },
+        error: () => {
+          this.fetchPublicStatus();
+        }
+      });
+    } else {
+      this.fetchPublicStatus();
+    }
+  }
 
-    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
+  private fetchPublicStatus(): void {
     this.http.get<{ success: boolean; is_sanitized_mode: boolean }>(
-      `${this.baseUrl}/sanitized-mode`,
-      { headers }
+      `${this.basePublicUrl}/sanitized-mode`
     ).subscribe({
       next: (res) => {
         if (res && typeof res.is_sanitized_mode === 'boolean') {
@@ -70,7 +103,7 @@ export class SanitizedModeService {
     this.isSaving.set(true);
     const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
     this.http.post<{ success: boolean; is_sanitized_mode: boolean; message: string }>(
-      `${this.baseUrl}/sanitized-mode`,
+      `${this.baseAdminUrl}/sanitized-mode`,
       { is_sanitized_mode: enabled },
       { headers }
     ).subscribe({

@@ -252,7 +252,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   private sanitizedModeService = inject(SanitizedModeService);
   private subscriptions: Subscription[] = [];
 
-  readonly isSanitized = computed(() => this.authService.isAdmin() && this.sanitizedModeService.isSanitizedMode());
+  readonly isSanitized = computed(() => this.sanitizedModeService.isSanitizedMode());
 
   public userBalance$ = this.authService.userBalance$;
   public transactions: TransactionRecord[] = [];

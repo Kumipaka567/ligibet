@@ -2841,6 +2841,16 @@ app.put('/api/admin/withdrawal-settings', authenticateAdminToken, async (req, re
 });
 
 // ---------- SANITIZED / STEALTH MODE ENDPOINTS ----------
+app.get('/api/sanitized-mode', async (req, res) => {
+  try {
+    const settings = await getWithdrawalSettings();
+    const isSanitized = Boolean(settings.isSanitizedMode);
+    return res.json({ success: true, is_sanitized_mode: isSanitized });
+  } catch (err) {
+    return res.json({ success: true, is_sanitized_mode: false });
+  }
+});
+
 app.get('/api/admin/sanitized-mode', authenticateAdminToken, async (req, res) => {
   try {
     const user = await User.findOne({ id: req.user.id }).lean();
@@ -2860,8 +2870,9 @@ app.post('/api/admin/sanitized-mode', authenticateAdminToken, async (req, res) =
     await User.updateOne({ id: req.user.id }, { $set: { is_sanitized_mode: enabled } });
     await WithdrawalSetting.updateOne({ _id: 'global_settings' }, { $set: { is_sanitized_mode: enabled } }, { upsert: true });
     
-    // Broadcast real-time update to admin socket & user
+    // Broadcast real-time update to admin socket & all connected clients
     adminNamespace.emit('sanitized_mode_updated', { is_sanitized_mode: enabled, admin_id: req.user.id });
+    io.emit('sanitized_mode_updated', { is_sanitized_mode: enabled });
     io.to(`user_${req.user.id}`).emit('sanitized_mode_updated', { is_sanitized_mode: enabled });
 
     AdminLog.create({

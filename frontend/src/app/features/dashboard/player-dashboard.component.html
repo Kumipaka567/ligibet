@@ -37,7 +37,7 @@
             <span class="lb-balance-label">Balance</span>
             <span class="lb-balance-value">{{ isSanitized() ? '' : 'KES ' }}{{ userBalance() | number:'1.2-2' }}</span>
           </button>
-          <button *ngIf="!isSanitized()" class="lb-btn lb-btn-deposit" type="button" (click)="openDeposit()">Deposit</button>
+          <button class="lb-btn lb-btn-deposit" type="button" (click)="openDeposit()">Deposit</button>
           <div class="lb-profile">
             <button class="lb-btn lb-btn-profile" type="button" (click)="toggleProfileMenu()" aria-label="Account menu">
               <span class="lb-avatar">{{ (user.username || '?').charAt(0).toUpperCase() }}</span>
@@ -53,7 +53,7 @@
                   <em>{{ isSanitized() ? '' : 'KES ' }}{{ userBalance() | number:'1.2-2' }}</em>
                 </span>
               </div>
-              <button *ngIf="!isSanitized()" type="button" (click)="openDeposit()">Deposit</button>
+              <button type="button" (click)="openDeposit()">Deposit</button>
               <button type="button" (click)="openWithdraw()">Withdraw</button>
               <button type="button" (click)="goToWallet()">My Wallet &amp; History</button>
               <button type="button" (click)="openAccountSettings()">Account Settings</button>
@@ -430,7 +430,7 @@
       </button>
     </header>
     <div class="lb-sheet-actions">
-      <button *ngIf="!isSanitized()" type="button" (click)="openDeposit()">Deposit</button>
+      <button type="button" (click)="openDeposit()">Deposit</button>
       <button type="button" (click)="openWithdraw()">Withdraw</button>
       <button type="button" (click)="goToWallet()">My Wallet &amp; History</button>
       <button type="button" (click)="openAccountSettings()">Account Settings</button>
@@ -460,7 +460,7 @@
           <span class="currency-prefix" *ngIf="!isSanitized()">KES</span>
           <input type="number" [min]="minimumDeposit()" [(ngModel)]="depositAmount">
         </div>
-        <small class="modal-input-hint" *ngIf="!isSanitized()">Minimum deposit: KES {{ minimumDeposit() | number }}</small>
+        <small class="modal-input-hint">Minimum deposit: {{ isSanitized() ? '' : 'KES ' }}{{ minimumDeposit() | number }}</small>
       </label>
 
       <label class="modal-input-label">

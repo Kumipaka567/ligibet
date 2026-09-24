@@ -105,7 +105,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.sanitizedMode.toggleSanitizedMode();
     const next = this.sanitizedMode.isSanitizedMode();
     this.showAdminToast(
-      next ? '🛡️ Sanitized View Mode activated for Game tab' : 'Normal View Mode restored for Game tab',
+      next ? '🛡️ Sanitized View Mode activated across entire app' : 'Normal View Mode restored',
       next ? 'success' : 'info'
     );
   }
