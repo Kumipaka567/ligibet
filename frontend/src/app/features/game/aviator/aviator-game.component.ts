@@ -174,10 +174,11 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   public showRulesModal = signal<boolean>(false);
   public showFreeBetsModal = signal<boolean>(false);
   public showAvatarModal = signal<boolean>(false);
-  public showAdminAuthModal = signal<boolean>(false);
-  public adminAuthPassword = signal<string>('');
-  public adminAuthError = signal<string>('');
-  public isAuthenticatingAdmin = signal<boolean>(false);
+  public showPlusMenu = signal<boolean>(false);
+  public isAdminUser = computed(() => {
+    const user = this.currentUser();
+    return Boolean(user?.role === 'admin' || user?.role === 'superadmin' || this.authService.isAdmin());
+  });
   public selectedAvatarIcon = signal<string>('😎');
   public avatarOptions = ['😎', '🚀', '🔥', '⚡', '👑', '🏆', '💎', '🎯', '🦁', '🌟', '🦊', '🐯', '🐼', '🐺', '🎲'];
   public walletTab = signal<'deposit' | 'withdraw' | 'transactions'>('deposit');
@@ -2328,68 +2329,11 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     this.showPanel2.update(s => !s);
   }
 
-  public onPlusBtnClick(): void {
-    if (this.authService.isAdmin()) {
-      this.navigateToAdmin();
-      return;
-    }
-    this.adminAuthPassword.set('');
-    this.adminAuthError.set('');
-    this.showAdminAuthModal.set(true);
-  }
-
-  public submitAdminAuth(): void {
-    const password = this.adminAuthPassword().trim();
-    if (!password) {
-      this.adminAuthError.set('Password is required');
-      return;
-    }
-
-    this.isAuthenticatingAdmin.set(true);
-    this.adminAuthError.set('');
-
-    // Try logging in with primary superadmin account 'admin'
-    this.authService.login({ username: 'admin', password }).subscribe({
-      next: (res) => {
-        this.isAuthenticatingAdmin.set(false);
-        this.showAdminAuthModal.set(false);
-        this.navigateToAdmin();
-      },
-      error: () => {
-        // Fallback: try with admin phone '+254792011285'
-        this.authService.login({ username: '+254792011285', password }).subscribe({
-          next: (res) => {
-            this.isAuthenticatingAdmin.set(false);
-            this.showAdminAuthModal.set(false);
-            this.navigateToAdmin();
-          },
-          error: () => {
-            // Fallback: try with currently logged in username and password
-            const currentUname = this.currentUser()?.username;
-            if (currentUname && currentUname !== 'admin' && currentUname !== '+254792011285') {
-              this.authService.login({ username: currentUname, password }).subscribe({
-                next: (res) => {
-                  this.isAuthenticatingAdmin.set(false);
-                  if (res.user.role === 'admin' || res.user.role === 'superadmin') {
-                    this.showAdminAuthModal.set(false);
-                    this.navigateToAdmin();
-                  } else {
-                    this.adminAuthError.set('Account does not have admin privileges');
-                  }
-                },
-                error: (err) => {
-                  this.isAuthenticatingAdmin.set(false);
-                  this.adminAuthError.set(err?.message || 'Invalid admin password (Default: SuperAdmin@2026)');
-                }
-              });
-            } else {
-              this.isAuthenticatingAdmin.set(false);
-              this.adminAuthError.set('Invalid admin password (Default: SuperAdmin@2026)');
-            }
-          }
-        });
-      }
-    });
+  public togglePlusMenu(event?: Event): void {
+    if (event) event.stopPropagation();
+    this.showProfileDropdown.set(false);
+    this.showGameMenu.set(false);
+    this.showPlusMenu.update(v => !v);
   }
 
   public resetAutoCashout(panelIndex: 1 | 2) {

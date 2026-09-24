@@ -573,13 +573,38 @@
               <button type="button" [class.active]="panel1().mode === 'auto'" (click)="setPanelMode(1, 'auto')">Auto</button>
             </div>
             
-            <button type="button" class="panel-add-btn" (click)="onPlusBtnClick()" [title]="isSanitized() ? '' : 'Admin / Open Second Bet Panel'">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
-                <rect x="2.5" y="2.5" width="19" height="19" rx="5" stroke="#484f56" stroke-width="1.8"/>
-                <line x1="12" y1="7" x2="12" y2="17" stroke="#94a0a8" stroke-width="2" stroke-linecap="round"/>
-                <line x1="7" y1="12" x2="17" y2="12" stroke="#94a0a8" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-            </button>
+            <div class="panel-add-btn-wrap">
+              <button type="button" class="panel-add-btn" (click)="togglePlusMenu($event)" title="Options">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
+                  <rect x="2.5" y="2.5" width="19" height="19" rx="5" stroke="#484f56" stroke-width="1.8"/>
+                  <line x1="12" y1="7" x2="12" y2="17" stroke="#94a0a8" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="7" y1="12" x2="17" y2="12" stroke="#94a0a8" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </button>
+
+              <!-- PLUS BUTTON POPUP MENU -->
+              <div class="panel-plus-dropdown" *ngIf="showPlusMenu()" (click)="$event.stopPropagation()">
+                <button type="button" class="plus-dropdown-item" (click)="togglePanel2(); showPlusMenu.set(false)">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    <line x1="12" y1="8" x2="12" y2="16"/>
+                    <line x1="8" y1="12" x2="16" y2="12"/>
+                  </svg>
+                  <span>{{ showPanel2() ? 'Hide Second Bet Panel' : 'Add Second Bet Panel' }}</span>
+                </button>
+
+                <!-- ADMIN MENU ITEM (RED FONT - VISIBLE ONLY TO ADMINS) -->
+                <button *ngIf="isAdminUser()" 
+                        type="button" 
+                        class="plus-dropdown-item admin-red-item" 
+                        (click)="navigateToAdmin(); showPlusMenu.set(false)">
+                  <svg class="admin-red-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                  </svg>
+                  <span class="admin-red-text">Admin Dashboard</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Body Row: Controls (Stepper + 2x2 Presets) & Big Bet Button -->
@@ -1433,38 +1458,6 @@
         <p>2. <strong>Fair Discussion:</strong> Spamming, abusive language, or harassment will result in chat privileges being suspended.</p>
         <p>3. <strong>System Integrity:</strong> All activities are monitored for authentic participation.</p>
       </div>
-    </div>
-  <!-- COVERT ADMIN ACCESS AUTH MODAL -->
-  <div *ngIf="showAdminAuthModal()" class="modal-backdrop" (click)="showAdminAuthModal.set(false)">
-    <div class="modal-card glass-card info-modal admin-auth-modal" (click)="$event.stopPropagation()">
-      <button class="modal-close" (click)="showAdminAuthModal.set(false)">✕</button>
-      <h2 class="modal-title">{{ isSanitized() ? 'SECURITY ACCESS' : 'ADMIN DASHBOARD ACCESS' }}</h2>
-      <p class="modal-subtitle">{{ isSanitized() ? 'Enter passcode to continue' : 'Enter admin password to open dashboard' }}</p>
-      
-      <form (ngSubmit)="submitAdminAuth()" class="admin-auth-form">
-        <div class="admin-auth-input-wrap">
-          <input type="password"
-                 [ngModel]="adminAuthPassword()"
-                 (ngModelChange)="adminAuthPassword.set($event)"
-                 name="adminPassword"
-                 [placeholder]="isSanitized() ? 'Passcode' : 'Admin Password'"
-                 autocomplete="current-password"
-                 required
-                 autofocus
-                 class="admin-auth-input" />
-        </div>
-        
-        <div *ngIf="adminAuthError()" class="admin-auth-error-msg">
-          {{ adminAuthError() }}
-        </div>
-        
-        <div class="admin-auth-actions">
-          <button type="button" class="admin-auth-cancel-btn" (click)="showAdminAuthModal.set(false)">Cancel</button>
-          <button type="submit" class="admin-auth-submit-btn" [disabled]="isAuthenticatingAdmin() || !adminAuthPassword()">
-            {{ isAuthenticatingAdmin() ? 'Verifying...' : 'Unlock Admin' }}
-          </button>
-        </div>
-      </form>
     </div>
   </div>
 
