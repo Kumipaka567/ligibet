@@ -634,7 +634,7 @@
                       class="big-bet-btn green" 
                       [disabled]="panel1().isPending"
                       (click)="placeBet(1)">
-                <span class="btn-title">{{ panel1().isPending ? (isSanitized() ? 'Connecting...' : 'Placing...') : (isSanitized() ? 'Talk with AI' : 'Bet') }}</span>
+                <span class="btn-title">{{ panel1().isPending ? 'Placing...' : (isSanitized() ? 'Place' : 'Bet') }}</span>
                 <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
@@ -667,7 +667,7 @@
               <button *ngIf="gameState() === 'RUNNING' && panel1().hasCashedOut && !panel1().queuedAmount"
                       class="big-bet-btn next-round"
                       (click)="queueBet(1)">
-                <span class="btn-title">{{ isSanitized() ? 'Talk with AI' : 'Bet' }}</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
                 <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
@@ -675,7 +675,7 @@
               <button *ngIf="gameState() === 'RUNNING' && !panel1().hasActiveBet && !panel1().hasCashedOut && !panel1().queuedAmount"
                       class="big-bet-btn green"
                       (click)="queueBet(1)">
-                <span class="btn-title">{{ isSanitized() ? 'Talk with AI' : 'Bet' }}</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
                 <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
@@ -691,7 +691,7 @@
               <button *ngIf="gameState() === 'CRASHED' && !panel1().queuedAmount"
                       class="big-bet-btn green"
                       (click)="queueBet(1)">
-                <span class="btn-title">{{ isSanitized() ? 'Talk with AI' : 'Bet' }}</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
                 <span class="btn-sub">{{ panel1().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
             </div>
@@ -775,7 +775,7 @@
                       class="big-bet-btn green" 
                       [disabled]="panel2().isPending"
                       (click)="placeBet(2)">
-                <span class="btn-title">{{ panel2().isPending ? (isSanitized() ? 'Connecting...' : 'Placing...') : (isSanitized() ? 'Talk with AI' : 'Bet') }}</span>
+                <span class="btn-title">{{ panel2().isPending ? 'Placing...' : (isSanitized() ? 'Place' : 'Bet') }}</span>
                 <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
@@ -808,7 +808,7 @@
               <button *ngIf="gameState() === 'RUNNING' && panel2().hasCashedOut && !panel2().queuedAmount"
                       class="big-bet-btn next-round"
                       (click)="queueBet(2)">
-                <span class="btn-title">{{ isSanitized() ? 'Talk with AI' : 'Bet' }}</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
                 <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
@@ -816,7 +816,7 @@
               <button *ngIf="gameState() === 'RUNNING' && !panel2().hasActiveBet && !panel2().hasCashedOut && !panel2().queuedAmount"
                       class="big-bet-btn green"
                       (click)="queueBet(2)">
-                <span class="btn-title">{{ isSanitized() ? 'Talk with AI' : 'Bet' }}</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
                 <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
 
@@ -832,7 +832,7 @@
               <button *ngIf="gameState() === 'CRASHED' && !panel2().queuedAmount"
                       class="big-bet-btn green"
                       (click)="queueBet(2)">
-                <span class="btn-title">{{ isSanitized() ? 'Talk with AI' : 'Bet' }}</span>
+                <span class="btn-title">{{ isSanitized() ? 'Place' : 'Bet' }}</span>
                 <span class="btn-sub">{{ panel2().amount | number:'1.2-2' }}{{ isSanitized() ? '' : ' KES' }}</span>
               </button>
             </div>
