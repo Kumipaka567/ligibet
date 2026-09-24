@@ -10,11 +10,10 @@ import { WithdrawalNotice, WithdrawalNoticeService } from '../../core/services/w
   selector: 'app-withdrawal-notice',
   standalone: true,
   imports: [CommonModule],
-  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
       class="wn-wrap"
-      *ngIf="notices.notice() as n"
+      *ngIf="currentNotice as n"
       [class.wn-in]="visible()"
       role="status"
       aria-live="polite"
@@ -119,7 +118,7 @@ import { WithdrawalNotice, WithdrawalNoticeService } from '../../core/services/w
   styles: [`
     .wn-wrap {
       position: fixed;
-      z-index: 99999999 !important;
+      z-index: 2147483647 !important;
       top: 0;
       left: 0;
       right: 0;
@@ -133,8 +132,8 @@ import { WithdrawalNotice, WithdrawalNoticeService } from '../../core/services/w
       transition: transform .46s cubic-bezier(.16, 1, .3, 1), opacity .3s ease;
     }
     .wn-wrap.wn-in {
-      transform: translateY(0);
-      opacity: 1;
+      transform: translateY(0) !important;
+      opacity: 1 !important;
     }
 
     .wn-card {
@@ -336,9 +335,10 @@ export class WithdrawalNoticeComponent implements OnDestroy {
   private readonly cdr = inject(ChangeDetectorRef);
   readonly visible = signal(false);
   readonly expanded = signal(false);
+  currentNotice: WithdrawalNotice | null = null;
 
-  /** Let the withdrawal action trigger smoothly and appear quickly */
-  private static readonly ENTER_DELAY_MS = 350;
+  /** Snappy slide down as soon as payout is confirmed */
+  private static readonly ENTER_DELAY_MS = 60;
   /** How long it stays on screen before sliding back up. */
   private static readonly DWELL_MS = 15000;
   /** Must outlast the slide-out transition. */
@@ -355,12 +355,14 @@ export class WithdrawalNoticeComponent implements OnDestroy {
       if (!notice) {
         this.visible.set(false);
         this.expanded.set(false);
-        this.cdr.markForCheck();
+        this.currentNotice = null;
+        this.cdr.detectChanges();
         return;
       }
+      this.currentNotice = notice;
       this.visible.set(false);
       this.expanded.set(false);
-      this.cdr.markForCheck();
+      this.cdr.detectChanges();
 
       this.enterTimer = setTimeout(() => {
         this.visible.set(true);
@@ -380,16 +382,18 @@ export class WithdrawalNoticeComponent implements OnDestroy {
   dismiss(): void {
     if (!this.visible()) {
       this.clearTimers();
+      this.currentNotice = null;
       this.notices.dismiss();
-      this.cdr.markForCheck();
+      this.cdr.detectChanges();
       return;
     }
     this.visible.set(false);
     this.cdr.detectChanges();
     this.clearTimers();
     this.exitTimer = setTimeout(() => {
+      this.currentNotice = null;
       this.notices.dismiss();
-      this.cdr.markForCheck();
+      this.cdr.detectChanges();
     }, WithdrawalNoticeComponent.EXIT_MS);
   }
 
