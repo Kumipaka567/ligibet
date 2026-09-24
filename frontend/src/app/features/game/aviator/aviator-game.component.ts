@@ -2063,26 +2063,18 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   private drawFlightZoneGlow(
     w: number,
     h: number,
-    multiplier: number,
+    _multiplier: number,
     state: GameState,
-    elapsedMs: number
+    _elapsedMs: number
   ) {
     if (!this.ctx || state === 'WAITING' || state === 'CRASHED') return;
 
-    // Target purple factor: 0 when < 2.00x, 1 when >= 2.00x
-    const targetPurple = multiplier >= 2.0 ? 1 : 0;
-    const dt = Math.min(0.1, elapsedMs / 1000);
-    this.purpleGlowPhase += (targetPurple - this.purpleGlowPhase) * (1 - Math.exp(-dt * 8));
+    // Maintain consistent cyan-blue glow throughout flight (no pink switch at 2x)
+    const r = 0;
+    const g = 145;
+    const b = 245;
 
-    const p = Math.max(0, Math.min(1, this.purpleGlowPhase));
-
-    // Under 2x: Electric Cyan-Blue (#0091ff) (Image 1)
-    // Over 2x: Vivid Magenta-Purple (#d500a5) (Image 2)
-    const r = Math.round(0 + (215 - 0) * p);
-    const g = Math.round(145 + (20 - 145) * p);
-    const b = Math.round(245 + (160 - 245) * p);
-
-    // Designated focal center (behind the multiplier text & plane flight zone)
+    // Designated focal center (behind the multiplier text & flight zone)
     const cx = w * 0.50;
     const cy = h * 0.44;
 
