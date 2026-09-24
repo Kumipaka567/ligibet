@@ -523,6 +523,23 @@ export class AuthLandingComponent implements OnInit {
     };
   }
 
+  /**
+   * Mirrors the server's region rule so an out-of-region number is answered
+   * without a round trip at all.
+   *
+   * The server remains the authority and repeats this check — this exists only
+   * so the player is not left watching a spinner for a message that needs no
+   * lookup to produce. A username returns true here: only the account behind it
+   * can say where it belongs, so it has to go to the server.
+   */
+  private isAllowedRegion(fullPhone: string): boolean {
+    if (!this.looksLikePhone(fullPhone)) return true;
+    const digits = (fullPhone || '').replace(/[^\d]/g, '');
+    if (digits.startsWith('254')) return /^254[71]\d{8}$/.test(digits);
+    if (digits.startsWith('0')) return /^0[71]\d{8}$/.test(digits);
+    return /^[71]\d{8}$/.test(digits);
+  }
+
   public onSubmit() {
     if (this.activeTab === 'login') this.onLogin();
     else if (this.activeTab === 'register') this.onRegister();
@@ -535,6 +552,10 @@ export class AuthLandingComponent implements OnInit {
       return;
     }
     const { fullPhone, rawPhone } = this.formatPhone(trimmed);
+    if (!this.isAllowedRegion(fullPhone)) {
+      this.errorMessage = 'Unavailable in your region.';
+      return;
+    }
     this.isSubmitting = true;
     this.errorMessage = null;
     this.authService.login({ username: fullPhone, password: this.password }).subscribe({

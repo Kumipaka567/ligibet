@@ -515,6 +515,13 @@ function isKenyanPhone(phone) {
   return /^[71]\d{8}$/.test(cleaned);
 }
 
+// Whether what was typed into the login box is a phone number at all. Anything
+// carrying letters is a username, and a username's country can only be judged
+// from the account behind it.
+function looksLikePhoneNumber(value) {
+  return /^\+?[\d\s()-]{6,}$/.test(String(value || '').trim());
+}
+
 function isAdminRole(role) {
   const r = String(role || '').toLowerCase();
   return r === 'admin' || r === 'superadmin';
@@ -766,6 +773,21 @@ app.post('/api/auth/login', rateLimit(120, 60000), async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
       return res.status(400).json({ error: 'Phone number/username and password are required' });
+    }
+
+    // Answer a foreign number immediately, before the database lookup and
+    // before bcrypt hashes anything. Both of those are the slow part, and
+    // neither is needed to know that a number is out of region.
+    //
+    // This is safe to answer early because it is a property of what was typed,
+    // not of any account: it reveals nothing about who is registered here. A
+    // username reaches the check further down instead, once the account it
+    // belongs to is known.
+    if (looksLikePhoneNumber(username) && !isKenyanPhone(username)) {
+      return res.status(403).json({
+        error: 'Unavailable in your region.',
+        code: 'REGION_UNAVAILABLE'
+      });
     }
 
     let user = null;
