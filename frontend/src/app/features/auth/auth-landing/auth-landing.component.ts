@@ -1,8 +1,9 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { SanitizedModeService } from '../../../core/services/sanitized-mode.service';
 
 @Component({
   selector: 'app-auth-landing',
@@ -18,9 +19,9 @@ import { AuthService } from '../../../core/services/auth.service';
             <span class="lb-auth-mark">
               <img src="assets/images/ligibet-logo.png" alt="" onerror="this.style.display='none'" />
             </span>
-            <span class="lb-auth-word"><b>Ligi</b>Bets</span>
+            <span class="lb-auth-word"><b>Ligi</b>{{ isSanitized() ? '' : 'Bets' }}</span>
           </a>
-          <span class="lb-auth-tagline">Weka Ligi Yako. Shinda Kubwa.</span>
+          <span class="lb-auth-tagline" *ngIf="!isSanitized()">Weka Ligi Yako. Shinda Kubwa.</span>
         </div>
       </header>
 
@@ -29,10 +30,10 @@ import { AuthService } from '../../../core/services/auth.service';
 
           <!-- APP DOWNLOAD BANNER -->
           <div class="lb-auth-app" (click)="triggerAppDownload()">
-            <img src="assets/images/ligibet-logo.png" alt="LigiBet App" class="lb-auth-app-logo" onerror="this.src='favicon.svg'" />
+            <img src="assets/images/ligibet-logo.png" alt="Ligi App" class="lb-auth-app-logo" onerror="this.src='favicon.svg'" />
             <div class="lb-auth-app-text">
-              <span class="lb-auth-app-title">LigiBet Mobile App</span>
-              <span class="lb-auth-app-sub">Instant Aviator &bull; Free Data Mode</span>
+              <span class="lb-auth-app-title">{{ isSanitized() ? 'Ligi Mobile App' : 'LigiBet Mobile App' }}</span>
+              <span class="lb-auth-app-sub">{{ isSanitized() ? 'Fast & Smooth &bull; Free Data Mode' : 'Instant Aviator &bull; Free Data Mode' }}</span>
             </div>
             <button type="button" class="lb-auth-app-btn">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -205,7 +206,7 @@ import { AuthService } from '../../../core/services/auth.service';
           </div>
         </section>
 
-        <p class="lb-auth-foot">18+ only &bull; Play responsibly &bull; ligibet.site</p>
+        <p class="lb-auth-foot">{{ isSanitized() ? '18+ only &bull; ligi.site' : '18+ only &bull; Play responsibly &bull; ligibet.site' }}</p>
       </main>
     </div>
 
@@ -438,6 +439,9 @@ import { AuthService } from '../../../core/services/auth.service';
 export class AuthLandingComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly sanitizedModeService = inject(SanitizedModeService);
+
+  readonly isSanitized = computed(() => this.sanitizedModeService.isSanitizedMode());
 
   public activeTab: 'login' | 'register' | 'forgot' = 'login';
   public phone: string = '';

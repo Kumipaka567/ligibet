@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthService, User } from '../../core/services/auth.service';
+import { SanitizedModeService } from '../../core/services/sanitized-mode.service';
 import { FootballMatch, MatchOutcome, SportsMarketService } from '../../core/services/sports-market.service';
 
 interface BetSlipSelection {
@@ -24,8 +25,11 @@ interface BetSlipSelection {
 export class PlayerDashboardComponent implements OnInit, OnDestroy {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly sanitizedModeService = inject(SanitizedModeService);
   readonly sports = inject(SportsMarketService);
   private readonly subscriptions: Subscription[] = [];
+
+  readonly isSanitized = computed(() => this.authService.isAdmin() && this.sanitizedModeService.isSanitizedMode());
 
   readonly currentUser = signal<User | null>(null);
   readonly userBalance = signal(0);
@@ -146,6 +150,58 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
     }
   ];
 
+  readonly displayedHeroBanners = computed(() => {
+    if (this.isSanitized()) {
+      return [
+        {
+          id: 'kings-move',
+          image: 'assets/banners/banner-kings-move.jpg',
+          headline: 'Arm wrestle your way to',
+          prize: 'Champion Tier',
+          prizeSuffix: 'every game!',
+          cta: 'Play Now',
+          tag: 'ligi.site 18+',
+          gameId: 'kings-move',
+          art: 'assets/games/photos/kings-move.jpg'
+        },
+        {
+          id: 'aviator',
+          image: 'assets/banners/banner-aviator.jpg',
+          headline: 'Rise Up The Leaderboard!',
+          prize: 'Top Score',
+          prizeSuffix: 'Daily Challenge',
+          cta: 'Play Game',
+          tag: 'Fair Play 18+',
+          gameId: 'aviator',
+          art: 'assets/images/aviator-dashboard-logo.png'
+        },
+        {
+          id: 'jackpot',
+          image: 'assets/banners/banner-jackpot.jpg',
+          headline: 'Weekend Football Challenge',
+          prize: '17 Matches',
+          prizeSuffix: 'Pick 17 Games',
+          cta: 'View Matches',
+          tag: 'Weekly 18+',
+          gameId: 'sports',
+          art: 'assets/games/photos/instant-virtuals.jpg'
+        },
+        {
+          id: 'bonus',
+          image: 'assets/banners/banner-bonus.jpg',
+          headline: 'Boost Your Game Experience!',
+          prize: 'PRO ACCESS',
+          prizeSuffix: '+ Free Access',
+          cta: 'Get Started',
+          tag: 'New Players 18+',
+          gameId: 'aviator',
+          art: 'assets/games/photos/comet-crash.jpg'
+        }
+      ];
+    }
+    return this.heroBanners;
+  });
+
   readonly currentBannerIndex = signal(0);
   private bannerTimer: any = null;
   readonly isBannerPaused = signal(false);
@@ -174,11 +230,11 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
   }
 
   nextBanner(): void {
-    this.currentBannerIndex.update(idx => (idx + 1) % this.heroBanners.length);
+    this.currentBannerIndex.update(idx => (idx + 1) % this.displayedHeroBanners().length);
   }
 
   prevBanner(): void {
-    this.currentBannerIndex.update(idx => (idx - 1 + this.heroBanners.length) % this.heroBanners.length);
+    this.currentBannerIndex.update(idx => (idx - 1 + this.displayedHeroBanners().length) % this.displayedHeroBanners().length);
   }
 
   setBanner(index: number): void {
@@ -218,36 +274,73 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
   readonly activeGameCategory = signal<string>('crash');
   readonly activeGameTab = signal<string>('crash');
 
-  readonly primaryNav = [
-    { id: 'sports', label: 'Sports Betting' },
-    { id: 'live', label: 'Live Betting' },
-    { id: 'ligileague', label: 'LigiLeague' },
-    { id: 'casino', label: 'Casino' },
-    { id: 'prediction', label: 'Prediction Market' },
-    { id: 'jackpots', label: 'Jackpots' },
-    { id: 'livescore', label: 'Livescore' },
-    { id: 'promotions', label: 'Promotions' }
-  ];
+  readonly displayedPrimaryNav = computed(() => {
+    if (this.isSanitized()) {
+      return [
+        { id: 'sports', label: 'Sports' },
+        { id: 'live', label: 'Live Matches' },
+        { id: 'ligileague', label: 'LigiLeague' },
+        { id: 'casino', label: 'Arcade' },
+        { id: 'prediction', label: 'Predictions' },
+        { id: 'jackpots', label: 'Challenges' },
+        { id: 'livescore', label: 'Scores' },
+        { id: 'promotions', label: 'Events' }
+      ];
+    }
+    return [
+      { id: 'sports', label: 'Sports Betting' },
+      { id: 'live', label: 'Live Betting' },
+      { id: 'ligileague', label: 'LigiLeague' },
+      { id: 'casino', label: 'Casino' },
+      { id: 'prediction', label: 'Prediction Market' },
+      { id: 'jackpots', label: 'Jackpots' },
+      { id: 'livescore', label: 'Livescore' },
+      { id: 'promotions', label: 'Promotions' }
+    ];
+  });
 
-  readonly navRail = [
-    { id: 'home', label: 'Home', icon: 'assets/icons/home.svg', badge: '' },
-    { id: 'live', label: 'LigiLIVE', icon: 'assets/icons/live.svg', badge: '68' },
-    { id: 'soccer', label: 'Soccer', icon: 'assets/icons/soccer.svg', badge: '' },
-    { id: 'ligileague', label: 'LigiLeague', icon: 'assets/icons/league.svg', badge: '' },
-    { id: 'aviator', label: 'Aviator', icon: 'assets/images/aviator-dashboard-logo.png', badge: '' },
-    { id: 'ligipoly', label: 'LigiPoly', icon: 'assets/icons/poly.svg', badge: '' },
-    { id: 'virtuals', label: 'Virtuals', icon: 'assets/icons/virtuals.svg', badge: 'NEW' },
-    { id: 'games', label: 'Games', icon: 'assets/icons/games.svg', badge: '' },
-    { id: 'crash', label: 'Crash', icon: 'assets/icons/crash.svg', badge: 'NEW' },
-    { id: 'casino', label: 'Casino', icon: 'assets/icons/casino.svg', badge: '' },
-    { id: 'promos', label: 'Promos', icon: 'assets/icons/promos.svg', badge: '6' },
-    { id: 'liginare', label: 'LigiNare', icon: 'assets/icons/nare.svg', badge: '' },
-    { id: 'evolution', label: 'Evolution', icon: 'assets/icons/evolution.svg', badge: 'NEW' },
-    { id: 'ligiturbo', label: 'LigiTurbo', icon: 'assets/icons/turbo.svg', badge: 'NEW' },
-    { id: 'slots', label: 'Slots', icon: 'assets/icons/slots.svg', badge: '' },
-    { id: 'esoccer', label: 'eSoccer', icon: 'assets/icons/esoccer.svg', badge: '' },
-    { id: 'basketball', label: 'Basketball', icon: 'assets/icons/basketball.svg', badge: '' }
-  ];
+  readonly displayedNavRail = computed(() => {
+    if (this.isSanitized()) {
+      return [
+        { id: 'home', label: 'Home', icon: 'assets/icons/home.svg', badge: '' },
+        { id: 'live', label: 'LigiLIVE', icon: 'assets/icons/live.svg', badge: '68' },
+        { id: 'soccer', label: 'Soccer', icon: 'assets/icons/soccer.svg', badge: '' },
+        { id: 'ligileague', label: 'LigiLeague', icon: 'assets/icons/league.svg', badge: '' },
+        { id: 'aviator', label: 'Game', icon: 'assets/icons/games.svg', badge: '' },
+        { id: 'ligipoly', label: 'LigiPoly', icon: 'assets/icons/poly.svg', badge: '' },
+        { id: 'virtuals', label: 'Virtuals', icon: 'assets/icons/virtuals.svg', badge: 'NEW' },
+        { id: 'games', label: 'Games', icon: 'assets/icons/games.svg', badge: '' },
+        { id: 'crash', label: 'Skill', icon: 'assets/icons/crash.svg', badge: 'NEW' },
+        { id: 'casino', label: 'Arcade', icon: 'assets/icons/casino.svg', badge: '' },
+        { id: 'promos', label: 'Rewards', icon: 'assets/icons/promos.svg', badge: '6' },
+        { id: 'liginare', label: 'LigiNare', icon: 'assets/icons/nare.svg', badge: '' },
+        { id: 'evolution', label: 'Evolution', icon: 'assets/icons/evolution.svg', badge: 'NEW' },
+        { id: 'ligiturbo', label: 'LigiTurbo', icon: 'assets/icons/turbo.svg', badge: 'NEW' },
+        { id: 'slots', label: 'Spin', icon: 'assets/icons/slots.svg', badge: '' },
+        { id: 'esoccer', label: 'eSoccer', icon: 'assets/icons/esoccer.svg', badge: '' },
+        { id: 'basketball', label: 'Basketball', icon: 'assets/icons/basketball.svg', badge: '' }
+      ];
+    }
+    return [
+      { id: 'home', label: 'Home', icon: 'assets/icons/home.svg', badge: '' },
+      { id: 'live', label: 'LigiLIVE', icon: 'assets/icons/live.svg', badge: '68' },
+      { id: 'soccer', label: 'Soccer', icon: 'assets/icons/soccer.svg', badge: '' },
+      { id: 'ligileague', label: 'LigiLeague', icon: 'assets/icons/league.svg', badge: '' },
+      { id: 'aviator', label: 'Aviator', icon: 'assets/images/aviator-dashboard-logo.png', badge: '' },
+      { id: 'ligipoly', label: 'LigiPoly', icon: 'assets/icons/poly.svg', badge: '' },
+      { id: 'virtuals', label: 'Virtuals', icon: 'assets/icons/virtuals.svg', badge: 'NEW' },
+      { id: 'games', label: 'Games', icon: 'assets/icons/games.svg', badge: '' },
+      { id: 'crash', label: 'Crash', icon: 'assets/icons/crash.svg', badge: 'NEW' },
+      { id: 'casino', label: 'Casino', icon: 'assets/icons/casino.svg', badge: '' },
+      { id: 'promos', label: 'Promos', icon: 'assets/icons/promos.svg', badge: '6' },
+      { id: 'liginare', label: 'LigiNare', icon: 'assets/icons/nare.svg', badge: '' },
+      { id: 'evolution', label: 'Evolution', icon: 'assets/icons/evolution.svg', badge: 'NEW' },
+      { id: 'ligiturbo', label: 'LigiTurbo', icon: 'assets/icons/turbo.svg', badge: 'NEW' },
+      { id: 'slots', label: 'Slots', icon: 'assets/icons/slots.svg', badge: '' },
+      { id: 'esoccer', label: 'eSoccer', icon: 'assets/icons/esoccer.svg', badge: '' },
+      { id: 'basketball', label: 'Basketball', icon: 'assets/icons/basketball.svg', badge: '' }
+    ];
+  });
 
   readonly sideTiles = [
     { id: 'instant-virtuals', name: 'Instant Virtuals', img: 'assets/games/instant-virtuals.svg' },
@@ -267,22 +360,45 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
     { id: 'comet-crash', name: 'Comet Crash', img: 'assets/games/comet-crash.svg' }
   ];
 
-  readonly gameTabs = [
-    { id: 'crash', label: 'Crash', flame: true },
-    { id: 'betbuilder', label: 'BetBuilder', flame: false },
-    { id: 'ligileague', label: 'LigiLeague', flame: false },
-    { id: 'ligipoly', label: 'LigiPoly', flame: false }
-  ];
+  readonly displayedGameTabs = computed(() => {
+    if (this.isSanitized()) {
+      return [
+        { id: 'crash', label: 'Fast Games', flame: true },
+        { id: 'betbuilder', label: 'Match Builder', flame: false },
+        { id: 'ligileague', label: 'LigiLeague', flame: false },
+        { id: 'ligipoly', label: 'LigiPoly', flame: false }
+      ];
+    }
+    return [
+      { id: 'crash', label: 'Crash', flame: true },
+      { id: 'betbuilder', label: 'BetBuilder', flame: false },
+      { id: 'ligileague', label: 'LigiLeague', flame: false },
+      { id: 'ligipoly', label: 'LigiPoly', flame: false }
+    ];
+  });
 
-  readonly gameCategories = [
-    { id: 'crash', label: 'Crash', count: 160 },
-    { id: 'slots', label: 'Slots', count: 1536 },
-    { id: 'exclusive', label: 'Ligi Exclusive', count: 24 },
-    { id: 'virtuals', label: 'Virtuals', count: 25 },
-    { id: 'wheel', label: 'Wheel Games', count: 31 },
-    { id: 'dice', label: 'Dice', count: 66 },
-    { id: 'high-stakes', label: 'High Stakes', count: 18 }
-  ];
+  readonly displayedGameCategories = computed(() => {
+    if (this.isSanitized()) {
+      return [
+        { id: 'crash', label: 'Fast Games', count: 160 },
+        { id: 'slots', label: 'Arcade', count: 1536 },
+        { id: 'exclusive', label: 'Ligi Exclusive', count: 24 },
+        { id: 'virtuals', label: 'Virtuals', count: 25 },
+        { id: 'wheel', label: 'Wheel Games', count: 31 },
+        { id: 'dice', label: 'Dice', count: 66 },
+        { id: 'high-stakes', label: 'Popular', count: 18 }
+      ];
+    }
+    return [
+      { id: 'crash', label: 'Crash', count: 160 },
+      { id: 'slots', label: 'Slots', count: 1536 },
+      { id: 'exclusive', label: 'Ligi Exclusive', count: 24 },
+      { id: 'virtuals', label: 'Virtuals', count: 25 },
+      { id: 'wheel', label: 'Wheel Games', count: 31 },
+      { id: 'dice', label: 'Dice', count: 66 },
+      { id: 'high-stakes', label: 'High Stakes', count: 18 }
+    ];
+  });
 
   readonly topLeagues = [
     { name: 'UEFA Champions League', region: 'Internationals', count: 18 },
@@ -543,8 +659,8 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
       this.activeFilter.set('all');
       return;
     }
-    const label = this.navRail.find(item => item.id === tab)?.label
-      || this.primaryNav.find(item => item.id === tab)?.label;
+    const label = this.displayedNavRail().find(item => item.id === tab)?.label
+      || this.displayedPrimaryNav().find(item => item.id === tab)?.label;
     if (label) this.showToast(`${label} is coming soon.`);
   }
 

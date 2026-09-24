@@ -124,7 +124,7 @@
               <svg class="pdm-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               Provably fair settings
             </button>
-            <button *ngIf="currentUser()?.role === 'admin' || currentUser()?.role === 'superadmin'" type="button" class="pdm-item admin-item" (click)="navigateToAdmin()">
+            <button *ngIf="(currentUser()?.role === 'admin' || currentUser()?.role === 'superadmin') && !isSanitized()" type="button" class="pdm-item admin-item" (click)="navigateToAdmin()">
               <svg class="pdm-svg-icon text-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
               {{ currentUser()?.role === 'superadmin' ? 'Superadmin dashboard' : 'Admin dashboard' }}
             </button>
@@ -404,7 +404,7 @@
                 <span>Provably Fair Settings</span>
               </button>
 
-              <button *ngIf="currentUser()?.role === 'admin' || currentUser()?.role === 'superadmin'" class="spribe-menu-btn admin-btn" (click)="navigateToAdmin()">
+              <button *ngIf="(currentUser()?.role === 'admin' || currentUser()?.role === 'superadmin') && !isSanitized()" class="spribe-menu-btn admin-btn" (click)="navigateToAdmin()">
                 <span class="menu-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
                 <span>{{ currentUser()?.role === 'superadmin' ? 'Superadmin Dashboard' : 'Admin Dashboard' }}</span>
               </button>
@@ -526,7 +526,7 @@
             
             <div class="betting-countdown-box">
               <div class="loader-spinner"></div>
-              <h2 class="betting-title">WAITING FOR NEXT ROUND</h2>
+              <h2 class="betting-title">{{ isSanitized() ? 'STARTING SOON' : 'WAITING FOR NEXT ROUND' }}</h2>
               <div class="countdown-timer">{{ countdownSeconds() }}s</div>
               <div class="progress-bar">
                 <div class="progress-fill" [style.width.%]="countdownProgress()"></div>
@@ -620,7 +620,7 @@
                       class="big-bet-btn queued"
                       (click)="cancelBet(1)">
                 <span class="btn-title">Cancel</span>
-                <span class="btn-sub">Waiting for next round</span>
+                <span class="btn-sub">{{ isSanitized() ? 'Starting soon...' : 'Waiting for next round' }}</span>
               </button>
 
               <!-- 3. RUNNING: BET QUEUED FOR NEXT ROUND -> RED CANCEL BUTTON -->
@@ -628,7 +628,7 @@
                       class="big-bet-btn queued"
                       (click)="cancelQueuedBet(1)">
                 <span class="btn-title">Cancel</span>
-                <span class="btn-sub">Waiting for next round</span>
+                <span class="btn-sub">{{ isSanitized() ? 'Starting soon...' : 'Waiting for next round' }}</span>
               </button>
 
               <!-- 4. RUNNING: ACTIVE BET IN FLIGHT -> GOLD CASH OUT BUTTON -->
@@ -661,7 +661,7 @@
                       class="big-bet-btn queued"
                       (click)="cancelQueuedBet(1)">
                 <span class="btn-title">Cancel</span>
-                <span class="btn-sub">Waiting for next round</span>
+                <span class="btn-sub">{{ isSanitized() ? 'Starting soon...' : 'Waiting for next round' }}</span>
               </button>
 
               <!-- 8. CRASHED: NO QUEUED BET -> GREEN BET BUTTON -->
@@ -761,7 +761,7 @@
                       class="big-bet-btn queued"
                       (click)="cancelBet(2)">
                 <span class="btn-title">Cancel</span>
-                <span class="btn-sub">Waiting for next round</span>
+                <span class="btn-sub">{{ isSanitized() ? 'Starting soon...' : 'Waiting for next round' }}</span>
               </button>
 
               <!-- 3. RUNNING: BET QUEUED FOR NEXT ROUND -> RED CANCEL BUTTON -->
@@ -769,7 +769,7 @@
                       class="big-bet-btn queued"
                       (click)="cancelQueuedBet(2)">
                 <span class="btn-title">Cancel</span>
-                <span class="btn-sub">Waiting for next round</span>
+                <span class="btn-sub">{{ isSanitized() ? 'Starting soon...' : 'Waiting for next round' }}</span>
               </button>
 
               <!-- 4. RUNNING: ACTIVE BET IN FLIGHT -> GOLD CASH OUT BUTTON -->
@@ -802,7 +802,7 @@
                       class="big-bet-btn queued"
                       (click)="cancelQueuedBet(2)">
                 <span class="btn-title">Cancel</span>
-                <span class="btn-sub">Waiting for next round</span>
+                <span class="btn-sub">{{ isSanitized() ? 'Starting soon...' : 'Waiting for next round' }}</span>
               </button>
 
               <!-- 8. CRASHED: NO QUEUED BET -> GREEN BET BUTTON -->

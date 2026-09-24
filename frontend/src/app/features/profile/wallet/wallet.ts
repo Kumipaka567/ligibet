@@ -1,9 +1,10 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthService, TransactionRecord } from '../../../core/services/auth.service';
 import { GameSocketService } from '../../../core/services/game-socket.service';
+import { SanitizedModeService } from '../../../core/services/sanitized-mode.service';
 
 @Component({
   selector: 'app-wallet',
@@ -12,11 +13,11 @@ import { GameSocketService } from '../../../core/services/game-socket.service';
   template: `
     <div class="wallet-page-wrapper">
       <header class="wallet-header">
-        <button class="back-btn" (click)="goBack()">‹ Back to Game</button>
+        <button class="back-btn" (click)="goBack()">‹ Back</button>
         <h1>User Wallet & Transaction History</h1>
         <div class="user-balance-box">
           <span class="lbl">Balance:</span>
-          <span class="val">{{ (userBalance$ | async) | number:'1.2-2' }} KES</span>
+          <span class="val">{{ isSanitized() ? '' : 'KES ' }}{{ (userBalance$ | async) | number:'1.2-2' }}</span>
         </div>
       </header>
 
@@ -31,7 +32,7 @@ import { GameSocketService } from '../../../core/services/game-socket.service';
         </div>
 
         <div *ngIf="!isLoading && transactions.length === 0" class="empty-state">
-          <p>No transactions recorded yet. Initiate a deposit from the game to get started.</p>
+          <p>No transactions recorded yet.</p>
         </div>
 
         <div *ngIf="!isLoading && transactions.length > 0" class="tx-table-wrap">
@@ -54,7 +55,7 @@ import { GameSocketService } from '../../../core/services/game-socket.service';
                     {{ tx.type | uppercase }}
                   </span>
                 </td>
-                <td class="amount-col">{{ tx.amount | number:'1.2-2' }} KES</td>
+                <td class="amount-col">{{ isSanitized() ? '' : 'KES ' }}{{ tx.amount | number:'1.2-2' }}</td>
                 <td>
                   <span class="status-badge" [class.completed]="tx.status === 'completed'" [class.failed]="tx.status === 'failed'" [class.pending]="tx.status === 'pending'">
                     <ng-container [ngSwitch]="tx.status">
@@ -248,7 +249,10 @@ export class WalletComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private gameSocket = inject(GameSocketService);
   private router = inject(Router);
+  private sanitizedModeService = inject(SanitizedModeService);
   private subscriptions: Subscription[] = [];
+
+  readonly isSanitized = computed(() => this.authService.isAdmin() && this.sanitizedModeService.isSanitizedMode());
 
   public userBalance$ = this.authService.userBalance$;
   public transactions: TransactionRecord[] = [];

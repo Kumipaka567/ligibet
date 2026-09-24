@@ -11,12 +11,12 @@
         <span class="lb-logo-mark">
           <img src="assets/images/ligibet-logo.png" alt="" onerror="this.style.display='none'" />
         </span>
-        <span class="lb-logo-word"><b>Ligi</b>Bets</span>
+        <span class="lb-logo-word"><b>Ligi</b>{{ isSanitized() ? '' : 'Bets' }}</span>
       </a>
 
       <nav class="lb-mainnav">
         <button
-          *ngFor="let item of primaryNav"
+          *ngFor="let item of displayedPrimaryNav()"
           type="button"
           class="lb-mainnav-item"
           [class.active]="activeNavTab() === item.id"
@@ -35,9 +35,9 @@
         <ng-container *ngIf="currentUser() as user; else guestActions">
           <button class="lb-balance" type="button" (click)="goToWallet()">
             <span class="lb-balance-label">Balance</span>
-            <span class="lb-balance-value">KES {{ userBalance() | number:'1.2-2' }}</span>
+            <span class="lb-balance-value">{{ isSanitized() ? '' : 'KES ' }}{{ userBalance() | number:'1.2-2' }}</span>
           </button>
-          <button class="lb-btn lb-btn-deposit" type="button" (click)="openDeposit()">Deposit</button>
+          <button *ngIf="!isSanitized()" class="lb-btn lb-btn-deposit" type="button" (click)="openDeposit()">Deposit</button>
           <div class="lb-profile">
             <button class="lb-btn lb-btn-profile" type="button" (click)="toggleProfileMenu()" aria-label="Account menu">
               <span class="lb-avatar">{{ (user.username || '?').charAt(0).toUpperCase() }}</span>
@@ -50,16 +50,16 @@
                 <span class="lb-avatar lg">{{ (user.username || '?').charAt(0).toUpperCase() }}</span>
                 <span class="lb-profile-head-text">
                   <b>{{ user.username }}</b>
-                  <em>KES {{ userBalance() | number:'1.2-2' }}</em>
+                  <em>{{ isSanitized() ? '' : 'KES ' }}{{ userBalance() | number:'1.2-2' }}</em>
                 </span>
               </div>
-              <button type="button" (click)="openDeposit()">Deposit</button>
+              <button *ngIf="!isSanitized()" type="button" (click)="openDeposit()">Deposit</button>
               <button type="button" (click)="openWithdraw()">Withdraw</button>
               <button type="button" (click)="goToWallet()">My Wallet &amp; History</button>
               <button type="button" (click)="openAccountSettings()">Account Settings</button>
-              <button type="button" (click)="goToAviator()">Play Aviator</button>
+              <button type="button" (click)="goToAviator()">{{ isSanitized() ? 'Play Game' : 'Play Aviator' }}</button>
               <button type="button" (click)="downloadApp()">Download App</button>
-              <button type="button" class="admin" *ngIf="isPrivileged()" (click)="goToAdmin()">Admin Dashboard</button>
+              <button type="button" class="admin" *ngIf="isPrivileged() && !isSanitized()" (click)="goToAdmin()">Admin Dashboard</button>
               <button type="button" class="danger" (click)="logout()">Log out</button>
             </div>
           </div>
@@ -79,7 +79,7 @@
       </button>
       <div class="lb-rail">
         <button
-          *ngFor="let item of navRail"
+          *ngFor="let item of displayedNavRail()"
           type="button"
           class="lb-rail-item"
           [class.active]="activeNavTab() === item.id"
@@ -179,14 +179,14 @@
 
         <div class="lb-hero-slides">
           <div
-            *ngFor="let banner of heroBanners; let i = index"
+            *ngFor="let banner of displayedHeroBanners(); let i = index"
             class="lb-hero-slide"
             [class.active]="currentBannerIndex() === i"
           >
             <img class="lb-hero-photo" [src]="banner.image" [alt]="banner.headline" (click)="openGame(banner.gameId)" />
             <div class="lb-hero-inner">
               <div class="lb-hero-brand">
-                <span class="lb-hero-mark"><b>Ligi</b>Bets</span>
+                <span class="lb-hero-mark"><b>Ligi</b>{{ isSanitized() ? '' : 'Bets' }}</span>
               </div>
               <div class="lb-hero-copy">
                 <h2>{{ banner.headline }}</h2>
@@ -206,7 +206,7 @@
         <!-- Slide Indicators -->
         <div class="lb-hero-dots">
           <button
-            *ngFor="let b of heroBanners; let i = index"
+            *ngFor="let b of displayedHeroBanners(); let i = index"
             type="button"
             class="lb-hero-dot"
             [class.active]="currentBannerIndex() === i"
@@ -215,14 +215,14 @@
           ></button>
         </div>
 
-        <div class="lb-hero-progress"><i [style.width.%]="((currentBannerIndex() + 1) / heroBanners.length) * 100"></i></div>
+        <div class="lb-hero-progress"><i [style.width.%]="((currentBannerIndex() + 1) / displayedHeroBanners().length) * 100"></i></div>
       </section>
 
       <!-- GAME PANEL -->
       <section class="lb-card">
         <nav class="lb-gametabs">
           <button
-            *ngFor="let tab of gameTabs"
+            *ngFor="let tab of displayedGameTabs()"
             type="button"
             class="lb-gametab"
             [class.active]="activeGameTab() === tab.id"
@@ -237,7 +237,7 @@
 
         <div class="lb-chips">
           <button
-            *ngFor="let cat of gameCategories"
+            *ngFor="let cat of displayedGameCategories()"
             type="button"
             class="lb-chip"
             [class.active]="activeGameCategory() === cat.id"
@@ -281,8 +281,8 @@
       <!-- AVIATOR STRIP -->
       <section class="lb-card lb-aviator-strip">
         <header class="lb-card-head">
-          <h3>Aviator — recent multipliers</h3>
-          <button type="button" class="lb-link" (click)="goToAviator()">Play Aviator</button>
+          <h3>{{ isSanitized() ? 'Recent Multipliers' : 'Aviator — recent multipliers' }}</h3>
+          <button type="button" class="lb-link" (click)="goToAviator()">{{ isSanitized() ? 'Play Game' : 'Play Aviator' }}</button>
         </header>
         <div class="lb-multipliers">
           <span
@@ -338,7 +338,7 @@
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M15 5l-7 7 7 7"/></svg>
           Back
         </button>
-        <span>Betslip</span>
+        <span>{{ isSanitized() ? 'Selection' : 'Betslip' }}</span>
         <button type="button" class="lb-drawer-close" (click)="showMobileSlipDrawer.set(false)" aria-label="Close betslip">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
@@ -347,8 +347,8 @@
       <section class="lb-slip">
         <header class="lb-slip-head">
           <span class="lb-slip-count">{{ selections().length }}</span>
-          <h3>Betslip</h3>
-          <button type="button" class="lb-slip-mybets">My bets</button>
+          <h3>{{ isSanitized() ? 'Selection' : 'Betslip' }}</h3>
+          <button type="button" class="lb-slip-mybets">{{ isSanitized() ? 'My selections' : 'My bets' }}</button>
         </header>
 
         <div class="lb-slip-mode">
@@ -379,24 +379,24 @@
           </div>
 
           <label class="lb-stake">
-            <span>Stake (KES)</span>
+            <span>Stake {{ isSanitized() ? '' : '(KES)' }}</span>
             <input type="number" min="10" [(ngModel)]="stake" />
           </label>
 
           <dl class="lb-slip-totals">
             <div><dt>Total odds</dt><dd>{{ combinedOdds() | number:'1.2-2' }}</dd></div>
-            <div><dt>Possible win</dt><dd class="win">KES {{ potentialReturn() | number:'1.2-2' }}</dd></div>
+            <div><dt>{{ isSanitized() ? 'Possible return' : 'Possible win' }}</dt><dd class="win">{{ isSanitized() ? '' : 'KES ' }}{{ potentialReturn() | number:'1.2-2' }}</dd></div>
           </dl>
 
-          <button type="button" class="lb-slip-place" (click)="placeDemoBet()">Place Bet</button>
+          <button type="button" class="lb-slip-place" (click)="placeDemoBet()">{{ isSanitized() ? 'Submit Selection' : 'Place Bet' }}</button>
         </div>
 
         <p class="lb-slip-notice" *ngIf="betNotice()">{{ betNotice() }}</p>
 
         <div class="lb-booking">
-          <p>Have a booking code? Please enter it here.</p>
-          <input type="text" placeholder="Booking code" [(ngModel)]="betslipCode" />
-          <button type="button" class="lb-booking-btn" (click)="loadBetslipByCode()">Load betslip</button>
+          <p>{{ isSanitized() ? 'Have a code? Please enter it here.' : 'Have a booking code? Please enter it here.' }}</p>
+          <input type="text" [placeholder]="isSanitized() ? 'Code' : 'Booking code'" [(ngModel)]="betslipCode" />
+          <button type="button" class="lb-booking-btn" (click)="loadBetslipByCode()">{{ isSanitized() ? 'Load selection' : 'Load betslip' }}</button>
         </div>
       </section>
     </aside>
@@ -406,9 +406,9 @@
   <nav class="lb-mobilebar">
     <button type="button" (click)="setNavTab('home')"><img src="assets/icons/home.svg" alt="" /><span>Home</span></button>
     <button type="button" (click)="setNavTab('live')"><img src="assets/icons/live.svg" alt="" /><span>Live</span></button>
-    <button type="button" (click)="goToAviator()"><img src="assets/images/aviator-dashboard-logo.png" alt="" /><span>Aviator</span></button>
+    <button type="button" (click)="goToAviator()"><img src="assets/images/aviator-dashboard-logo.png" alt="" /><span>{{ isSanitized() ? 'Game' : 'Aviator' }}</span></button>
     <button type="button" class="slip" (click)="toggleMobileSlipDrawer()">
-      <img src="assets/icons/crash.svg" alt="" /><span>Slip</span>
+      <img src="assets/icons/crash.svg" alt="" /><span>{{ isSanitized() ? 'Selection' : 'Slip' }}</span>
       <em *ngIf="selections().length">{{ selections().length }}</em>
     </button>
     <button type="button" class="account" (click)="toggleProfileMenu()">
@@ -423,20 +423,20 @@
       <span class="lb-avatar lg">{{ (sheetUser.username || '?').charAt(0).toUpperCase() }}</span>
       <span class="lb-profile-head-text">
         <b>{{ sheetUser.username }}</b>
-        <em>KES {{ userBalance() | number:'1.2-2' }}</em>
+        <em>{{ isSanitized() ? '' : 'KES ' }}{{ userBalance() | number:'1.2-2' }}</em>
       </span>
       <button type="button" class="lb-drawer-close" (click)="showProfileMenu.set(false)" aria-label="Close account menu">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
     </header>
     <div class="lb-sheet-actions">
-      <button type="button" (click)="openDeposit()">Deposit</button>
+      <button *ngIf="!isSanitized()" type="button" (click)="openDeposit()">Deposit</button>
       <button type="button" (click)="openWithdraw()">Withdraw</button>
       <button type="button" (click)="goToWallet()">My Wallet &amp; History</button>
       <button type="button" (click)="openAccountSettings()">Account Settings</button>
-      <button type="button" (click)="goToAviator()">Play Aviator</button>
+      <button type="button" (click)="goToAviator()">{{ isSanitized() ? 'Play Game' : 'Play Aviator' }}</button>
       <button type="button" (click)="downloadApp()">Download App</button>
-      <button type="button" class="admin" *ngIf="isPrivileged()" (click)="goToAdmin()">Admin Dashboard</button>
+      <button type="button" class="admin" *ngIf="isPrivileged() && !isSanitized()" (click)="goToAdmin()">Admin Dashboard</button>
       <button type="button" class="danger" (click)="logout()">Log out</button>
     </div>
   </div>
@@ -450,17 +450,17 @@
         <div class="mpesa-logo">M</div>
         <div>
           <h2>M-PESA Deposit</h2>
-          <p class="modal-intro">Fund your LigiBet account instantly</p>
+          <p class="modal-intro">Fund your {{ isSanitized() ? 'Ligi' : 'LigiBet' }} account instantly</p>
         </div>
       </div>
 
       <label class="modal-input-label">
-        <span>Deposit Amount (KES)</span>
+        <span>Deposit Amount {{ isSanitized() ? '' : '(KES)' }}</span>
         <div class="modal-input-box">
-          <span class="currency-prefix">KES</span>
+          <span class="currency-prefix" *ngIf="!isSanitized()">KES</span>
           <input type="number" [min]="minimumDeposit()" [(ngModel)]="depositAmount">
         </div>
-        <small class="modal-input-hint">Minimum deposit: KES {{ minimumDeposit() | number }}</small>
+        <small class="modal-input-hint" *ngIf="!isSanitized()">Minimum deposit: KES {{ minimumDeposit() | number }}</small>
       </label>
 
       <label class="modal-input-label">
@@ -485,14 +485,14 @@
         <div class="mpesa-logo withdraw">W</div>
         <div>
           <h2>Withdraw to M-PESA</h2>
-          <p class="modal-intro">Available balance: KES {{ userBalance() | number:'1.2-2' }}</p>
+          <p class="modal-intro">Available balance: {{ isSanitized() ? '' : 'KES ' }}{{ userBalance() | number:'1.2-2' }}</p>
         </div>
       </div>
 
       <label class="modal-input-label">
-        <span>Withdrawal Amount (KES)</span>
+        <span>Withdrawal Amount {{ isSanitized() ? '' : '(KES)' }}</span>
         <div class="modal-input-box">
-          <span class="currency-prefix">KES</span>
+          <span class="currency-prefix" *ngIf="!isSanitized()">KES</span>
           <input type="number" min="10" [(ngModel)]="withdrawAmount">
         </div>
       </label>
