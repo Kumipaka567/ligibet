@@ -63,18 +63,21 @@
         [title]="sanitizedMode.isSanitizedMode() ? 'Sanitized Mode is Active (All betting features hidden on Game tab) - Click to Restore Normal View' : 'Normal View Active - Click to activate Sanitized Mode'"
       >
         <span class="sanitized-icon">🛡️</span>
-        <span class="sanitized-label">{{ sanitizedMode.isSanitizedMode() ? 'Sanitized Mode: ON' : 'Sanitized Mode: OFF' }}</span>
+        <span class="sanitized-label">
+          <span class="sanitized-label-desktop">{{ sanitizedMode.isSanitizedMode() ? 'Sanitized Mode: ON' : 'Sanitized Mode: OFF' }}</span>
+          <span class="sanitized-label-mobile">{{ sanitizedMode.isSanitizedMode() ? 'ON' : 'OFF' }}</span>
+        </span>
         <span class="sanitized-pill-indicator"></span>
       </button>
 
       <!-- PREDATOR SCREEN QUICK ACCESS -->
-      <button class="action-btn outline-sm" (click)="openPredator()" title="Open Predator Signal Screen">
+      <button class="action-btn outline-sm header-desktop-btn" (click)="openPredator()" title="Open Predator Signal Screen">
         <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/></svg>
         <span>Predator</span>
       </button>
 
       <!-- FULLSCREEN PLAY ROUTE BUTTON -->
-      <button class="game-view-btn" (click)="backToGame()" title="Open Player Fullscreen Game">
+      <button class="game-view-btn header-desktop-btn" (click)="backToGame()" title="Open Player Fullscreen Game">
         <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         <span>Play Fullscreen</span>
       </button>
@@ -425,15 +428,15 @@
               Write text (e.g. phone number or notes) displayed visibly on the clean white Predator screen in Sanitized Mode:
             </p>
 
-            <div class="control-input-row">
+            <div class="control-input-row predator-control-row">
               <input
                 type="text"
                 [(ngModel)]="predatorInputText"
-                class="styled-input-sm"
+                class="styled-input predator-styled-input"
                 placeholder="Write text or phone number (e.g. +254 712 345 678)..."
                 (keydown.enter)="savePredatorText()"
               />
-              <button class="sm-btn primary" (click)="savePredatorText()">Save Text</button>
+              <button class="action-btn primary predator-save-btn" (click)="savePredatorText()">Save Text</button>
             </div>
 
             <div *ngIf="predatorSavedNotice" class="success-callout mono">

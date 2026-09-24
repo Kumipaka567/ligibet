@@ -1,6 +1,5 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AdminRoomStatus, AdminSocketService } from '../../../core/services/admin-socket';
@@ -24,14 +23,14 @@ export interface PredatorRoom {
 
 /**
  * A standalone readout of the next crash point.
- * In normal mode: displays rooms 1 to 3 with full telemetry.
- * In sanitized mode: clean white screen, room 1 only, crash value without decimals,
- * plus configurable visible text (e.g. phone number or notes).
+ * In normal mode: displays rooms 1 to 3 with full dark telemetry.
+ * In sanitized mode: clean white screen, room 1 only, big predictor without decimals,
+ * and the configured number/words displayed large directly below it. All editing done in admin dashboard.
  */
 @Component({
   selector: 'app-predator',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule],
   templateUrl: './predator.component.html',
   styleUrls: ['./predator.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -54,14 +53,10 @@ export class PredatorComponent implements OnInit, OnDestroy {
     this.authService.isAdmin() && this.sanitizedModeService.isSanitizedMode()
   );
 
-  /** Configurable visible text (e.g. phone number / notes) */
+  /** Configurable visible text (configured only from the admin dashboard) */
   public readonly predatorText = computed(() =>
     this.sanitizedModeService.predatorCustomText()
   );
-
-  /** Inline text editing on the Predator screen */
-  public readonly isEditingText = signal(false);
-  public readonly editTextVal = signal('');
 
   /**
    * Room list:
@@ -157,14 +152,6 @@ export class PredatorComponent implements OnInit, OnDestroy {
   }
 
   public phaseLabel(phase: string): string {
-    if (this.isSanitized()) {
-      switch (phase) {
-        case 'betting': return 'Ready';
-        case 'flying': return 'Active';
-        case 'crashed': return 'Settled';
-        default: return 'Standby';
-      }
-    }
     switch (phase) {
       case 'betting': return 'Betting Open';
       case 'flying': return 'In Flight';
@@ -191,20 +178,6 @@ export class PredatorComponent implements OnInit, OnDestroy {
       case 'high': return 'Long runner';
       default: return 'No target yet';
     }
-  }
-
-  public startEditText(): void {
-    this.editTextVal.set(this.predatorText());
-    this.isEditingText.set(true);
-  }
-
-  public saveEditText(): void {
-    this.sanitizedModeService.setPredatorCustomText(this.editTextVal());
-    this.isEditingText.set(false);
-  }
-
-  public cancelEditText(): void {
-    this.isEditingText.set(false);
   }
 
   public trackByRoom(_index: number, room: PredatorRoom): number {

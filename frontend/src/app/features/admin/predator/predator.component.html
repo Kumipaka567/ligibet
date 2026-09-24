@@ -1,92 +1,24 @@
 <div class="predator-page" [class.sanitized-white-mode]="isSanitized()">
 
-  <!-- SANITIZED WHITE MODE: Clean white screen, room 1 only, no decimals, visible custom text -->
+  <!-- SANITIZED WHITE MODE: Clean white screen containing ONLY the big next crash and large edited number & words below it -->
   <ng-container *ngIf="isSanitized(); else normalPredatorView">
-    <div class="sanitized-container">
-      <!-- CLEAN HEADER -->
-      <header class="sanitized-header">
-        <div class="sanitized-brand">
-          <div class="sanitized-icon">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-            </svg>
-          </div>
-          <div>
-            <h1 class="sanitized-title">Signals Monitor</h1>
-            <p class="sanitized-sub">Room 1 Live Signal Feed</p>
-          </div>
+    <div class="sanitized-screen-wrapper">
+      <!-- Subtle return link to dashboard in corner -->
+      <a class="sanitized-subtle-back" (click)="backToDashboard()" title="Return to Dashboard">
+        ← Dashboard
+      </a>
+
+      <div class="sanitized-center-content">
+        <!-- BIG PREDICTOR (NEXT CRASH POINT WITHOUT DECIMALS) -->
+        <div class="sanitized-huge-predictor" *ngIf="rooms()[0] as r1">
+          {{ formatCrashValue(r1.nextCrashPoint) }}
         </div>
 
-        <div class="sanitized-nav">
-          <span class="sanitized-status-pill" [class.online]="isConnected()">
-            <span class="status-dot"></span>
-            {{ isConnected() ? 'Online' : 'Connecting…' }}
-          </span>
-          <button type="button" class="sanitized-dash-btn" (click)="backToDashboard()">
-            Admin Dashboard
-          </button>
+        <!-- CONFIGURED NUMBER AND WORDS (LARGE & VISIBLE BELOW PREDICTED CRASH) -->
+        <div class="sanitized-large-custom-text" *ngIf="predatorText()">
+          {{ predatorText() }}
         </div>
-      </header>
-
-      <!-- VISIBLE TEXT / PHONE NUMBER CARD -->
-      <section class="sanitized-text-card">
-        <div class="text-card-header">
-          <span class="text-card-label">Visible Contact / Desk Notes</span>
-          <button *ngIf="!isEditingText()" type="button" class="text-edit-btn" (click)="startEditText()" title="Edit note or phone number">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-            Edit
-          </button>
-        </div>
-
-        <!-- VIEWING VISIBLE TEXT -->
-        <div *ngIf="!isEditingText()" class="text-display-box" (click)="startEditText()">
-          <p class="visible-text-content" *ngIf="predatorText()">{{ predatorText() }}</p>
-          <p class="visible-text-empty" *ngIf="!predatorText()">
-            <em>No text set yet. Click here or configure in Admin Dashboard to add a phone number or notice.</em>
-          </p>
-        </div>
-
-        <!-- EDITING VISIBLE TEXT INLINE -->
-        <div *ngIf="isEditingText()" class="text-edit-box">
-          <input 
-            type="text" 
-            [(ngModel)]="editTextVal" 
-            class="text-edit-input" 
-            placeholder="e.g. +254 712 345 678 or VIP Signal Desk"
-            (keydown.enter)="saveEditText()"
-          />
-          <div class="text-edit-actions">
-            <button type="button" class="btn-save" (click)="saveEditText()">Save</button>
-            <button type="button" class="btn-cancel" (click)="cancelEditText()">Cancel</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- ROOM 1 SIGNAL (NO DECIMALS, SINGLE DIGIT / WHOLE INTEGER ONLY) -->
-      <section class="sanitized-signal-section" *ngFor="let room of rooms(); trackBy: trackByRoom">
-        <div class="sanitized-signal-card">
-          <div class="signal-header">
-            <span class="signal-badge">Room 1</span>
-            <span class="signal-phase-badge" [attr.data-phase]="room.phase">{{ phaseLabel(room.phase) }}</span>
-          </div>
-
-          <div class="signal-readout">
-            <span class="signal-label">NEXT SIGNAL</span>
-            <div class="signal-number">
-              {{ formatCrashValue(room.nextCrashPoint) }}
-            </div>
-            <span class="signal-subtext">Live Room 1 Indicator</span>
-          </div>
-
-          <div class="signal-footer">
-            <span class="signal-timestamp" *ngIf="lastUpdate()">Updated {{ lastUpdate() | date: 'HH:mm:ss' }}</span>
-            <span class="signal-room-info">Channel 1</span>
-          </div>
-        </div>
-      </section>
+      </div>
     </div>
   </ng-container>
 
