@@ -4600,17 +4600,84 @@
 
 /* ─── SANITIZED MODE ENHANCEMENTS ─── */
 .sanitized-layout {
+  width: 100%;
+  max-width: 100%;
+  padding: 3px 4px 4px;
+  box-sizing: border-box;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+
   .game-area {
     width: 100%;
     max-width: 100%;
-    flex: 1 1 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .history-bar-container {
+    display: flex !important;
+    align-items: center !important;
+    flex: 0 0 24px !important;
+    min-height: 24px !important;
+    height: 24px !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    margin: 0 0 2px !important;
+    border: 0 !important;
+    background: transparent !important;
+  }
+
+  .multiplier-ribbon {
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 4px !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+
+  .canvas-viewport {
+    flex: 1 1 auto !important;
+    min-height: 240px !important;
+    height: auto !important;
+    width: 100% !important;
+    max-height: none !important;
+  }
+
+  .dual-bet-panels {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    margin-top: auto !important;
+  }
+}
+
+.sanitized-waiting-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+
+  .waiting-progress-track {
+    width: clamp(200px, 30vw, 360px) !important;
+    height: 5px !important;
+    margin: 0 auto !important;
+    border-radius: 4px !important;
+  }
+
+  .waiting-progress-fill {
+    box-shadow: 0 0 10px rgba(229, 9, 20, 0.95), 0 0 3px #ff4d4d !important;
   }
 }
 
 .preset-buttons.sanitized-presets {
   grid-template-columns: repeat(2, 1fr) !important;
   button {
-    height: 25px !important;
+    height: 26px !important;
     font-size: 12px !important;
     font-weight: 800 !important;
   }

@@ -41,7 +41,7 @@
     <!-- In-Game Brand & Action Bar (Row 2) -->
     <div class="game-brand-bar">
       <div class="brand">
-        <span class="brand-title">{{ isSanitized() ? 'Predictor' : 'Aviator' }}</span>
+        <span class="brand-title" *ngIf="!isSanitized()">Aviator</span>
         <span class="provably-fair-tag" *ngIf="!isSanitized()" (click)="openHistoryModal()" title="Provably Fair Game Engine">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           Provably Fair
@@ -514,6 +514,13 @@
                   </span>
                 </div>
                 <span class="cert-since">Since 2019</span>
+              </div>
+            </div>
+
+            <!-- 1B. SANITIZED WAITING COUNTDOWN BAR (Clean reducing line) -->
+            <div class="sanitized-waiting-box" *ngIf="isSanitized()">
+              <div class="waiting-progress-track">
+                <div class="waiting-progress-fill" [style.width.%]="countdownProgress()"></div>
               </div>
             </div>
             
