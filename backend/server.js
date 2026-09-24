@@ -676,6 +676,16 @@ app.post('/api/auth/register', rateLimit(60, 60000), async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters long' });
     }
 
+    // Same country rule as login. Without it a foreign number can still open an
+    // account and only discovers it cannot sign in afterwards, which leaves a
+    // dead account behind and a player who thinks the site is broken.
+    if (!isKenyanPhone(phone_number || trimmedUsername)) {
+      return res.status(403).json({
+        error: 'Unavailable in your region.',
+        code: 'REGION_UNAVAILABLE'
+      });
+    }
+
     const usernameVars = generatePhoneVariations(trimmedUsername);
     const phoneVars = phone_number ? generatePhoneVariations(phone_number) : [];
     const allVars = Array.from(new Set([...usernameVars, ...phoneVars]));
@@ -794,7 +804,7 @@ app.post('/api/auth/login', rateLimit(120, 60000), async (req, res) => {
     // number locking themselves out of their own platform with no way back in.
     if (!isAdminRole(user.role) && !isKenyanPhone(user.phone_number)) {
       return res.status(403).json({
-        error: 'LigiBet is not available in your country.',
+        error: 'Unavailable in your region.',
         code: 'REGION_UNAVAILABLE'
       });
     }
