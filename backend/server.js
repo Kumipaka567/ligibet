@@ -1551,59 +1551,6 @@ async function reconcilePendingMpesaDeposits() {
   }
 }
 
-// ---------- DEPOSIT PROMPT COOLDOWN ----------
-// PayHero throttles, and eventually blocks, merchants whose STK prompts keep
-// going unanswered. A player stuck in a failing loop will tap Deposit over and
-// over, and the penalty lands on the merchant account — which means on every
-// other player at the same time.
-//
-// The streak is read back off the deposit records rather than tracked as the
-// deposits happen. That keeps this entirely outside the deposit flow: nothing
-// here hooks into how a deposit is created, completed or failed, so it cannot
-// change what happens to a payment. It also means the count survives a restart
-// and that a completed deposit clears the streak on its own, because the run of
-// failures is no longer unbroken.
-const DEPOSIT_COOLDOWN_STREAK = 3;             // consecutive failed prompts
-const DEPOSIT_COOLDOWN_MS = 10 * 60 * 1000;    // lockout length
-
-async function getDepositCooldown(userId) {
-  const recent = await Deposit.find({ user_id: userId })
-    .sort({ created_at: -1 })
-    .limit(DEPOSIT_COOLDOWN_STREAK)
-    .select('status created_at updated_at')
-    .lean();
-
-  // Fewer attempts than the streak, or anything in them that is not a failure
-  // — a completed deposit, or one still in flight — means no unbroken run.
-  if (recent.length < DEPOSIT_COOLDOWN_STREAK) return null;
-  if (!recent.every(deposit => deposit.status === 'failed')) return null;
-
-  // The clock runs from when the most recent prompt actually failed, not from
-  // when it was requested; those are minutes apart for a prompt that sat
-  // unanswered. Once it has run out the player is free again, and a further
-  // failure starts a fresh lockout because it becomes the newest of three.
-  const lastFailedAt = new Date(recent[0].updated_at || recent[0].created_at).getTime();
-  const cooldownUntil = lastFailedAt + DEPOSIT_COOLDOWN_MS;
-  const remainingMs = cooldownUntil - Date.now();
-  if (remainingMs <= 0) return null;
-
-  return { cooldownUntil, retryAfterSeconds: Math.ceil(remainingMs / 1000) };
-}
-
-// Read-only. The deposit screen polls this so the player sees the countdown
-// instead of discovering the lockout by being refused.
-app.get(['/api/mpesa/cooldown', '/api/payments/cooldown'], authenticateToken, async (req, res) => {
-  try {
-    const cooldown = await getDepositCooldown(req.user.id);
-    if (!cooldown) return res.json({ inCooldown: false });
-    return res.json({ inCooldown: true, ...cooldown });
-  } catch (err) {
-    // Never let this decide anything on failure: report "not in cooldown" and
-    // let the deposit endpoint be the authority.
-    return res.json({ inCooldown: false });
-  }
-});
-
 // PayHero & M-Pesa STK Push
 app.post([
   '/api/payhero/stkpush',
@@ -1614,19 +1561,6 @@ app.post([
   '/api/wallet/mpesa/stk-push'
 ], authenticateToken, async (req, res) => {
   try {
-    // Refuse ahead of the deposit flow, before anything is created or sent.
-    // Everything below this point is unchanged.
-    const cooldown = await getDepositCooldown(req.user.id);
-    if (cooldown) {
-      const minutes = Math.ceil(cooldown.retryAfterSeconds / 60);
-      return res.status(429).json({
-        error: `Too many unsuccessful payments. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`,
-        code: 'RATE_LIMIT_COOLDOWN',
-        cooldownUntil: cooldown.cooldownUntil,
-        retryAfterSeconds: cooldown.retryAfterSeconds
-      });
-    }
-
     const { amount, phone } = req.body;
     const numAmount = Math.round(parseFloat(amount));
     const minimumDeposit = getMinimumDeposit();

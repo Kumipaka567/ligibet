@@ -329,25 +329,6 @@ export class AuthService {
     );
   }
 
-  /**
-   * Remaining deposit lockout for the signed-in player, if any.
-   *
-   * Read-only, and deliberately its own call rather than something folded into
-   * the deposit request: the deposit screen polls this to show the countdown,
-   * which keeps the countdown entirely outside the deposit flow. It never
-   * throws — a failed check reports "not in cooldown" and lets the deposit
-   * endpoint stay the authority on whether an attempt is allowed.
-   */
-  public getDepositCooldown(): Observable<{ inCooldown: boolean; cooldownUntil?: number; retryAfterSeconds?: number }> {
-    const headers = this.getAuthHeaders();
-    return this.http.get<{ inCooldown: boolean; cooldownUntil?: number; retryAfterSeconds?: number }>(
-      `${this.baseUrl}/mpesa/cooldown`,
-      { headers }
-    ).pipe(
-      catchError(() => of({ inCooldown: false }))
-    );
-  }
-
   public getDepositHistory(): Observable<{ deposits: DepositRecord[] }> {
     const headers = this.getAuthHeaders();
     return this.http.get<{ deposits: DepositRecord[] }>(

@@ -1124,21 +1124,8 @@
                     (click)="selectDepositPreset(preset)">{{ preset }}</button>
           </div>
 
-          <!-- DEPOSIT LOCKOUT COUNTDOWN -->
-          <div *ngIf="depositLocked()" class="deposit-cooldown-card">
-            <div class="deposit-cooldown-head">
-              <span class="deposit-cooldown-title">Too many unsuccessful payments</span>
-              <span class="deposit-cooldown-timer">{{ depositCooldownLabel() }}</span>
-            </div>
-            <span class="deposit-cooldown-sub">Try again after 10 minutes.</span>
-          </div>
-
-          <button class="main-green-action-btn"
-                  [disabled]="mpesaStatus() === 'sending' || mpesaStatus() === 'waiting'"
-                  (click)="submitDeposit()">
-            {{ depositLocked()
-                ? 'Try again in ' + depositCooldownLabel()
-                : (mpesaStatus() === 'sending' ? 'Sending Prompt...' : (mpesaStatus() === 'waiting' ? 'Prompt Sent...' : 'Pay with M-Pesa')) }}
+          <button class="main-green-action-btn" [disabled]="mpesaStatus() === 'sending' || mpesaStatus() === 'waiting'" (click)="submitDeposit()">
+            {{ mpesaStatus() === 'sending' ? 'Sending Prompt...' : (mpesaStatus() === 'waiting' ? 'Prompt Sent...' : 'Pay with M-Pesa') }}
           </button>
 
           <!-- ACTIVE PROMPT / WAITING STATUS CARD -->
