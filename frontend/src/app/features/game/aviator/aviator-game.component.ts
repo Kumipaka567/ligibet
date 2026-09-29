@@ -727,6 +727,10 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
       this.gameSocket.isConnected$.subscribe(connected => {
         this.isConnected.set(connected);
         if (connected) {
+          if (this.mockLoopIntervalId) {
+            clearInterval(this.mockLoopIntervalId);
+            this.mockLoopIntervalId = null;
+          }
           this.authService.loadCurrentUser().subscribe();
         }
       }),
@@ -1071,15 +1075,23 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   public onCrash(finalPoint: number) {
+    if (this.gameState() === 'CRASHED') {
+      this.finalCrashMultiplier.set(finalPoint);
+      this.currentMultiplier.set(finalPoint);
+      return;
+    }
+
     const wasFlying = this.gameState() === 'RUNNING';
     this.gameState.set('CRASHED');
     this.finalCrashMultiplier.set(finalPoint);
     this.currentMultiplier.set(finalPoint);
 
     // Freeze the exact in-flight point. The canvas immediately takes it through
-    // one smooth exit path instead of jumping several pixels per frame.
+    // one single smooth exit path only when transitioning from active flight.
     this.crashFlightProgress = this.flightProgress;
-    this.crashStartedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    this.crashStartedAt = wasFlying
+      ? (typeof performance !== 'undefined' ? performance.now() : Date.now())
+      : 0;
 
     // Start the crash sound while the flight loop fades out. This is non-blocking
     // so neither the plane nor the next-round state waits for audio playback.
@@ -1936,8 +1948,8 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
       const basePathX = minX + (maxX - minX) * p;
       const basePathY = maxY - (maxY - minY) * Math.pow(p, 0.84);
 
-      // Subtle, silky Spribe aerodynamic floating
-      const flightTime = frameTime / 1000;
+      // Subtle, silky Spribe aerodynamic floating (frozen at crash start for a single clean exit path)
+      const flightTime = (state === 'CRASHED' && this.crashStartedAt ? this.crashStartedAt : frameTime) / 1000;
       const waveX = Math.sin(flightTime * 0.9) * 3.5;
       const waveY = Math.cos(flightTime * 1.1) * 5.0;
 
@@ -1989,13 +2001,16 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
           this.drawAirplaneSprite(planeX, planeY, dynamicPitch, spriteScale);
         }
       } else if (state === 'CRASHED') {
-        const crashStartedAt = this.crashStartedAt ?? frameTime;
-        const crashProgress = Math.max(0, Math.min(1, (frameTime - crashStartedAt) / this.crashExitDurationMs));
-        const exitDistance = 1 - Math.pow(1 - crashProgress, 2);
-        const crashedX = planeX + (w * 0.45 + planeDrawW) * exitDistance;
-        const crashedY = planeY - (h * 0.42 + planeDrawH) * exitDistance;
-        if (crashProgress < 1 && !this.isSanitized()) {
-          this.drawAirplaneSprite(crashedX, crashedY, -0.12 - crashProgress * 0.35, spriteScale);
+        if (this.crashStartedAt && this.crashStartedAt > 0 && !this.isSanitized()) {
+          const crashProgress = Math.max(0, Math.min(1, (frameTime - this.crashStartedAt) / this.crashExitDurationMs));
+          if (crashProgress < 1) {
+            const exitDistance = Math.pow(crashProgress, 1.35);
+            const exitDeltaX = Math.max(w * 0.60, w - planeX) + planeDrawW * 1.5;
+            const exitDeltaY = Math.max(h * 0.55, planeY) + planeDrawH * 1.5;
+            const crashedX = planeX + exitDeltaX * exitDistance;
+            const crashedY = planeY - exitDeltaY * exitDistance;
+            this.drawAirplaneSprite(crashedX, crashedY, -0.12 - crashProgress * 0.35, spriteScale);
+          }
         }
       }
     } else {

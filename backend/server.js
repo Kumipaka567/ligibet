@@ -4613,7 +4613,7 @@ async function startServer() {
         startBettingPhase();
         startSecondaryBettingPhase(2, 3600);
         startSecondaryBettingPhase(3, 6800);
-        break;
+        return;
       }
       await new Promise(resolve => setTimeout(resolve, 5000));
     }

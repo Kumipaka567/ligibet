@@ -113,7 +113,9 @@ export interface PlayerRealtimeEvent {
 })
 export class GameSocketService {
   private socket: Socket | null = null;
+  private currentToken: string | null = null;
   private activeRoom: GameRoom = 1;
+  private lastCrashedRoundKey: string | null = null;
   private get serverUrl(): string {
     return getBackendOrigin();
   }
@@ -175,10 +177,16 @@ export class GameSocketService {
    * Initialize Socket.IO connection with JWT token authentication handshake
    */
   public connect(token: string): void {
-    if (this.socket && this.socket.connected) {
+    if (this.socket) {
+      if (this.currentToken === token && (this.socket.connected || (this.socket as any).active)) {
+        return;
+      }
+      this.socket.removeAllListeners();
       this.socket.disconnect();
+      this.socket = null;
     }
 
+    this.currentToken = token;
     this.socket = io(this.serverUrl, {
       auth: {
         token: token
@@ -216,6 +224,15 @@ export class GameSocketService {
 
     this.socket.on('phase_update', (data: PhaseUpdate) => {
       if (!this.isActiveRoom(data.room)) return;
+      if (data.phase === 'crashed') {
+        const crashKey = `${data.room ?? this.activeRoom}:${data.roundId ?? ''}`;
+        if (this.lastCrashedRoundKey === crashKey && this.phase$.value === 'crashed') {
+          return;
+        }
+        this.lastCrashedRoundKey = crashKey;
+      } else {
+        this.lastCrashedRoundKey = null;
+      }
       this.phase$.next(data.phase);
       this.roundState$.next(data);
       if (data.multiplier !== undefined) {
@@ -234,6 +251,11 @@ export class GameSocketService {
 
     this.socket.on('round_crashed', (data: { crashPoint: number; roundId: number; room?: GameRoom }) => {
       if (!this.isActiveRoom(data.room)) return;
+      const crashKey = `${data.room ?? this.activeRoom}:${data.roundId ?? ''}`;
+      if (this.lastCrashedRoundKey === crashKey && this.phase$.value === 'crashed') {
+        return;
+      }
+      this.lastCrashedRoundKey = crashKey;
       this.phase$.next('crashed');
       this.roundState$.next({
         phase: 'crashed',
@@ -246,6 +268,11 @@ export class GameSocketService {
     this.socket.on('room_state', (data: RoomState) => {
       if (!data || !Array.isArray(data.history)) return;
       this.activeRoom = data.room;
+      if (data.phase === 'crashed') {
+        this.lastCrashedRoundKey = `${data.room}:${data.roundId ?? ''}`;
+      } else {
+        this.lastCrashedRoundKey = null;
+      }
       this.phase$.next(data.phase);
       this.roundState$.next(data);
       this.multiplier$.next(data.multiplier ?? 1.00);
@@ -442,9 +469,12 @@ export class GameSocketService {
    */
   public disconnect(): void {
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
-      this.isConnected$.next(false);
     }
+    this.currentToken = null;
+    this.lastCrashedRoundKey = null;
+    this.isConnected$.next(false);
   }
 }
