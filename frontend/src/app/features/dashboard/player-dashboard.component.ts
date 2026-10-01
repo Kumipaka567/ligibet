@@ -705,12 +705,6 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
     this.showProfileMenu.update(value => !value);
   }
 
-  goToWallet(): void {
-    this.showProfileMenu.set(false);
-    this.closeMobileMenu();
-    this.router.navigate(['/wallet']);
-  }
-
   toggleSelection(match: FootballMatch, outcome: MatchOutcome): void {
     const outcomeLabel = outcome === 'home' ? match.home : outcome === 'draw' ? 'Draw' : match.away;
     const odds = outcome === 'home' ? match.homeOdds : outcome === 'draw' ? match.drawOdds : match.awayOdds;

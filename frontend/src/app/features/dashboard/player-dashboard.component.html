@@ -33,7 +33,7 @@
         </button>
 
         <ng-container *ngIf="currentUser() as user; else guestActions">
-          <button class="lb-balance" type="button" (click)="goToWallet()">
+          <button class="lb-balance" type="button">
             <span class="lb-balance-label">Balance</span>
             <span class="lb-balance-value">{{ isSanitized() ? '' : 'KES ' }}{{ userBalance() | number:'1.2-2' }}</span>
           </button>
@@ -55,7 +55,6 @@
               </div>
               <button type="button" (click)="openDeposit()">Deposit</button>
               <button type="button" (click)="openWithdraw()">Withdraw</button>
-              <button type="button" (click)="goToWallet()">My Wallet &amp; History</button>
               <button type="button" (click)="openAccountSettings()">Account Settings</button>
               <button type="button" (click)="goToAviator()">{{ isSanitized() ? 'Play Game' : 'Play Aviator' }}</button>
               <button type="button" (click)="downloadApp()">Download App</button>
@@ -432,7 +431,6 @@
     <div class="lb-sheet-actions">
       <button type="button" (click)="openDeposit()">Deposit</button>
       <button type="button" (click)="openWithdraw()">Withdraw</button>
-      <button type="button" (click)="goToWallet()">My Wallet &amp; History</button>
       <button type="button" (click)="openAccountSettings()">Account Settings</button>
       <button type="button" (click)="goToAviator()">{{ isSanitized() ? 'Play Game' : 'Play Aviator' }}</button>
       <button type="button" (click)="downloadApp()">Download App</button>

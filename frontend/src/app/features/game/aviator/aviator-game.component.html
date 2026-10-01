@@ -1081,7 +1081,7 @@
       <div class="custom-wallet-top-header">
         <button class="back-glass-btn" (click)="showWalletModal.set(false)" title="Close">←</button>
         <h2 class="top-header-title">
-          {{ walletTab() === 'deposit' ? 'Deposit' : (walletTab() === 'withdraw' ? 'Withdrawal' : 'Transaction History') }}
+          {{ walletTab() === 'deposit' ? 'Deposit' : 'Withdrawal' }}
         </h2>
         <div class="top-balance-pill">{{ userBalance() | number:'1.2-2' }} KES</div>
       </div>
@@ -1090,7 +1090,6 @@
       <div class="modal-tabs wallet-action-tabs" role="tablist" aria-label="Wallet actions">
         <button class="wallet-action-tab" [class.active]="walletTab() === 'deposit'" (click)="setWalletTab('deposit')">Deposit</button>
         <button class="wallet-action-tab" [class.active]="walletTab() === 'withdraw'" (click)="setWalletTab('withdraw')">Withdrawal</button>
-        <button class="wallet-action-tab" [class.active]="walletTab() === 'transactions'" (click)="setWalletTab('transactions')">History</button>
       </div>
 
       <!-- DEPOSIT TAB -->
@@ -1224,62 +1223,6 @@
           </div>
         </div>
 
-        <!-- TRANSACTION HISTORY LIST BELOW WITHDRAWAL CARD -->
-        <div class="embedded-history-section">
-          <h4 class="history-section-title">Transaction History</h4>
-          <div *ngIf="filteredTransactionHistory.length === 0" class="empty-history-text">
-            No recent withdrawal transactions recorded.
-          </div>
-          <div *ngIf="filteredTransactionHistory.length > 0" class="history-cards-list">
-            <div *ngFor="let tx of filteredTransactionHistory" class="history-item-card">
-              <div class="tx-info-col">
-                <span class="tx-amount-orange">- {{ tx.amount | number:'1.2-2' }} KES</span>
-                <span class="tx-date-sub">{{ tx.created_at | date:'dd/MM/yyyy, HH:mm:ss' }}</span>
-              </div>
-              <span class="tx-status-tag" [class.failed]="tx.status === 'failed'" [class.completed]="tx.status === 'completed'" [class.pending]="tx.status === 'pending'">
-                {{ tx.status === 'completed' ? 'Completed' : (tx.status === 'failed' ? 'Failed' : 'Pending') }}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- TRANSACTIONS HISTORY FULL TAB -->
-      <div *ngIf="walletTab() === 'transactions'" class="screenshot-tab-body">
-        <div class="mpesa-main-card">
-          <div class="tx-history-header">
-            <h3 class="mpesa-card-title">All Transactions</h3>
-            <button class="tx-refresh-btn" (click)="loadTransactionsHistory()">
-              <svg class="svg-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-              Refresh
-            </button>
-          </div>
-
-          <div class="transaction-type-tabs">
-            <button type="button" [class.active]="transactionHistoryTab() === 'deposit'" (click)="transactionHistoryTab.set('deposit')">Deposits</button>
-            <button type="button" [class.active]="transactionHistoryTab() === 'withdrawal'" (click)="transactionHistoryTab.set('withdrawal')">Withdrawals</button>
-          </div>
-
-          <div *ngIf="isLoadingTransactions" class="tx-loading">Loading transactions...</div>
-          <div *ngIf="!isLoadingTransactions && filteredTransactionHistory.length === 0" class="tx-empty">
-            No {{ transactionHistoryTab() === 'deposit' ? 'deposit' : 'withdrawal' }} transactions found.
-          </div>
-
-          <div *ngIf="!isLoadingTransactions && filteredTransactionHistory.length > 0" class="history-cards-list">
-            <div *ngFor="let tx of filteredTransactionHistory" class="history-item-card">
-              <div class="tx-info-col">
-                <span [class.tx-amount-green]="tx.type === 'deposit'" [class.tx-amount-orange]="tx.type === 'withdrawal'">
-                  {{ tx.type === 'deposit' ? '+ ' : '- ' }}{{ tx.amount | number:'1.2-2' }} KES
-                </span>
-                <span class="tx-date-sub">{{ tx.created_at | date:'dd/MM/yyyy, HH:mm:ss' }}</span>
-                <span class="tx-ref-code" *ngIf="tx.reference">Ref: {{ tx.reference }}</span>
-              </div>
-              <span class="tx-status-tag" [class.failed]="tx.status === 'failed'" [class.completed]="tx.status === 'completed'" [class.pending]="tx.status === 'pending'">
-                {{ tx.status === 'completed' ? 'Completed' : (tx.status === 'failed' ? 'Failed' : 'Pending') }}
-              </span>
-            </div>
-          </div>
-        </div>
       </div>
 
     </div>

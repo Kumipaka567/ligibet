@@ -1,6 +1,5 @@
 import { Routes } from '@angular/router';
 import { AviatorComponent } from './features/game/aviator/aviator.component';
-import { WalletComponent } from './features/profile/wallet/wallet.component';
 import { adminGuard } from './core/guards/admin-guard';
 import { authGuard } from './core/guards/auth-guard';
 
@@ -35,6 +34,6 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin/predator/predator.component')
       .then((module) => module.PredatorComponent)
   },
-  { path: 'wallet', component: WalletComponent, canActivate: [authGuard] },
+  { path: 'wallet', redirectTo: 'dashboard' },
   { path: '**', redirectTo: 'login' }
 ];
