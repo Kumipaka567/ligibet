@@ -997,13 +997,11 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         if (res?.stats) this.stats = { ...this.stats, ...res.stats };
         if (Array.isArray(res?.users)) this.userList = res.users;
         if (Array.isArray(res?.logs)) this.adminLogs = res.logs;
-        if (Array.isArray(res?.transactions)) {
-          this.allAdminTransactions = res.transactions;
-          this.transactionsList = res.transactions.filter((tx: AdminTransaction) => tx.type === this.txTypeFilter);
-        }
-        this.markLoaded('dashboard', 'users', 'transactions', 'logs');
+        // The ledger is not seeded from here: the overview's transactions are the
+        // latest 100 of every type, so bet payouts crowd deposits out of it.
+        // The Transactions tab fetches its own deposit/withdrawal page instead.
+        this.markLoaded('dashboard', 'users', 'logs');
         this.isLoadingUsers = false;
-        this.isLoadingTransactions = false;
       },
       error: () => {
         // Fall back to the individual endpoints if the bootstrap is unavailable.
@@ -1011,9 +1009,6 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       }
     });
   }
-
-  /** Latest unfiltered transaction page, so type switches are instant. */
-  private allAdminTransactions: AdminTransaction[] = [];
 
   public fetchOverviewStats(): void {
     const token = this.authService.getToken();
