@@ -1,0 +1,196 @@
+/* Reference board presentation. Selectors exclude admin previews and sanitized mode. */
+#aviator-board.reference-interface {
+  background: #0e0e0e;
+  color: #eee;
+  font-family: Arial, Helvetica, sans-serif;
+
+  .top-nav { flex: 0 0 auto; border: 0; background: #17232f; }
+  .top-nav-utility { height: 46px; min-height: 46px; padding: 0 12px; background: #17232f; border: 0; }
+  .go-back-btn, .fullscreen-top-btn { color: #fff; font-size: 12px; font-weight: 600; }
+  .fullscreen-top-btn .fs-icon { width: 18px; height: 18px; }
+  .game-brand-bar { height: 40px; min-height: 40px; padding: 0 12px; border: 0; background: #1b1c1c; justify-content: flex-end; }
+  .brand, .game-deposit-btn, .profile-dropdown-wrap, .settings-dropdown-wrap { display: none; }
+  .nav-actions { gap: 8px; }
+  .nav-actions .balance-badge { padding: 0; }
+  .nav-actions .balance-amount { font-family: inherit; font-size: 14px; color: #29b600; font-weight: 700; }
+  .balance-currency { font-weight: 400; color: #a5a5a5; }
+  .nav-actions .chat-header-btn { width: 26px; height: 28px; color: #a1a1a1; }
+  .nav-actions .chat-header-btn svg { width: 20px; height: 20px; }
+  .game-menu-wrap { position: relative; z-index: 30; }
+  .header-game-menu-btn { display: flex; align-items: center; justify-content: center; width: 26px; height: 28px; padding: 3px; border: 0; background: transparent; color: #929292; cursor: pointer; }
+  .header-game-menu-btn svg { width: 20px; height: 20px; }
+  .spribe-dropdown-menu { top: calc(100% + 12px); right: 0; max-height: calc(100dvh - 100px); overflow-y: auto; }
+  .menu-room-selector { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; padding: 8px; min-height: 44px; }
+  .menu-room-selector button { min-height: 30px; }
+
+  .main-layout { padding: 4px 6px 0; gap: 6px; }
+  .left-sidebar { flex: 0 0 21.5%; padding: 7px 8px 0; border: 0; border-radius: 22px 22px 18px 18px; background: #1c1d1d; }
+  .bets-tabs { height: 33px; flex-basis: 33px; padding: 4px; margin-bottom: 10px; background: #111313; border: 0; border-radius: 20px; }
+  .bets-tabs button { font-size: 12px; font-weight: 400; color: #aaa; border-radius: 16px; }
+  .bets-tabs button.active { background: #2c2d2f; font-weight: 400; }
+  .bets-header-info { flex-basis: 43px; padding: 0 7px; margin-bottom: 3px; }
+  .bets-count { display: flex; flex-direction: column; gap: 3px; font-size: 14px; color: #fff; }
+  .bets-count b { font-size: 14px; font-weight: 400; }
+  .bets-table-header { flex-basis: 26px; font-size: 10px; padding: 2px 7px 6px; }
+  .bets-list { gap: 4px; padding-bottom: 5px; }
+  .bet-row { flex-basis: 32px; min-height: 32px; border-radius: 18px; padding: 2px 5px; font-size: 12px; background: #101212; }
+  .bet-row.cashed-out { background: #21330b; }
+  .player-name { gap: 8px; color: #c6c6c6; }
+  .user-avatar-icon { display: inline-flex; align-items: center; justify-content: center; width: 25px; height: 25px; flex: 0 0 25px; font-size: 19px; border-radius: 50%; background: #4a493f; border: 1px solid #a0a098; }
+  .mult-badge { font-size: 12px; }
+  .sidebar-footer { flex-basis: 32px; font-size: 10px; padding: 0 8px; }
+  .sidebar-footer button { font-size: 10px; }
+  .sidebar-footer strong { font-size: 12px; }
+
+  .game-area { gap: 5px; }
+  .live-banner { flex-basis: 40px; margin-top: 7px; padding: 3px 5px; gap: 10px; border: 0; border-radius: 24px; background: linear-gradient(110deg, #302536, #27272a 56%, #2b432d); }
+  .live-banner::after { content: none; }
+  .tournament-status { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 8px; height: 32px; padding: 0 11px; border-radius: 20px; background: #3b3042; color: #e3dde6; font-size: 12px; }
+  .tournament-status svg { width: 15px; height: 15px; }
+  .banner-text { font-size: 14px; letter-spacing: -.4px; color: #cecece; }
+  .tournament-arrow { display: flex; flex: 0 0 32px; align-items: center; justify-content: center; height: 32px; border-radius: 50%; background: #ffcc16; color: #111; box-shadow: 0 0 8px #ffc91466; }
+  .tournament-arrow svg { width: 20px; height: 20px; }
+  .history-bar-container { display: flex; flex: 0 0 33px; align-items: center; gap: 0; }
+  .multiplier-ribbon { width: 100%; height: 100%; padding: 0 42px 0 10px; gap: 12px; }
+  .mult-pill { font-size: 12px; color: #00bfff; }
+  .mult-pill.mid { color: #9d43d1; }
+  .mult-pill.high { color: #e12bc6; }
+  .more-ribbon-btn { top: 11px; bottom: auto; right: 7px; width: 25px; height: 16px; background: #2b2b2e; border-radius: 12px; }
+  .more-ribbon-btn::after { font-size: 9px; line-height: 16px; }
+  .canvas-viewport { flex: 1 1 0; min-height: 220px; border-radius: 22px; border-color: #2d2e2e; background: #000; }
+  .live-multiplier-display { margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: clamp(68px, 5.3vw, 104px); font-weight: 700; letter-spacing: -3px; line-height: 1; text-shadow: none; filter: none; }
+  .crashed-multiplier-display { font-family: Arial, Helvetica, sans-serif; font-size: clamp(68px, 5.3vw, 104px); }
+
+  .partner-branding-box { width: min(94%, 330px); transform: none; }
+  .stage-overlay.waiting { background: repeating-linear-gradient(155deg, #0c0d0d 0 52px, #000 52px 104px); }
+  .ufc-partner-badge { gap: 20px; width: 100%; height: 78px; }
+  .ufc-reference-logo { display: block; width: 154px; height: 56px; }
+  .vertical-divider { flex: 0 0 1px; width: 1px; height: 78px; background: #a6a6a6; margin: 0; opacity: .9; }
+  .aviator-title-wrap { width: 96px; height: 78px; }
+  .waiting-plane-logo { position: static; width: 90px; height: 53px; transform: none; filter: none; }
+  .aviator-title { display: none; }
+  .partner-subtitle { margin-top: 6px; font-family: Arial, Helvetica, sans-serif; font-size: 25px; font-weight: 900; letter-spacing: -.6px; white-space: nowrap; }
+  .waiting-progress-track { width: 200px; height: 4px; margin: 11px auto 16px; background: #28292e; }
+  .waiting-progress-fill { background: #f00046; box-shadow: none; }
+  .spribe-cert-badge { box-sizing: border-box; width: 106px; min-width: 0; height: 74px; padding: 6px; gap: 5px; border-radius: 10px; border: 1px solid #659814; background: linear-gradient(160deg, #2b3914, #1a250c); box-shadow: none; }
+  .spribe-cert-badge .cert-header { gap: 7px; }
+  .spribe-cert-badge .spribe-logo-icon { width: 22px; height: 22px; }
+  .spribe-cert-badge .cert-title { font-family: Impact, 'Arial Narrow', sans-serif; font-size: 18px; font-weight: 400; letter-spacing: 0; }
+  .spribe-cert-badge .cert-status-pill { padding: 2px 5px; gap: 4px; border: 1px solid #558709; border-radius: 5px; background: #142209; margin: 0; }
+  .spribe-cert-badge .cert-status-text { color: #66b300; font-family: Arial, Helvetica, sans-serif; font-size: 10px; font-weight: 400; }
+  .spribe-cert-badge .spribe-check-circle { width: 12px; height: 12px; background: #19bf00; }
+  .spribe-cert-badge .cert-since { color: #eee; font-size: 9px; font-family: Arial, Helvetica, sans-serif; font-weight: 400; letter-spacing: 0; }
+
+  .dual-bet-panels { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; flex: 0 0 auto; }
+  .bet-panel-box { min-height: 184px; padding: 8px 16px 18px; border: 0; border-radius: 22px; background: #1c1d1d; }
+  .panel-header-row { flex: 0 0 32px; min-height: 32px; margin-bottom: 28px; }
+  .panel-subtabs { width: 208px; height: 32px; padding: 4px; border-radius: 20px; background: #121414; }
+  .panel-subtabs button { min-width: 0; border-radius: 16px; font-family: inherit; font-size: 12px; font-weight: 400; color: #aaa; }
+  .panel-subtabs button.active { background: #2c2d2f; }
+  .panel-body { width: min(100%, 365px); margin: auto; grid-template-columns: minmax(0, 140px) minmax(0, 1fr); gap: 12px; }
+  .controls-col { gap: 4px; }
+  .amount-stepper { position: relative; box-sizing: border-box; height: 30px; padding: 2px 3px; border-radius: 18px; background: #121414; }
+  .amount-stepper .step-btn { flex: 0 0 24px; width: 24px; height: 24px; font-size: 19px; font-weight: 400; background: #2c2e30; color: #aaa; }
+  .amount-stepper .amount-input { font-family: inherit; font-size: 17px; font-weight: 700; color: transparent; }
+  .amount-display { position: absolute; left: 28px; right: 28px; text-align: center; font-size: 17px; font-weight: 700; color: #ddd; pointer-events: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .amount-stepper:has(.amount-input:focus) .amount-display { display: none; }
+  .amount-stepper .amount-input:focus { color: #fff; }
+  .amount-stepper:has(.amount-input:disabled) .amount-display { color: #7b8690; }
+  .amount-input::-webkit-inner-spin-button, .amount-input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+  .amount-input { appearance: textfield; -moz-appearance: textfield; }
+  .preset-buttons { gap: 4px; }
+  .preset-buttons button { height: 23px; min-height: 23px; border-radius: 14px; font-family: inherit; font-size: 14px; font-weight: 400; color: #929292; background: #121414; }
+  .big-bet-btn { min-height: 82px; border-radius: 13px; border-width: 1px; padding: 5px; box-shadow: 0 0 0 4px #111414; }
+  .big-bet-btn.green, .big-bet-btn.next-round { background: #20ad00; border-color: #a2e78e; }
+  .big-bet-btn .btn-title, .big-bet-btn .btn-sub { font-family: inherit; font-size: 23px; line-height: 1.2; font-weight: 400; letter-spacing: 0; }
+  .big-bet-btn.queued .btn-sub { font-size: 14px; }
+  .panel-close-btn, .panel-add-btn-wrap .panel-add-btn { width: 28px; height: 28px; border-radius: 50%; background: #292b2d; border: 4px solid #141616; }
+  .panel-close-btn svg { width: 18px; height: 18px; }
+  .panel-add-btn-wrap { right: 8px; }
+  .panel-add-btn-wrap .panel-add-btn { opacity: .45; }
+  .dual-bet-panels:has(.bet-panel-box:nth-child(2)) .panel-add-btn-wrap .panel-add-btn { visibility: hidden; }
+  .auto-controls-row { flex-wrap: wrap; gap: 10px; margin: 14px auto 0; width: min(100%, 420px); }
+  button:focus-visible, input:focus-visible { outline: 2px solid #eee; outline-offset: 3px; }
+
+  @media (min-width: 901px) and (max-width: 1400px) {
+    .panel-body { grid-template-columns: minmax(0, 120px) minmax(0, 1fr); max-width: 340px; gap: 8px; }
+    .bet-panel-box { min-height: 164px; padding-inline: 12px; }
+    .panel-header-row { margin-bottom: 16px; }
+    .banner-text { font-size: 12px; }
+    .bet-row { font-size: 11px; }
+  }
+  @media (min-width: 901px) and (max-height: 650px) {
+    .top-nav-utility { height: 32px; min-height: 32px; }
+    .game-brand-bar { height: 32px; min-height: 32px; }
+    .bet-panel-box { min-height: 140px; padding-bottom: 10px; }
+    .panel-header-row { margin-bottom: 10px; }
+    .canvas-viewport { min-height: 160px; }
+  }
+
+  @media (max-width: 900px) {
+    height: auto;
+    max-height: none;
+    min-height: 100dvh;
+    overflow: visible;
+    .top-nav-utility { height: clamp(34px, 9.2vw, 66px); min-height: clamp(34px, 9.2vw, 66px); padding-inline: 8px; }
+    .go-back-btn, .fullscreen-top-btn { font-size: clamp(11px, 2.65vw, 19px); }
+    .fullscreen-top-btn .fs-icon { width: clamp(16px, 4.2vw, 30px); height: clamp(16px, 4.2vw, 30px); }
+    .game-brand-bar { height: clamp(34px, 9.4vw, 68px); min-height: clamp(34px, 9.4vw, 68px); padding-inline: 10px; }
+    .nav-actions { gap: clamp(8px, 2.5vw, 18px); }
+    .nav-actions .balance-amount { font-size: clamp(13px, 3.2vw, 23px); }
+    .header-game-menu-btn, .nav-actions .chat-header-btn { width: clamp(26px, 5.4vw, 39px); height: 32px; }
+    .header-game-menu-btn svg, .nav-actions .chat-header-btn svg { width: clamp(18px, 3.7vw, 27px); height: clamp(18px, 3.7vw, 27px); }
+    .spribe-dropdown-menu { right: -40px; width: min(340px, calc(100vw - 24px)); max-height: calc(100dvh - 110px); }
+    .main-layout { flex-direction: column; min-height: 0; padding: 0 clamp(4px, 1vw, 8px) 12px; gap: clamp(5px, 1vw, 8px); overflow: visible; }
+    .game-area { order: 1; flex: 0 0 auto; width: 100%; gap: clamp(4px, 1vw, 7px); overflow: visible; }
+    .left-sidebar { order: 2; flex: 0 0 auto; width: 100%; min-height: 260px; padding: 8px; border-radius: clamp(18px, 4.8vw, 34px); }
+    .bets-tabs { height: clamp(30px, 7.6vw, 55px); flex-basis: clamp(30px, 7.6vw, 55px); margin-bottom: 10px; }
+    .bets-tabs button { font-size: clamp(12px, 2.65vw, 19px); }
+    .bets-header-info { flex-basis: 43px; }
+    .bets-count, .bets-count b { font-size: clamp(13px, 2.8vw, 20px); }
+    .bets-list { max-height: 420px; }
+    .live-banner { position: relative; isolation: isolate; flex: 0 0 clamp(38px, 10.4vw, 75px); box-sizing: border-box; margin-top: clamp(7px, 2vw, 15px); padding: 4px; gap: 7px; border: 2px solid transparent; border-radius: 50px; background: linear-gradient(100deg, #302536, #272a2e 55%, #264f3f) padding-box, linear-gradient(105deg, #f08436, #df225b 25%, #7b46d7 60%, #51c9eb) border-box; box-shadow: 0 0 0 2px #ae202c28; }
+    .tournament-status { height: 100%; padding-inline: clamp(9px, 2.5vw, 18px); gap: 7px; font-size: clamp(10px, 2.65vw, 19px); background: #37333f; }
+    .tournament-status svg { width: clamp(13px, 3.2vw, 23px); height: clamp(13px, 3.2vw, 23px); }
+    .banner-text { text-align: left; font-size: clamp(11px, 2.9vw, 21px); letter-spacing: -.5px; }
+    .tournament-arrow { flex-basis: clamp(28px, 7.7vw, 55px); height: clamp(28px, 7.7vw, 55px); }
+    .tournament-arrow svg { width: clamp(18px, 4.6vw, 33px); height: clamp(18px, 4.6vw, 33px); }
+    .history-bar-container { flex-basis: clamp(27px, 8vw, 58px); }
+    .multiplier-ribbon { gap: clamp(10px, 2.8vw, 20px); padding-inline: 10px 36px; }
+    .mult-pill { font-size: clamp(10px, 2.5vw, 18px); }
+    .more-ribbon-btn { top: 50%; transform: translateY(-50%); right: 7px; width: clamp(22px, 5.5vw, 40px); height: clamp(14px, 3.8vw, 27px); }
+    .more-ribbon-btn::after { line-height: clamp(14px, 3.8vw, 27px); }
+    .canvas-viewport { flex: 0 0 auto; width: 100%; height: auto; min-height: 0; aspect-ratio: 1.366; border-radius: clamp(18px, 4.8vw, 34px); }
+    .live-multiplier-display, .crashed-multiplier-display { font-size: clamp(54px, 16.2vw, 117px); letter-spacing: -2px; }
+    .dual-bet-panels { grid-template-columns: 1fr; flex: 0 0 auto; gap: clamp(5px, 1.1vw, 8px); }
+    .bet-panel-box { min-height: 0; padding: clamp(8px, 2vw, 15px) clamp(18px, 5.6vw, 40px) clamp(9px, 2.25vw, 16px); border-radius: clamp(18px, 4.8vw, 34px); }
+    .panel-header-row { flex: 0 0 auto; min-height: clamp(25px, 7.8vw, 56px); margin-bottom: clamp(8px, 2.7vw, 20px); }
+    .panel-subtabs { width: 58%; height: clamp(27px, 7.8vw, 56px); padding: clamp(3px, .8vw, 6px); border-radius: 40px; }
+    .panel-subtabs button { font-size: clamp(11px, 2.65vw, 19px); border-radius: 30px; }
+    .panel-body { width: 100%; max-width: none; grid-template-columns: minmax(0, 39%) minmax(0, 1fr); gap: clamp(9px, 2.6vw, 19px); }
+    .controls-col { gap: clamp(3px, .55vw, 4px); }
+    .amount-stepper { height: clamp(24px, 7vw, 50px); padding: 3px; border-radius: 30px; }
+    .amount-stepper .step-btn { width: clamp(22px, 5.8vw, 42px); height: clamp(22px, 5.8vw, 42px); flex-basis: clamp(22px, 5.8vw, 42px); font-size: clamp(17px, 4.4vw, 32px); }
+    .amount-stepper .amount-input { font-size: clamp(13px, 3.6vw, 26px); }
+    .amount-display { left: clamp(28px, 6.3vw, 46px); right: clamp(28px, 6.3vw, 46px); font-size: clamp(13px, 3.6vw, 26px); }
+    .preset-buttons { gap: clamp(3px, .55vw, 4px); }
+    .preset-buttons button { height: clamp(20px, 5.6vw, 40px); min-height: 0; font-size: clamp(11px, 3vw, 22px); border-radius: 25px; }
+    .big-bet-btn { min-height: clamp(68px, 19.2vw, 138px); border-radius: clamp(11px, 3vw, 22px); }
+    .big-bet-btn .btn-title, .big-bet-btn .btn-sub { font-size: clamp(18px, 4.7vw, 34px); }
+    .big-bet-btn.queued .btn-sub { font-size: clamp(11px, 2.5vw, 18px); }
+    .panel-close-btn, .panel-add-btn-wrap .panel-add-btn { width: clamp(25px, 7vw, 50px); height: clamp(25px, 7vw, 50px); }
+    .panel-close-btn { right: -16px; }
+    .panel-add-btn-wrap { right: -16px; }
+    .panel-add-btn-wrap .panel-add-btn { opacity: .25; }
+    .auto-controls-row { width: 100%; }
+    .ufc-partner-badge { gap: clamp(12px, 4.8vw, 20px); }
+    .ufc-reference-logo { width: min(154px, 39vw); }
+    .partner-subtitle { font-size: min(25px, 6.3vw); }
+  }
+}
+
+/* Keep the board clear; the same download action remains in the game menu. */
+body:has(#aviator-board.reference-interface) .ligibet-floating-download { display: none; }
+.aviator-root .amount-display { display: none; }
+#aviator-board.reference-interface .amount-display { display: block; }
+#aviator-board.reference-interface .amount-stepper:has(.amount-input:focus) .amount-display { display: none; }

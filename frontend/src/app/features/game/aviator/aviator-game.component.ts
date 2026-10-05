@@ -395,7 +395,9 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   private initPlaneImage() {
     if (typeof window !== 'undefined') {
       const img = new Image();
-      img.src = '/assets/images/plane.png';
+      img.src = this.isMiniView || this.isSanitized()
+        ? '/assets/images/plane.png'
+        : '/assets/images/aviator-reference-plane.svg';
       img.onload = () => {
         this.planeImage = img;
       };
@@ -1891,7 +1893,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     const dt = Math.min(0.06, elapsedMs / 1000);
 
     // ─── SLOW, SMOOTH SUNBURST ROTATION (SPRIBE SILKY BACKGROUND FLOW) ─────
-    const rays = 32;
+    const rays = this.isMiniView || this.isSanitized() ? 32 : 12;
     const rayAngle = (Math.PI / 2) / rays;
     const rayCycle = rayAngle * 2;
 
@@ -1919,14 +1921,23 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     this.drawFlightZoneGlow(w, h, mult, state, elapsedMs);
 
     if (state === 'RUNNING' || state === 'CRASHED') {
-      const isMobileBoard = w <= 600;
-      const spriteScale = isMobileBoard ? 0.95 : 1.25;
+      const isMobileBoard = this.isMiniView || this.isSanitized() ? w <= 600 : window.innerWidth <= 900;
+      const spriteScale = this.isMiniView || this.isSanitized()
+        ? (isMobileBoard ? 0.95 : 1.25)
+        : (isMobileBoard ? Math.max(0.7, w * 0.225 / 95) : 1.5);
 
       // ─── FLIGHT PROGRESS & SMOOTH INTERPOLATION (BETIKA / SPRIBE ULTRA-SMOOTH) ───
       if (state === 'RUNNING') {
         const m = Math.max(1.00, mult);
-        const climbP = 1 - Math.pow(m, -0.68);
-        const targetProgress = Math.min(0.86, Math.max(0.04, 0.04 + climbP * 0.84));
+        // Presentation coordinates only; server multipliers and round timing are unchanged.
+        const climbP = this.isMiniView || this.isSanitized()
+          ? 1 - Math.pow(m, -0.68)
+          : 1 - Math.exp(-(m - 1) * (isMobileBoard ? 1.7 : 2.8));
+        const targetProgress = this.isMiniView || this.isSanitized()
+          ? Math.min(0.86, Math.max(0.04, 0.04 + climbP * 0.84))
+          : (isMobileBoard
+            ? Math.min(0.92, Math.max(0.04, 0.09 + climbP * 0.90))
+            : Math.min(0.94, Math.max(0.04, 0.06 + climbP * 0.92)));
         const dt = Math.min(0.05, elapsedMs / 1000);
         const smoothing = 1 - Math.exp(-dt * 5.5);
         this.flightProgress += (targetProgress - this.flightProgress) * smoothing;
@@ -1946,7 +1957,9 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
       const minY = marginY + (isMobileBoard ? 10 : 16);
 
       const basePathX = minX + (maxX - minX) * p;
-      const basePathY = maxY - (maxY - minY) * Math.pow(p, 0.84);
+      const verticalProgress = !this.isMiniView && !this.isSanitized() && isMobileBoard
+        ? Math.min(0.97, p * 1.35) : Math.pow(p, 0.84);
+      const basePathY = maxY - (maxY - minY) * verticalProgress;
 
       // Subtle, silky Spribe aerodynamic floating (frozen at crash start for a single clean exit path)
       const flightTime = (state === 'CRASHED' && this.crashStartedAt ? this.crashStartedAt : frameTime) / 1000;
@@ -1970,9 +1983,9 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
       // ─── 1 & 2. TRANSLUCENT RED TRAIL FILL & CURVE (ONLY DURING ACTIVE FLIGHT) ───
       if (state === 'RUNNING' && !this.isSanitized()) {
         const fill = this.ctx.createLinearGradient(0, tailY, 0, h);
-        fill.addColorStop(0, 'rgba(215, 12, 45, 0.55)');
-        fill.addColorStop(0.5, 'rgba(150, 8, 30, 0.36)');
-        fill.addColorStop(1, 'rgba(80, 4, 16, 0.18)');
+        fill.addColorStop(0, this.isMiniView ? 'rgba(215, 12, 45, 0.55)' : 'rgba(205, 0, 46, 0.55)');
+        fill.addColorStop(0.5, this.isMiniView ? 'rgba(150, 8, 30, 0.36)' : 'rgba(166, 0, 30, 0.62)');
+        fill.addColorStop(1, this.isMiniView ? 'rgba(80, 4, 16, 0.18)' : 'rgba(126, 0, 20, 0.72)');
 
         this.ctx.beginPath();
         this.ctx.moveTo(0, h);
@@ -1987,10 +2000,10 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
         this.ctx.beginPath();
         this.ctx.moveTo(0, h);
         this.ctx.quadraticCurveTo(ctrlX, ctrlY, tailX, tailY);
-        this.ctx.strokeStyle = '#e50914';
+        this.ctx.strokeStyle = this.isMiniView ? '#e50914' : '#ff0046';
         this.ctx.lineWidth = 3.2;
         this.ctx.shadowColor = '#e50914';
-        this.ctx.shadowBlur = 10;
+        this.ctx.shadowBlur = this.isMiniView ? 10 : 0;
         this.ctx.stroke();
         this.ctx.shadowBlur = 0;
       }
@@ -2042,7 +2055,9 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
       this.ctx.closePath();
 
       const isEven = Math.abs(i) % 2 === 0;
-      this.ctx.fillStyle = isEven ? 'rgba(255, 255, 255, 0.085)' : 'rgba(0, 0, 0, 0.35)';
+      this.ctx.fillStyle = isEven
+        ? `rgba(255, 255, 255, ${this.isMiniView || this.isSanitized() ? 0.085 : 0.04})`
+        : 'rgba(0, 0, 0, 0.35)';
       this.ctx.fill();
     }
     this.ctx.restore();
@@ -2125,7 +2140,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
       const drawWidth = 95;
       const drawHeight = (drawWidth * this.planeImage.naturalHeight) / this.planeImage.naturalWidth;
       this.ctx.drawImage(this.planeImage, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
-      this.drawUploadedPlanePropeller(drawWidth, drawHeight);
+      if (this.isMiniView || this.isSanitized()) this.drawUploadedPlanePropeller(drawWidth, drawHeight);
     } else {
       // Fallback: Engine glow behind the tail
       const glowGradient = this.ctx.createRadialGradient(-30, 0, 1, -30, 0, 22);
