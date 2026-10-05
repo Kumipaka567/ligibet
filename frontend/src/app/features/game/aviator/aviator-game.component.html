@@ -38,7 +38,7 @@
     <div class="game-brand-bar">
       <div class="brand">
         <span class="brand-title" *ngIf="!isSanitized()">Aviator</span>
-        <span class="provably-fair-tag" *ngIf="!isSanitized()" (click)="openHistoryModal()" title="Provably Fair Game Engine">
+        <span class="provably-fair-tag" *ngIf="!isSanitized()" (click)="openProvablyFairModal()" title="Provably Fair Game Engine">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           Provably Fair
         </span>
@@ -380,7 +380,7 @@
       </div>
 
       <div class="sidebar-footer">
-        <button (click)="openHistoryModal()" title="Open provably fair game history">
+        <button (click)="openProvablyFairModal()" title="Open provably fair game history">
           <span aria-hidden="true">&#9670;</span> Provably Fair Game
         </button>
         <span>Powered by <strong>SPRIBE</strong></span>
@@ -400,7 +400,7 @@
       <div class="history-bar-container glass-card" [class.mini-history-bar]="isMiniView">
 
 
-        <div class="multiplier-ribbon" role="list" aria-label="Recent rounds, newest first">
+        <div class="multiplier-ribbon" role="list" tabindex="0" aria-label="Recent rounds, newest first. Scroll left for older rounds.">
           <div *ngFor="let mult of history()"
                class="mult-pill" role="listitem"
                [class.low]="mult < 2.0"
@@ -410,7 +410,7 @@
           </div>
         </div>
 
-        <button type="button" class="more-ribbon-btn" *ngIf="!isMiniView && !isSanitized()" (click)="openHistoryModal()" aria-label="Open round history" title="Round history">•••</button>
+        <button type="button" class="more-ribbon-btn" *ngIf="!isMiniView && !isSanitized()" (click)="openRoundHistoryModal()" aria-label="Open round history" title="Round history">•••</button>
       </div>
 
       <!-- CANVAS FLIGHT VIEWPORT -->
@@ -1243,22 +1243,57 @@
     </div>
   </div>
 
-  <!-- PROVABLY FAIR & HISTORY MODAL -->
-  <div *ngIf="showHistoryModal()" class="modal-backdrop">
-    <div class="modal-card glass-card history-modal">
-      <button class="modal-close" (click)="showHistoryModal.set(false)">✕</button>
-      <h2 class="modal-title">ROUND HISTORY & PROVABLY FAIR</h2>
-      <p class="modal-subtitle">Cryptographic SHA-256 verification seeds</p>
-
+  <!-- PERSONAL BETS AND ROUND HISTORY -->
+  <div *ngIf="showHistoryModal()" class="modal-backdrop" [class.bet-history-backdrop]="historyModalView() === 'bets'" (click)="closeHistoryModal()">
+    <div class="modal-card glass-card history-modal" [class.personal-bet-history]="historyModalView() === 'bets'" role="dialog" aria-modal="true" aria-labelledby="history-dialog-title" (click)="$event.stopPropagation()">
+      <ng-container *ngIf="historyModalView() === 'bets'; else roundHistory">
+        <header class="bet-history-header">
+          <h2 id="history-dialog-title">MY BET HISTORY</h2>
+          <button type="button" class="bet-history-close" (click)="closeHistoryModal()" aria-label="Close bet history">✕</button>
+        </header>
+        <div class="bet-history-content">
+          <div class="personal-bet-table" role="table" aria-label="Your recent bets" [attr.aria-busy]="personalBetsLoading()">
+            <div class="personal-bet-columns" role="row">
+              <span role="columnheader">Date</span><span role="columnheader">Bet KES</span><span role="columnheader">X</span><span role="columnheader">Cash out KES</span><span role="columnheader" class="bet-actions-label">Actions</span>
+            </div>
+            <div class="personal-bet-rows" role="rowgroup">
+              <div *ngFor="let bet of visiblePersonalBets(); trackBy: trackPersonalBet" class="personal-bet-row" role="row" [class.won]="bet.status === 'cashed_out'">
+                <time role="cell" [attr.datetime]="bet.created_at" [attr.title]="(bet.created_at | date:'medium':'+0300') + ' EAT'">
+                  <span>{{ bet.created_at | date:'HH:mm':'+0300' }}</span><span>{{ bet.created_at | date:'dd-MM-yy':'+0300' }}</span>
+                </time>
+                <span class="personal-bet-stake" role="cell">{{ bet.bet_amount | number:'1.2-2' }}</span>
+                <span role="cell"><span *ngIf="bet.cashout_multiplier; else noCashout" class="personal-bet-multiplier" [class.mid]="bet.cashout_multiplier >= 2 && bet.cashout_multiplier < 10" [class.high]="bet.cashout_multiplier >= 10">{{ bet.cashout_multiplier | number:'1.2-2' }}x</span><ng-template #noCashout><span class="no-cashout">—</span></ng-template></span>
+                <span class="personal-bet-payout" role="cell"><ng-container *ngIf="bet.status === 'cashed_out'; else betStatus">{{ bet.payout_amount | number:'1.2-2' }}</ng-container><ng-template #betStatus><span class="personal-bet-status">{{ bet.status === 'lost' ? 'Lost' : bet.status === 'cancelled' ? 'Cancelled' : 'Pending' }}</span></ng-template></span>
+                <span class="personal-bet-actions" role="cell">
+                  <button type="button" (click)="selectedHistoryBet.set(selectedHistoryBet()?.id === bet.id ? null : bet)" [attr.aria-label]="'Details for bet ' + bet.id" title="Bet details"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M10 2 17 5v5c0 4-7 7-7 7S3 14 3 10V5z"/><path d="m6 9 3 3 5-6"/></svg></button>
+                  <button type="button" (click)="composeBetMessage(bet)" [attr.aria-label]="'Draft a chat message about bet ' + bet.id" title="Draft chat message"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M17 9c0 4-4 6-8 6H6l-4 2 1-4c-1-1-1-2-1-4 0-4 4-6 8-6s7 2 7 6z"/></svg></button>
+                </span>
+              </div>
+            </div>
+          </div>
+          <p *ngIf="personalBetsLoading()" class="bet-history-state" role="status">Loading your bets…</p>
+          <div *ngIf="personalBetsError()" class="bet-history-state" role="alert"><p>{{ personalBetsError() }}</p><button type="button" class="bet-history-load" (click)="loadPersonalBetHistory()">Try again</button></div>
+          <p *ngIf="!personalBetsLoading() && !personalBetsError() && !personalBets().length" class="bet-history-state">Your bets will appear here.</p>
+          <p *ngIf="selectedHistoryBet() as bet" class="bet-history-detail" role="status">Bet #{{ bet.id }} · Round #{{ bet.round_id }} · {{ bet.status === 'cashed_out' ? 'Cashed out' : bet.status | titlecase }}</p>
+          <footer class="bet-history-footer" *ngIf="!personalBetsLoading() && !personalBetsError() && personalBets().length">
+            <button type="button" class="bet-history-load" (click)="loadMorePersonalBets()" [disabled]="personalBetLimit() >= personalBets().length">{{ personalBetLimit() < personalBets().length ? 'Load more' : 'All recent bets loaded' }}</button>
+            <span *ngIf="personalBetLimit() >= personalBets().length && personalBets().length >= 50" class="bet-history-limit">Showing your latest 50 bets</span>
+          </footer>
+        </div>
+      </ng-container>
+      <ng-template #roundHistory>
+      <button type="button" class="modal-close" (click)="closeHistoryModal()" aria-label="Close round history">✕</button>
+      <h2 id="history-dialog-title" class="modal-title">ROUND HISTORY</h2>
+      <p class="modal-subtitle">Recent completed rounds</p>
       <div class="history-list-box">
         <div *ngFor="let mult of history(); let i = index" class="history-modal-row">
-          <span class="round-num">Round #{{ history().length - i }}</span>
+          <span class="round-num">{{ i === 0 ? 'Latest' : i + ' rounds ago' }}</span>
           <span class="round-mult-badge" [class.low]="mult < 2.0" [class.mid]="mult >= 2.0 && mult < 10.0" [class.high]="mult >= 10.0">
             {{ mult | number:'1.2-2' }}x
           </span>
-          <span class="pf-hash">HMAC: sha256_verified</span>
         </div>
       </div>
+      </ng-template>
     </div>
   </div>
 

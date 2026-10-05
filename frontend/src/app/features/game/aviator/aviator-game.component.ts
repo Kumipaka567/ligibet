@@ -24,6 +24,16 @@ import { getBackendOrigin } from '../../../core/config/backend-url';
 
 export type GameState = 'WAITING' | 'RUNNING' | 'CRASHED';
 
+export interface PersonalBetRecord {
+  id: number;
+  round_id: number;
+  bet_amount: number;
+  cashout_multiplier: number | null;
+  payout_amount: number | null;
+  status: string;
+  created_at: string;
+}
+
 export interface LiveBet {
   id: string;
   player: string;
@@ -163,6 +173,14 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   // Modals & UI overlays
   public showWalletModal = signal<boolean>(false);
   public showHistoryModal = signal<boolean>(false);
+  public historyModalView = signal<'bets' | 'rounds'>('bets');
+  public personalBets = signal<PersonalBetRecord[]>([]);
+  public personalBetLimit = signal(10);
+  public visiblePersonalBets = computed(() => this.personalBets().slice(0, this.personalBetLimit()));
+  public personalBetsLoading = signal(false);
+  public personalBetsError = signal('');
+  public selectedHistoryBet = signal<PersonalBetRecord | null>(null);
+  private personalBetsRequest?: Subscription;
   public showProfileModal = signal<boolean>(false);
   public showProfileDropdown = signal<boolean>(false);
   public showGameMenu = signal<boolean>(false);
@@ -665,6 +683,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.personalBetsRequest?.unsubscribe();
     this.loadingPresentationTimers.forEach(timer => clearTimeout(timer));
     this.subs.forEach(s => s.unsubscribe());
     if (this.animationFrameId !== null) {
@@ -698,6 +717,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @HostListener('window:keydown.space', ['$event'])
   handleSpaceKey(event: Event) {
+    if (this.showHistoryModal()) return;
     const activeEl = document.activeElement;
     if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
       return;
@@ -2425,6 +2445,58 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   public openHistoryModal() {
     this.showGameMenu.set(false);
     this.showProfileDropdown.set(false);
+    this.historyModalView.set('bets');
+    this.personalBetLimit.set(10);
+    this.selectedHistoryBet.set(null);
+    this.showHistoryModal.set(true);
+    this.loadPersonalBetHistory();
+  }
+
+  public loadPersonalBetHistory(): void {
+    this.personalBetsRequest?.unsubscribe();
+    this.personalBetsLoading.set(true);
+    this.personalBetsError.set('');
+    this.personalBets.set([]);
+    this.personalBetsRequest = this.authService.getTransactionHistory().subscribe({
+      next: ({ bets }) => {
+        this.personalBets.set([...(bets || [])].sort((a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime() || b.id - a.id
+        ));
+        this.personalBetsLoading.set(false);
+      },
+      error: () => {
+        this.personalBetsError.set('Could not load your bets. Please try again.');
+        this.personalBetsLoading.set(false);
+      }
+    });
+  }
+
+  public loadMorePersonalBets(): void {
+    this.personalBetLimit.update(limit => Math.min(limit + 10, this.personalBets().length));
+  }
+
+  public trackPersonalBet(_index: number, bet: PersonalBetRecord): number {
+    return bet.id;
+  }
+
+  public composeBetMessage(bet: PersonalBetRecord): void {
+    const result = bet.status === 'cashed_out'
+      ? `cashed out at ${Number(bet.cashout_multiplier).toFixed(2)}x for KES ${Number(bet.payout_amount).toFixed(2)}`
+      : bet.status;
+    this.chatInputText = `Round ${bet.round_id}: bet KES ${Number(bet.bet_amount).toFixed(2)}, ${result}.`.slice(0, 160);
+    this.showHistoryModal.set(false);
+    if (!this.showChatModal()) this.toggleChat();
+  }
+
+  @HostListener('document:keydown.escape')
+  public closeHistoryModal(): void {
+    this.showHistoryModal.set(false);
+  }
+
+  public openRoundHistoryModal(): void {
+    this.showGameMenu.set(false);
+    this.showProfileDropdown.set(false);
+    this.historyModalView.set('rounds');
     this.showHistoryModal.set(true);
   }
 
@@ -2453,9 +2525,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   public openProvablyFairModal() {
-    this.showGameMenu.set(false);
-    this.showProfileDropdown.set(false);
-    this.showHistoryModal.set(true);
+    this.openRoundHistoryModal();
   }
 
   public openAvatarModal() {
