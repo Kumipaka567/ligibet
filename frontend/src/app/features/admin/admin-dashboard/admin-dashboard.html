@@ -681,7 +681,13 @@
               <td class="mono text-muted" data-label="ID">#{{ tx.id }}</td>
               <td data-label="Account"><strong>{{ tx.username }}</strong></td>
               <td class="mono" data-label="Phone">{{ tx.phone_number || '--' }}</td>
-              <td data-label="Amount"><strong class="mono">{{ tx.amount | number:'1.2-2' }} KES</strong></td>
+              <td data-label="Amount" class="tx-amount-cell" [class.is-deposit]="tx.type === 'deposit'" [class.is-withdrawal]="tx.type === 'withdrawal'" [class.is-failed]="tx.status === 'failed'">
+                <div class="tx-amount-block">
+                  <span class="tx-amount-currency">KES</span>
+                  <strong class="mono tx-amount-val">{{ tx.amount | number:'1.2-2' }}</strong>
+                  <span class="tx-type-tag" *ngIf="tx.type">{{ tx.type === 'deposit' ? 'Deposit' : 'Withdrawal' }}</span>
+                </div>
+              </td>
               <td class="mono text-xs" data-label="Reference / Receipt">{{ tx.reference || '--' }}</td>
               <td data-label="Status">
                 <span class="status-badge" [class.completed]="tx.status === 'completed'" [class.failed]="tx.status === 'failed'" [class.pending]="tx.status === 'pending'">

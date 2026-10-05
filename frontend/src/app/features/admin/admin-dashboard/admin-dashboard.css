@@ -1686,6 +1686,13 @@
 .admin-table td strong { color:#e0ebf5; font-weight:550; }
 .admin-table tr:last-child td { border-bottom:0; }
 .admin-table tr:hover td { background:#1a2835; }
+.tx-amount-cell { white-space:nowrap; }
+.tx-amount-block { display:inline-flex; align-items:baseline; gap:5px; }
+.tx-amount-currency { font-size:10px; font-weight:700; color:#8ea4bb; }
+.tx-amount-val { font-size:13px; font-weight:700; color:#e0ebf5; }
+.tx-amount-cell.is-deposit .tx-amount-val { color:#34d399; }
+.tx-amount-cell.is-deposit.is-failed .tx-amount-val { color:#fb923c; }
+.tx-type-tag { display:none; }
 .registration-cell { white-space:nowrap; }
 .registration-cell strong,.registration-cell>span { display:block; }
 .registration-cell>span { font-size:10px; color:#8ea4bb; margin-top:3px; }
@@ -1783,6 +1790,72 @@
  .admin-table td[colspan]::before { display:none; }
  .admin-table .btn-group-sm,.admin-table .btn-group-row { max-width:none; gap:7px; }
  .admin-table .sm-btn { min-height:36px; padding:7px 10px; }
+ .admin-table td.tx-amount-cell {
+   grid-column: 1 / -1 !important;
+   display: block !important;
+   padding: 12px 14px !important;
+   margin: 6px 0 10px 0 !important;
+   background: linear-gradient(135deg, #0e1a26 0%, #132435 100%) !important;
+   border: 1px solid #2d455b !important;
+   border-radius: 10px !important;
+   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35) !important;
+ }
+ .admin-table td.tx-amount-cell::before {
+   content: attr(data-label);
+   display: flex !important;
+   align-items: center !important;
+   justify-content: space-between !important;
+   font-size: 10px !important;
+   font-weight: 700 !important;
+   letter-spacing: .9px !important;
+   text-transform: uppercase !important;
+   color: #9cb5cb !important;
+   margin-bottom: 6px !important;
+ }
+ .admin-table td.tx-amount-cell .tx-amount-block {
+   display: flex !important;
+   align-items: baseline !important;
+   justify-content: flex-start !important;
+   gap: 8px !important;
+   flex-wrap: wrap !important;
+   width: 100% !important;
+ }
+ .admin-table td.tx-amount-cell .tx-amount-currency {
+   font-size: 13px !important;
+   font-weight: 800 !important;
+   color: #cbd5e1 !important;
+   letter-spacing: .5px !important;
+ }
+ .admin-table td.tx-amount-cell .tx-amount-val {
+   font-size: clamp(24px, 6.5vw, 30px) !important;
+   font-weight: 900 !important;
+   letter-spacing: -.8px !important;
+   line-height: 1.1 !important;
+   color: #26e7a6 !important;
+   text-shadow: 0 2px 12px rgba(38, 231, 166, 0.3) !important;
+ }
+ .admin-table td.tx-amount-cell.is-failed .tx-amount-val {
+   color: #ff9f43 !important;
+   text-shadow: 0 2px 14px rgba(255, 159, 67, 0.35) !important;
+ }
+ .admin-table td.tx-amount-cell .tx-type-tag {
+   display: inline-flex !important;
+   margin-left: auto !important;
+   font-size: 10px !important;
+   font-weight: 800 !important;
+   text-transform: uppercase !important;
+   letter-spacing: .6px !important;
+   padding: 3px 8px !important;
+   border-radius: 5px !important;
+   background: rgba(38, 231, 166, 0.16) !important;
+   color: #34d399 !important;
+   border: 1px solid rgba(38, 231, 166, 0.35) !important;
+ }
+ .admin-table td.tx-amount-cell.is-failed .tx-type-tag {
+   background: rgba(239, 68, 68, 0.18) !important;
+   color: #fca5a5 !important;
+   border-color: rgba(239, 68, 68, 0.4) !important;
+ }
  .registration-cell { white-space:normal; }
  .modal-backdrop { padding:12px; }
  .modal-card,.custom-dialog-card { padding:20px; max-height:calc(100dvh - 24px); }
@@ -1817,6 +1890,56 @@
  .admin-table td[colspan]::before { display:none; }
  .admin-table .btn-group-sm,.admin-table .btn-group-row { max-width:none; gap:7px; }
  .admin-table .sm-btn { min-height:36px; padding:7px 10px; }
+ .admin-table td.tx-amount-cell {
+   grid-column: 1 / -1 !important;
+   display: block !important;
+   padding: 12px 14px !important;
+   margin: 6px 0 10px 0 !important;
+   background: linear-gradient(135deg, #0e1a26 0%, #132435 100%) !important;
+   border: 1px solid #2d455b !important;
+   border-radius: 10px !important;
+   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35) !important;
+ }
+ .admin-table td.tx-amount-cell .tx-amount-block {
+   display: flex !important;
+   align-items: baseline !important;
+   gap: 8px !important;
+   flex-wrap: wrap !important;
+   width: 100% !important;
+ }
+ .admin-table td.tx-amount-cell .tx-amount-val {
+   font-size: 26px !important;
+   font-weight: 900 !important;
+   color: #26e7a6 !important;
+   text-shadow: 0 2px 12px rgba(38, 231, 166, 0.3) !important;
+ }
+ .admin-table td.tx-amount-cell.is-failed .tx-amount-val {
+   color: #ff9f43 !important;
+   text-shadow: 0 2px 14px rgba(255, 159, 67, 0.35) !important;
+ }
+ .admin-table td.tx-amount-cell .tx-amount-currency {
+   font-size: 13px !important;
+   font-weight: 800 !important;
+   color: #cbd5e1 !important;
+ }
+ .admin-table td.tx-amount-cell .tx-type-tag {
+   display: inline-flex !important;
+   margin-left: auto !important;
+   font-size: 10px !important;
+   font-weight: 800 !important;
+   text-transform: uppercase !important;
+   letter-spacing: .6px !important;
+   padding: 3px 8px !important;
+   border-radius: 5px !important;
+   background: rgba(38, 231, 166, 0.16) !important;
+   color: #34d399 !important;
+   border: 1px solid rgba(38, 231, 166, 0.35) !important;
+ }
+ .admin-table td.tx-amount-cell.is-failed .tx-type-tag {
+   background: rgba(239, 68, 68, 0.18) !important;
+   color: #fca5a5 !important;
+   border-color: rgba(239, 68, 68, 0.4) !important;
+ }
  .registration-cell { white-space:normal; }
  .filter-controls .user-search-wrap { flex-basis:100%; min-width:0; order:-1; }
  .filter-controls .styled-select { flex:1; min-width:0; }
