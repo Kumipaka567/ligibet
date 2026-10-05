@@ -688,9 +688,22 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
   // Audio notification synthesis (Admin only)
+  // Audio notification synthesis (Admin only)
   private audioCtx: AudioContext | null = null;
   private lastDepositInitiatedSoundTime = 0;
   private lastDepositCompletedSoundTime = 0;
+  private lastDepositCompletedToastTime = 0;
+
+  public resumeAudioContext(): void {
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume().catch(() => {});
+    }
+  }
+
+  @HostListener('document:pointerdown')
+  public onDashboardPointerDown(): void {
+    this.resumeAudioContext();
+  }
 
   private getAudioContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
@@ -716,36 +729,41 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     try {
       const ctx = this.getAudioContext();
       if (!ctx) return;
+
+      const trigger = () => {
+        const now = ctx.currentTime;
+        // Note 1: Clean prompt ping (D5: 587.33 Hz)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(587.33, now);
+        gain1.gain.setValueAtTime(0, now);
+        gain1.gain.linearRampToValueAtTime(0.2, now + 0.02);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.16);
+
+        // Note 2: Higher prompt chime (A5: 880.00 Hz)
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(880.00, now + 0.12);
+        gain2.gain.setValueAtTime(0, now + 0.12);
+        gain2.gain.linearRampToValueAtTime(0.25, now + 0.14);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.12);
+        osc2.stop(now + 0.4);
+      };
+
       if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
+        ctx.resume().then(() => trigger()).catch(() => {});
+      } else {
+        trigger();
       }
-      const now = ctx.currentTime;
-
-      // Note 1: Clean prompt ping (D5: 587.33 Hz)
-      const osc1 = ctx.createOscillator();
-      const gain1 = ctx.createGain();
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(587.33, now);
-      gain1.gain.setValueAtTime(0, now);
-      gain1.gain.linearRampToValueAtTime(0.2, now + 0.02);
-      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-      osc1.connect(gain1);
-      gain1.connect(ctx.destination);
-      osc1.start(now);
-      osc1.stop(now + 0.16);
-
-      // Note 2: Higher prompt chime (A5: 880.00 Hz)
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(880.00, now + 0.12);
-      gain2.gain.setValueAtTime(0, now + 0.12);
-      gain2.gain.linearRampToValueAtTime(0.25, now + 0.14);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.start(now + 0.12);
-      osc2.stop(now + 0.4);
     } catch {
       // Audio autoplay policy
     }
@@ -758,31 +776,36 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     try {
       const ctx = this.getAudioContext();
       if (!ctx) return;
+
+      const trigger = () => {
+        const now = ctx.currentTime;
+        // Ascending celebratory payment chord: C5 -> E5 -> G5 -> C6
+        const notes = [
+          { freq: 523.25, start: 0, dur: 0.12, vol: 0.18 },
+          { freq: 659.25, start: 0.08, dur: 0.12, vol: 0.2 },
+          { freq: 783.99, start: 0.16, dur: 0.14, vol: 0.22 },
+          { freq: 1046.50, start: 0.24, dur: 0.35, vol: 0.25 }
+        ];
+
+        for (const n of notes) {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(n.freq, now + n.start);
+          gain.gain.setValueAtTime(0, now + n.start);
+          gain.gain.linearRampToValueAtTime(n.vol, now + n.start + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + n.start + n.dur);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + n.start);
+          osc.stop(now + n.start + n.dur + 0.02);
+        }
+      };
+
       if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
-      }
-      const now = ctx.currentTime;
-
-      // Ascending celebratory payment chord: C5 -> E5 -> G5 -> C6
-      const notes = [
-        { freq: 523.25, start: 0, dur: 0.12, vol: 0.18 },
-        { freq: 659.25, start: 0.08, dur: 0.12, vol: 0.2 },
-        { freq: 783.99, start: 0.16, dur: 0.14, vol: 0.22 },
-        { freq: 1046.50, start: 0.24, dur: 0.35, vol: 0.25 }
-      ];
-
-      for (const n of notes) {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(n.freq, now + n.start);
-        gain.gain.setValueAtTime(0, now + n.start);
-        gain.gain.linearRampToValueAtTime(n.vol, now + n.start + 0.015);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + n.start + n.dur);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now + n.start);
-        osc.stop(now + n.start + n.dur + 0.02);
+        ctx.resume().then(() => trigger()).catch(() => {});
+      } else {
+        trigger();
       }
     } catch {
       // Audio autoplay policy
@@ -810,9 +833,10 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.fetchPayHeroBalance();
     this.fetchOnlinePlayersSummary();
     this.payHeroPollTimer = setInterval(() => {
+      this.fetchOverviewStats();
       this.fetchPayHeroBalance();
-      if (!this.adminSocket.isConnected$.value) this.fetchOnlinePlayersSummary();
-    }, 30000);
+      this.fetchOnlinePlayersSummary();
+    }, 12000);
     this.sanitizedMode.fetchStatus();
     this.predatorInputText = this.sanitizedMode.predatorCustomText();
     // Load expensive lists only when their tab is opened. Previously every
@@ -883,8 +907,18 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         if (event.type === 'deposit') {
           this.fetchPayHeroBalance(true);
           if (event.status === 'completed') {
+            this.lastDepositCompletedToastTime = Date.now();
+            const username = event.username || (event.user_id ? `User #${event.user_id}` : 'Player');
+            const amountFormatted = Number(event.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            this.showAdminToast(`Deposit of KES ${amountFormatted} by ${username} completed successfully.`, 'success', 'Deposit Completed');
             this.playDepositCompletedSound();
+            this.stats.totalDeposits = (this.stats.totalDeposits || 0) + Number(event.amount || 0);
+            this.stats.totalVolume = (this.stats.totalVolume || 0) + Number(event.amount || 0);
+            this.cdr.markForCheck();
           }
+        } else if (event.type === 'withdrawal' && event.status === 'completed') {
+          this.stats.totalWithdrawals = (this.stats.totalWithdrawals || 0) + Number(event.amount || 0);
+          this.cdr.markForCheck();
         }
         this.applyTransactionUpdate(event);
         this.queueRealtimeRefresh({ transactions: true, dashboard: true, users: true, activeUsers: true, logs: true });
@@ -895,7 +929,10 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           this.fetchPayHeroBalance(true);
           return;
         }
-        if (event) this.queueRealtimeRefresh({ dashboard: true });
+        if (event) {
+          this.fetchOverviewStats();
+          this.queueRealtimeRefresh({ dashboard: true });
+        }
       }),
       this.adminSocket.walletUpdated$.subscribe(event => {
         if (!event) return;
@@ -910,6 +947,12 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       }),
       this.adminSocket.depositsUpdated$.subscribe(event => {
         if (event?.action === 'mpesa_deposit_completed') {
+          const now = Date.now();
+          if (now - this.lastDepositCompletedToastTime > 1500) {
+            this.lastDepositCompletedToastTime = now;
+            const playerMsg = event.userId ? `User #${event.userId}` : 'A player';
+            this.showAdminToast(`${playerMsg} deposit completed successfully.`, 'success', 'Deposit Completed');
+          }
           this.playDepositCompletedSound();
         }
         if (event) this.queueRealtimeRefresh({ transactions: true, dashboard: true, users: true, activeUsers: true });
@@ -1074,6 +1117,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
   public setTab(tab: AdminDashboardComponent['activeTab']): void {
+    this.resumeAudioContext();
     // Admins tab is superadmin-only
     if (tab === 'admins' && !this.isSuperAdmin) return;
     if (this.activeTab === tab) return;
@@ -1084,9 +1128,11 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     }
     // Rows already held render immediately and a refresh only goes out once the
     // data has aged, so switching tabs no longer waits on a network round trip.
-    if (tab === 'monitor' && (this.isStale('dashboard') || this.pendingRealtimeRefresh.dashboard)) {
+    if (tab === 'monitor') {
       this.pendingRealtimeRefresh.dashboard = false;
       this.fetchOverviewStats();
+      this.fetchPayHeroBalance();
+      this.fetchOnlinePlayersSummary();
     }
     if (tab === 'withdrawal-settings') {
       this.fetchWithdrawalSettings();
