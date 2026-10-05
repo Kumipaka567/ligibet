@@ -477,6 +477,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       (role === 'all' || user.role === role) &&
       (presence === 'all' || Boolean(user.is_online) === (presence === 'online')) &&
       this.matchesUserSearch(user, q)
+    ).sort((a, b) =>
+      (Date.parse(b.created_at) || 0) - (Date.parse(a.created_at) || 0) || b.id - a.id
     );
     return this._cachedDisplayedUsers;
   }
