@@ -532,6 +532,7 @@
 
           <!-- 3. CRASHED STAGE -->
           <div *ngIf="gameState() === 'CRASHED'" class="stage-overlay crashed">
+            <p *ngIf="!isMiniView && !isSanitized()" class="flew-away-text">FLEW AWAY!</p>
             <h1 class="crashed-multiplier-display">{{ finalCrashMultiplier() | number:'1.2-2' }}x</h1>
           </div>
 

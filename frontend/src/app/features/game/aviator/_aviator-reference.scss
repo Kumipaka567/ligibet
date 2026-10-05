@@ -59,7 +59,9 @@
   .more-ribbon-btn::after { font-size: 9px; line-height: 16px; }
   .canvas-viewport { flex: 1 1 0; min-height: 220px; border-radius: 22px; border-color: #2d2e2e; background: #000; }
   .live-multiplier-display { margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: clamp(68px, 5.3vw, 104px); font-weight: 700; letter-spacing: -3px; line-height: 1; text-shadow: none; filter: none; }
-  .crashed-multiplier-display { font-family: Arial, Helvetica, sans-serif; font-size: clamp(68px, 5.3vw, 104px); }
+  .stage-overlay.crashed { gap: 22px; }
+  .flew-away-text { margin: 0; color: #fff; font-family: Arial, Helvetica, sans-serif; font-size: clamp(26px, 2vw, 38px); font-weight: 400; line-height: 1; letter-spacing: 0; }
+  .crashed-multiplier-display { margin: 0; color: #d50027; font-family: Arial, Helvetica, sans-serif; font-size: clamp(68px, 5.3vw, 104px); font-weight: 700; line-height: 1; letter-spacing: -2px; filter: none; text-shadow: none; }
 
   .partner-branding-box { width: min(94%, 330px); transform: none; }
   .stage-overlay.waiting { background: repeating-linear-gradient(155deg, #0c0d0d 0 52px, #000 52px 104px); }
@@ -162,6 +164,8 @@
     .more-ribbon-btn::after { line-height: clamp(14px, 3.8vw, 27px); }
     .canvas-viewport { flex: 0 0 auto; width: 100%; height: auto; min-height: 0; aspect-ratio: 1.366; border-radius: clamp(18px, 4.8vw, 34px); }
     .live-multiplier-display, .crashed-multiplier-display { font-size: clamp(54px, 16.2vw, 117px); letter-spacing: -2px; }
+    .stage-overlay.crashed { gap: clamp(18px, 5.6vw, 28px); }
+    .flew-away-text { font-size: clamp(22px, 5.2vw, 38px); }
     .dual-bet-panels { grid-template-columns: 1fr; flex: 0 0 auto; gap: clamp(5px, 1.1vw, 8px); }
     .bet-panel-box { min-height: 0; padding: clamp(8px, 2vw, 15px) clamp(18px, 5.6vw, 40px) clamp(9px, 2.25vw, 16px); border-radius: clamp(18px, 4.8vw, 34px); }
     .panel-header-row { flex: 0 0 auto; min-height: clamp(25px, 7.8vw, 56px); margin-bottom: clamp(8px, 2.7vw, 20px); }

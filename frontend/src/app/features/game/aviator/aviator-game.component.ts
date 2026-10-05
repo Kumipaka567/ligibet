@@ -2066,16 +2066,17 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   private drawFlightZoneGlow(
     w: number,
     h: number,
-    _multiplier: number,
+    multiplier: number,
     state: GameState,
     _elapsedMs: number
   ) {
     if (!this.ctx || state === 'WAITING' || state === 'CRASHED') return;
 
-    // Maintain consistent cyan-blue glow throughout flight (no pink switch at 2x)
-    const r = 0;
-    const g = 145;
-    const b = 245;
+    // Change only the flight backdrop at the displayed 2.00x threshold.
+    const purple = multiplier >= 2 && !this.isMiniView && !this.isSanitized();
+    const r = purple ? 105 : 0;
+    const g = purple ? 43 : 145;
+    const b = purple ? 172 : 245;
 
     // Designated focal center (behind the multiplier text & flight zone)
     const cx = w * 0.50;
