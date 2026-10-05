@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, NgZone, inject } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { BehaviorSubject } from 'rxjs';
 import { getBackendOrigin } from '../config/backend-url';
@@ -82,6 +82,22 @@ export interface AdminRealtimeEvent {
   userId: number | null;
   occurredAt: string;
   balance?: number;
+  role?: string;
+  is_suspended?: boolean;
+  is_online?: boolean;
+  user?: {
+    id: number;
+    username?: string;
+    phone_number?: string;
+    balance?: number;
+    role?: string;
+    is_suspended?: boolean;
+    created_at?: string;
+    is_online?: boolean;
+    has_custom_withdrawal_popup?: boolean;
+    custom_withdrawal_title?: string;
+    custom_withdrawal_message?: string;
+  };
 }
 
 export interface AdminTransactionUpdate {
@@ -139,6 +155,7 @@ const EMPTY_CURRENT_ROUND: AdminCurrentRound = {
   providedIn: 'root'
 })
 export class AdminSocketService {
+  private zone = inject(NgZone);
   private socket: Socket | null = null;
   private get serverUrl(): string {
     return `${getBackendOrigin()}/admin`;
@@ -159,6 +176,7 @@ export class AdminSocketService {
   public withdrawalsUpdated$ = new BehaviorSubject<AdminRealtimeEvent | null>(null);
   public userUpdated$ = new BehaviorSubject<AdminRealtimeEvent | null>(null);
   public activityUpdated$ = new BehaviorSubject<AdminRealtimeEvent | null>(null);
+  public accessRevoked$ = new BehaviorSubject<{ userId: number; reason: string } | null>(null);
   public predatorTextUpdate$ = new BehaviorSubject<string | null>(null);
 
   public connect(token: string): void {
@@ -166,6 +184,8 @@ export class AdminSocketService {
       this.socket.disconnect();
       this.socket = null;
     }
+    this.isConnected$.next(false);
+    this.clearRealtimeEvents();
 
     this.socket = io(this.serverUrl, {
       auth: { token },
@@ -176,29 +196,29 @@ export class AdminSocketService {
       reconnectionDelayMax: 5000
     });
 
-    this.socket.on('connect', () => {
+    this.listen('connect', () => {
       this.isConnected$.next(true);
       this.error$.next(null);
     });
 
-    this.socket.on('connect_error', (err: Error) => {
+    this.listen('connect_error', (err: Error) => {
       this.isConnected$.next(false);
       this.error$.next(err.message || 'Admin socket connection failed.');
     });
 
-    this.socket.on('admin_snapshot', (snapshot: AdminSnapshot) => {
+    this.listen('admin_snapshot', (snapshot: AdminSnapshot) => {
       this.applySnapshot(snapshot);
     });
 
-    this.socket.on('admin_round_generated', (snapshot: AdminSnapshot) => {
+    this.listen('admin_round_generated', (snapshot: AdminSnapshot) => {
       this.applySnapshot(snapshot);
     });
 
-    this.socket.on('admin_next_round', (nextRound: AdminNextRound) => {
+    this.listen('admin_next_round', (nextRound: AdminNextRound) => {
       this.nextRound$.next(nextRound);
     });
 
-    this.socket.on('admin_betting_countdown', (data: Pick<AdminNextRound, 'roundId' | 'countdownMs' | 'bettingClosesAt'>) => {
+    this.listen('admin_betting_countdown', (data: Pick<AdminNextRound, 'roundId' | 'countdownMs' | 'bettingClosesAt'>) => {
       const current = this.nextRound$.getValue();
       if (current.roundId === data.roundId) {
         this.nextRound$.next({
@@ -209,7 +229,7 @@ export class AdminSocketService {
       }
     });
 
-    this.socket.on('admin_round_status', (data: {
+    this.listen('admin_round_status', (data: {
       roundId: number;
       status: AdminRoundStatus;
       phase: AdminGamePhase;
@@ -237,61 +257,60 @@ export class AdminSocketService {
       this.history$.next(data.history);
     });
 
-    this.socket.on('admin_current_round', (currentRound: AdminCurrentRound) => {
+    this.listen('admin_current_round', (currentRound: AdminCurrentRound) => {
       this.currentRound$.next(currentRound);
     });
 
-    this.socket.on('admin_previous_round', (data: { previousRound: AdminPreviousRound }) => {
+    this.listen('admin_previous_round', (data: { previousRound: AdminPreviousRound }) => {
       this.previousRound$.next(data.previousRound);
     });
 
-    this.socket.on('admin_transaction_update', (data: AdminTransactionUpdate) => {
-      console.log(`[${new Date().toISOString()}] [PAYMENT_LOG] Admin socket received: admin_transaction_update`, data);
+    this.listen('admin_transaction_update', (data: AdminTransactionUpdate) => {
       this.transactionUpdate$.next(data);
     });
 
-    this.socket.on('dashboard_stats_updated', (data: AdminRealtimeEvent) => {
-      console.log(`[${new Date().toISOString()}] [PAYMENT_LOG] Admin socket received: dashboard_stats_updated`, data);
+    this.listen('dashboard_stats_updated', (data: AdminRealtimeEvent) => {
       this.dashboardStatsUpdated$.next(data);
     });
 
-    this.socket.on('wallet_updated', (data: AdminRealtimeEvent) => {
-      console.log(`[${new Date().toISOString()}] [PAYMENT_LOG] Admin socket received: wallet_updated`, data);
+    this.listen('wallet_updated', (data: AdminRealtimeEvent) => {
       this.walletUpdated$.next(data);
     });
 
-    this.socket.on('transactions_updated', (data: AdminRealtimeEvent) => {
-      console.log(`[${new Date().toISOString()}] [PAYMENT_LOG] Admin socket received: transactions_updated`, data);
+    this.listen('transactions_updated', (data: AdminRealtimeEvent) => {
       this.transactionsUpdated$.next(data);
     });
 
-    this.socket.on('deposits_updated', (data: AdminRealtimeEvent) => {
-      console.log(`[${new Date().toISOString()}] [PAYMENT_LOG] Admin socket received: deposits_updated`, data);
+    this.listen('deposits_updated', (data: AdminRealtimeEvent) => {
       this.depositsUpdated$.next(data);
     });
 
-    this.socket.on('withdrawals_updated', (data: AdminRealtimeEvent) => {
-      console.log(`[${new Date().toISOString()}] [PAYMENT_LOG] Admin socket received: withdrawals_updated`, data);
+    this.listen('withdrawals_updated', (data: AdminRealtimeEvent) => {
       this.withdrawalsUpdated$.next(data);
     });
 
-    this.socket.on('user_updated', (data: AdminRealtimeEvent) => {
-      console.log(`[${new Date().toISOString()}] [PAYMENT_LOG] Admin socket received: user_updated`, data);
+    this.listen('user_updated', (data: AdminRealtimeEvent) => {
       this.userUpdated$.next(data);
     });
 
-    this.socket.on('activity_updated', (data: AdminRealtimeEvent) => {
-      console.log(`[${new Date().toISOString()}] [PAYMENT_LOG] Admin socket received: activity_updated`, data);
+    this.listen('activity_updated', (data: AdminRealtimeEvent) => {
       this.activityUpdated$.next(data);
     });
 
-    this.socket.on('predator_text_updated', (data: { predator_custom_text?: string }) => {
+    this.listen('predator_text_updated', (data: { predator_custom_text?: string }) => {
       if (data && typeof data.predator_custom_text === 'string') {
         this.predatorTextUpdate$.next(data.predator_custom_text);
       }
     });
 
-    this.socket.on('disconnect', (reason: string) => {
+    this.listen('admin_access_revoked', (data: { userId: number; reason: string }) => {
+      this.accessRevoked$.next(data);
+      this.socket?.disconnect();
+      this.isConnected$.next(false);
+      this.error$.next(data.reason || 'Administrator access has changed.');
+    });
+
+    this.listen('disconnect', (reason: string) => {
       this.isConnected$.next(false);
       if (reason !== 'io client disconnect') {
         this.error$.next(`Admin socket disconnected (${reason}). Reconnecting…`);
@@ -318,6 +337,22 @@ export class AdminSocketService {
       this.socket = null;
     }
     this.isConnected$.next(false);
+  }
+
+  private listen<T>(event: string, handler: (payload: T) => void): void {
+    this.socket?.on(event, (payload: T) => this.zone.run(() => handler(payload)));
+  }
+
+  private clearRealtimeEvents(): void {
+    this.transactionUpdate$.next(null);
+    this.dashboardStatsUpdated$.next(null);
+    this.walletUpdated$.next(null);
+    this.transactionsUpdated$.next(null);
+    this.depositsUpdated$.next(null);
+    this.withdrawalsUpdated$.next(null);
+    this.userUpdated$.next(null);
+    this.activityUpdated$.next(null);
+    this.accessRevoked$.next(null);
   }
 
   private applySnapshot(snapshot: AdminSnapshot): void {

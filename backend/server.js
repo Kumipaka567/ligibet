@@ -14,6 +14,8 @@ const bcrypt = require('bcryptjs');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const axios = require('axios');
+const { createRealtimeEmitter, adminSocketAccessError, revokeAdminSockets } = require('./realtime');
+const { userSearchConditions } = require('./user-search');
 
 function escapeRegExp(string) {
   return String(string || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -289,56 +291,7 @@ function realtimeLog(message, details = null) {
   console.log(`[${new Date().toISOString()}] [REALTIME] ${message}${suffix}`);
 }
 
-function emitRealtimeMutation({
-  action,
-  userId = null,
-  balance,
-  transaction = null,
-  deposits = false,
-  withdrawals = false,
-  user = false,
-  dashboard = true,
-  notifyPlayer = true
-}) {
-  const payload = {
-    action,
-    userId,
-    occurredAt: new Date().toISOString()
-  };
-
-  if (userId && notifyPlayer) {
-    const numBal = Number(balance);
-    if (Number.isFinite(numBal)) {
-      const walletPayload = { ...payload, balance: numBal };
-      io.to(`user_${userId}`).emit('balance_update', { balance: numBal });
-      io.to(`user_${userId}`).emit('balance_updated', { balance: numBal });
-      io.to(`user_${userId}`).emit('balance', { balance: numBal });
-      io.to(`user_${userId}`).emit('wallet_updated', walletPayload);
-      io.to(`user_${String(userId)}`).emit('balance_update', { balance: numBal });
-      io.to(`user_${String(userId)}`).emit('balance_updated', { balance: numBal });
-      io.to(`user_${String(userId)}`).emit('wallet_updated', walletPayload);
-    }
-    io.to(`user_${userId}`).emit('transactions_updated', payload);
-    io.to(`user_${userId}`).emit('user_updated', payload);
-    if (transaction) io.to(`user_${userId}`).emit('transactions_updated', payload);
-    if (deposits) io.to(`user_${userId}`).emit('deposits_updated', payload);
-    if (withdrawals) io.to(`user_${userId}`).emit('withdrawals_updated', payload);
-    if (user) io.to(`user_${userId}`).emit('user_updated', payload);
-  }
-
-  if (transaction) {
-    adminNamespace.emit('admin_transaction_update', transaction);
-    adminNamespace.emit('transactions_updated', payload);
-  }
-  if (Number.isFinite(Number(balance))) {
-    adminNamespace.emit('wallet_updated', { ...payload, balance: Number(balance) });
-  }
-  if (deposits) adminNamespace.emit('deposits_updated', payload);
-  if (withdrawals) adminNamespace.emit('withdrawals_updated', payload);
-  if (user) adminNamespace.emit('user_updated', payload);
-  if (dashboard) adminNamespace.emit('dashboard_stats_updated', payload);
-  adminNamespace.emit('activity_updated', payload);
-}
+const emitRealtimeMutation = createRealtimeEmitter(io, adminNamespace);
 
 // ---------- SETTINGS HELPERS ----------
 const DEFAULT_MINIMUM_TOTAL_WAGER = 2500.00;
@@ -725,7 +678,7 @@ app.post('/api/auth/register', rateLimit(60, 60000), async (req, res) => {
       await user.save();
 
       const token = jwt.sign(buildTokenPayload(user), JWT_SECRET, { expiresIn: '7d' });
-      emitRealtimeMutation({ action: 'user_registered', userId: user.id, user: true });
+      emitRealtimeMutation({ action: 'user_registered', userId: user.id, user });
 
       return res.status(201).json({
         message: 'Registration successful',
@@ -1586,6 +1539,7 @@ app.post([
       payer_phone: formattedPhone,
       provider: 'payhero'
     });
+    emitRealtimeMutation({ action: 'mpesa_deposit_pending', userId: req.user.id, deposits: true });
 
     const channelId = parseInt(process.env.PAYHERO_CHANNEL_ID || PAYHERO_CHANNEL_ID, 10);
     const authToken = process.env.PAYHERO_AUTH_TOKEN || PAYHERO_AUTH_TOKEN;
@@ -2230,10 +2184,11 @@ app.post('/api/chat/rain/claim', authenticateToken, async (req, res) => {
     });
 
     // Notify wallet balance change
-    notifyStateChanges({
+    emitRealtimeMutation({
+      action: 'rain_bonus_claimed',
       userId: user.id,
       balance: user.balance,
-      user: user
+      user
     });
 
     return res.json({
@@ -2423,7 +2378,7 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
         connectedPlayers: connectedPlayerSockets,
         onlineUsers: connectedUserCounts.size
       },
-      users: users.map(u => ({ ...u, balance: parseFloat(u.balance || 0) })),
+      users: users.map(u => ({ ...u, balance: parseFloat(u.balance || 0), is_online: (connectedUserCounts.get(u.id) || 0) > 0 })),
       transactions: transactions.map(t => {
         const u = userMap.get(t.user_id) || {};
         return {
@@ -2453,10 +2408,7 @@ app.get('/api/admin/users', authenticateAdminToken, async (req, res) => {
 
     const filter = {};
     if (search) {
-      filter.$or = [
-        { username: new RegExp(escapeRegExp(search), 'i') },
-        { phone_number: new RegExp(escapeRegExp(search), 'i') }
-      ];
+      filter.$or = userSearchConditions(search);
     }
     if (role !== 'all') filter.role = role;
 
@@ -2468,7 +2420,7 @@ app.get('/api/admin/users', authenticateAdminToken, async (req, res) => {
       .limit(100)
       .lean();
 
-    return res.json({ users: users.map(u => ({ ...u, balance: parseFloat(u.balance || 0) })) });
+    return res.json({ users: users.map(u => ({ ...u, balance: parseFloat(u.balance || 0), is_online: (connectedUserCounts.get(u.id) || 0) > 0 })) });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch user list' });
   }
@@ -2493,6 +2445,7 @@ app.post('/api/admin/users/:id/suspend', authenticateAdminToken, async (req, res
     if (suspend) {
       suspendedUserIds.add(targetUserId);
       enforceSuspensionNow(targetUserId);
+      revokeAdminSockets(adminNamespace, targetUserId, 'Account suspended');
     } else {
       suspendedUserIds.delete(targetUserId);
     }
@@ -2504,7 +2457,7 @@ app.post('/api/admin/users/:id/suspend', authenticateAdminToken, async (req, res
       target_user_id: targetUserId
     });
 
-    emitRealtimeMutation({ action: suspend ? 'user_suspended' : 'user_activated', userId: targetUserId, user: true });
+    emitRealtimeMutation({ action: suspend ? 'user_suspended' : 'user_activated', userId: targetUserId, user });
     return res.json({ message: `User ${suspend ? 'suspended' : 'activated'} successfully` });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update user status' });
@@ -2516,7 +2469,7 @@ app.post('/api/admin/users/:id/balance', authenticateAdminToken, async (req, res
   try {
     const targetUserId = parseInt(req.params.id, 10);
     const amount = parseFloat(req.body.amount);
-    if (isNaN(amount)) return res.status(400).json({ error: 'Invalid balance amount' });
+    if (!Number.isFinite(amount)) return res.status(400).json({ error: 'Invalid balance amount' });
 
     let updatedUser = await User.findOneAndUpdate(
       { id: targetUserId },
@@ -2550,12 +2503,8 @@ app.post('/api/admin/users/:id/balance', authenticateAdminToken, async (req, res
       userId: targetUserId,
       balance: updatedUser.balance,
       transaction: tx,
-      user: true
+      user: updatedUser
     });
-
-    // Also emit balance update directly to all player sockets for this user
-    io.to(`user_${targetUserId}`).emit('balance_updated', { balance: updatedUser.balance });
-    io.to(`user_${targetUserId}`).emit('mpesa_deposit_completed', { balance: updatedUser.balance });
 
     return res.json({ message: 'Balance adjusted successfully', newBalance: updatedUser.balance });
   } catch (err) {
@@ -2610,6 +2559,7 @@ app.delete('/api/admin/users/:id', authenticateAdminToken, async (req, res) => {
     }
 
     await User.deleteOne({ id: targetUserId });
+    revokeAdminSockets(adminNamespace, targetUserId, 'Account deleted');
     await AdminLog.create({
       admin_id: req.user.id,
       action: 'DELETE_USER',
@@ -2745,8 +2695,8 @@ app.post('/api/admin/create-admin', authenticateSuperAdminToken, async (req, res
       target_user_id: newAdmin.id
     });
 
-    emitRealtimeMutation({ action: 'admin_created', userId: newAdmin.id, user: true });
-    return res.status(201).json({ message: `Admin user ${trimmed} created successfully`, user: newAdmin });
+    emitRealtimeMutation({ action: 'admin_created', userId: newAdmin.id, user: newAdmin });
+    return res.status(201).json({ message: `Admin user ${trimmed} created successfully`, user: buildPublicUser(newAdmin) });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create admin user' });
   }
@@ -2755,7 +2705,10 @@ app.post('/api/admin/create-admin', authenticateSuperAdminToken, async (req, res
 // Admin Set User Role
 app.post('/api/admin/users/:id/set-role', authenticateSuperAdminToken, async (req, res) => {
   try {
-    const targetUserId = parseInt(req.params.id, 10);
+    const targetUserId = Number(req.params.id);
+    if (!Number.isSafeInteger(targetUserId) || targetUserId <= 0) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
     const { role } = req.body;
     if (!['user', 'admin'].includes(role)) {
       return res.status(400).json({ error: "Role must be 'user' or 'admin'" });
@@ -2772,6 +2725,7 @@ app.post('/api/admin/users/:id/set-role', authenticateSuperAdminToken, async (re
 
     targetUser.role = role;
     await targetUser.save();
+    if (role === 'user') revokeAdminSockets(adminNamespace, targetUserId, 'Administrator role removed');
 
     await AdminLog.create({
       admin_id: req.user.id,
@@ -2780,8 +2734,8 @@ app.post('/api/admin/users/:id/set-role', authenticateSuperAdminToken, async (re
       target_user_id: targetUserId
     });
 
-    emitRealtimeMutation({ action: 'user_role_updated', userId: targetUserId, user: true });
-    return res.json({ message: `User role updated to '${role}' successfully` });
+    emitRealtimeMutation({ action: 'user_role_updated', userId: targetUserId, user: targetUser });
+    return res.json({ message: `User role updated to '${role}' successfully`, user: buildPublicUser(targetUser) });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update user role' });
   }
@@ -3020,7 +2974,10 @@ app.get('/api/admin/active-users', authenticateAdminToken, async (req, res) => {
     const onlineUserIds = Array.from(connectedUserCounts.keys()).filter(id => (connectedUserCounts.get(id) || 0) > 0);
 
     // Retrieve all registered accounts (including admin accounts so admin can test popups)
-    const users = await User.find({})
+    const search = req.query.search ? String(req.query.search).trim() : '';
+    const conditions = userSearchConditions(search);
+    const users = await User.find(conditions.length ? { $or: conditions } : {})
+      .select('-password_hash -__v -_id')
       .sort({ balance: -1, id: 1 })
       .lean();
 
@@ -3050,7 +3007,7 @@ app.get('/api/admin/active-users', authenticateAdminToken, async (req, res) => {
       is_online: onlineUserIds.includes(u.id)
     })).sort((a, b) => (b.is_online ? 1 : 0) - (a.is_online ? 1 : 0) || b.balance - a.balance);
 
-    const pendingWds = await Withdrawal.find({ status: 'pending' })
+    const pendingWds = await Withdrawal.find({ status: 'pending', ...(conditions.length ? { user_id: { $in: userIds } } : {}) })
       .sort({ created_at: -1 })
       .lean();
 
@@ -3124,7 +3081,7 @@ app.post('/api/admin/users/:id/withdrawal-popup', authenticateAdminToken, async 
       target_user_id: userId
     }).catch(logErr => console.warn('AdminLog error:', logErr.message));
 
-    setImmediate(() => emitRealtimeMutation({ action: 'user_withdrawal_popup_updated', userId, dashboard: true }));
+    setImmediate(() => emitRealtimeMutation({ action: 'user_withdrawal_popup_updated', userId, user: true, dashboard: true }));
 
     return res.json({
       success: true,
@@ -4088,6 +4045,7 @@ io.on('connection', (socket) => {
   if (user?.id) {
     const prev = connectedUserCounts.get(user.id) || 0;
     connectedUserCounts.set(user.id, prev + 1);
+    if (prev === 0) emitRealtimeMutation({ action: 'user_online', userId: user.id, user: true, isOnline: true, notifyPlayer: false });
     socket.join(`user_${user.id}`);
     socket.join(`user_${String(user.id)}`);
 
@@ -4221,7 +4179,7 @@ io.on('connection', (socket) => {
       const confirmedPayload = { betId: betDoc.id, amount, slot, room };
       socket.emit('bet_confirmed', confirmedPayload);
       socket.emit('betConfirmed', confirmedPayload);
-      socket.emit('balance_update', { balance: updatedUser.balance });
+      emitRealtimeMutation({ action: 'bet_placed', userId: socket.user.id, balance: updatedUser.balance });
 
       const broadcastPayload = {
         id: betDoc.id,
@@ -4277,7 +4235,7 @@ io.on('connection', (socket) => {
 
       socket.emit('bet_cancelled', { betId: activeBet.id, amount: activeBet.betAmount, slot, room });
       if (updatedUser) {
-        socket.emit('balance_update', { balance: updatedUser.balance });
+        emitRealtimeMutation({ action: 'bet_cancelled', userId: socket.user.id, balance: updatedUser.balance });
       }
 
       io.to(playerRoomName(room)).emit('bet_cancelled_broadcast', {
@@ -4334,7 +4292,7 @@ io.on('connection', (socket) => {
         { new: true }
       );
 
-      await Transaction.create({
+      const payoutTransaction = await Transaction.create({
         user_id: socket.user.id,
         type: 'bet_payout',
         amount: payout,
@@ -4345,7 +4303,7 @@ io.on('connection', (socket) => {
       const successPayload = { multiplier: cashoutMult, payoutAmount: payout, slot, room };
       socket.emit('cash_out_success', successPayload);
       socket.emit('cashOutSuccess', successPayload);
-      socket.emit('balance_update', { balance: user?.balance });
+      emitRealtimeMutation({ action: 'bet_cashout', userId: socket.user.id, balance: user?.balance, transaction: payoutTransaction });
 
       const cashedOutBroadcast = {
         id: activeBet.id,
@@ -4438,8 +4396,10 @@ io.on('connection', (socket) => {
     connectedPlayerSockets = Math.max(0, connectedPlayerSockets - 1);
     if (user?.id) {
       const count = (connectedUserCounts.get(user.id) || 1) - 1;
-      if (count <= 0) connectedUserCounts.delete(user.id);
-      else connectedUserCounts.set(user.id, count);
+      if (count <= 0) {
+        connectedUserCounts.delete(user.id);
+        emitRealtimeMutation({ action: 'user_offline', userId: user.id, user: true, isOnline: false, notifyPlayer: false });
+      } else connectedUserCounts.set(user.id, count);
     }
     emitAdminCurrentRound();
   });
@@ -4454,8 +4414,9 @@ adminNamespace.use((socket, next) => {
     if (err || !decoded) return next(new Error('Invalid token'));
     try {
       const user = await User.findOne({ id: decoded.id }).lean();
-      if (!user || !isAdminRole(user.role)) return next(new Error('Admin privileges required'));
-      socket.user = user;
+      const accessError = adminSocketAccessError(user);
+      if (accessError) return next(new Error(accessError));
+      socket.user = buildPublicUser(user);
       next();
     } catch (e) {
       next(new Error('Database verification failed'));

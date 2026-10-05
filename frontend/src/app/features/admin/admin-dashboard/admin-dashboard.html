@@ -1,177 +1,28 @@
-<main class="admin-shell">
-  <!-- TOP NAVIGATION HEADER -->
-  <header class="admin-header">
-    <div class="brand-block">
-      <div class="brand-logo">
-        <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-        </svg>
-        <span>LIGIBET {{ isSuperAdmin ? 'SUPERADMIN' : 'ADMIN' }}</span>
-      </div>
-      <span class="eyebrow">{{ isSuperAdmin ? 'Master Console' : 'Administration' }}</span>
-    </div>
-
-    <!-- DESKTOP TABS -->
-    <div class="admin-tab-bar desktop-only">
-      <button [class.active]="activeTab === 'monitor' || activeTab === 'game'" (click)="setTab('monitor')">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        <span>Game & Monitor</span>
-      </button>
-      <button [class.active]="activeTab === 'predator'" (click)="setTab('predator')">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/><line x1="12" y1="1.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22.5" y2="12"/></svg>
-        <span>Predator</span>
-      </button>
-      <button [class.active]="activeTab === 'withdrawal-settings'" (click)="setTab('withdrawal-settings')">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        <span>Withdrawal & Deposit</span>
-      </button>
-      <button [class.active]="activeTab === 'active-users'" (click)="setTab('active-users')">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        <span>Active Players</span>
-        <span *ngIf="pendingWithdrawalsList.length > 0" class="badge-count">{{ pendingWithdrawalsList.length }}</span>
-      </button>
-      <button [class.active]="activeTab === 'transactions'" (click)="setTab('transactions')">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-        <span>Transactions</span>
-      </button>
-      <button [class.active]="activeTab === 'users'" (click)="setTab('users')">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <span>Users</span>
-      </button>
-      <button *ngIf="isSuperAdmin" [class.active]="activeTab === 'admins'" (click)="setTab('admins')">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <span>Admins</span>
-      </button>
-      <button [class.active]="activeTab === 'logs'" (click)="setTab('logs')">
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-        <span>Audit</span>
-      </button>
-    </div>
-
-    <div class="header-right">
-      <span class="connection-pill" [class.connected]="isConnected$ | async">
-        <span class="indicator-dot"></span>
-        {{ (isConnected$ | async) ? 'Live' : 'Offline' }}
-      </span>
-
-      <!-- SANITIZED / STEALTH MODE MASTER TOGGLE -->
-      <button 
-        type="button" 
-        class="sanitized-toggle-btn"
-        [class.is-sanitized]="sanitizedMode.isSanitizedMode()"
-        (click)="toggleSanitizedMode()"
-        [title]="sanitizedMode.isSanitizedMode() ? 'Sanitized Mode is Active (All betting features hidden on Game tab) - Click to Restore Normal View' : 'Normal View Active - Click to activate Sanitized Mode'"
-      >
-        <span class="sanitized-icon">🛡️</span>
-        <span class="sanitized-label">
-          <span class="sanitized-label-desktop">{{ sanitizedMode.isSanitizedMode() ? 'Sanitized Mode: ON' : 'Sanitized Mode: OFF' }}</span>
-          <span class="sanitized-label-mobile">{{ sanitizedMode.isSanitizedMode() ? 'ON' : 'OFF' }}</span>
-        </span>
-        <span class="sanitized-pill-indicator"></span>
-      </button>
-
-      <!-- PREDATOR SCREEN QUICK ACCESS -->
-      <button class="action-btn outline-sm header-desktop-btn" (click)="openPredator()" title="Open Predator Signal Screen">
-        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/></svg>
-        <span>Predator</span>
-      </button>
-
-      <!-- FULLSCREEN PLAY ROUTE BUTTON -->
-      <button class="game-view-btn header-desktop-btn" (click)="backToGame()" title="Open Player Fullscreen Game">
-        <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        <span>Play Fullscreen</span>
-      </button>
-
-      <button class="nav-btn logout" (click)="logout()" title="Logout">
-        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-      </button>
-
-      <!-- MOBILE MENU DROPDOWN BUTTON -->
-      <button class="hamburger-btn mobile-only" (click)="toggleMobileMenu()" [class.active]="mobileMenuOpen" aria-label="Toggle navigation menu" title="Menu">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-          <line x1="3" y1="6" x2="21" y2="6"/>
-          <line x1="3" y1="12" x2="21" y2="12"/>
-          <line x1="3" y1="18" x2="21" y2="18"/>
-        </svg>
-      </button>
-    </div>
-  </header>
-
-  <!-- MOBILE NAVIGATION DROPDOWN -->
-  <nav class="mobile-nav-menu" *ngIf="mobileMenuOpen">
-    <button class="sanitized-mobile-btn" [class.is-sanitized]="sanitizedMode.isSanitizedMode()" (click)="toggleSanitizedMode(); mobileMenuOpen = false">
-      🛡️ {{ sanitizedMode.isSanitizedMode() ? 'Sanitized Mode: Active (ON)' : 'Sanitized Mode: Inactive (OFF)' }}
-    </button>
-    <button class="game-view-btn full-width margin-bottom-xs" (click)="backToGame(); mobileMenuOpen = false">
-      <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-      Play Fullscreen (Play View)
-    </button>
-    <button class="action-btn outline-sm full-width margin-bottom-xs" (click)="openPredator(); mobileMenuOpen = false">
-      🎯 Open Fullscreen Predator Screen
-    </button>
-    <button [class.active]="activeTab === 'predator'" (click)="setTab('predator'); mobileMenuOpen = false">Predator Settings & Text</button>
-    <button [class.active]="activeTab === 'monitor' || activeTab === 'game'" (click)="setTab('monitor'); mobileMenuOpen = false">Game & Engine Monitor</button>
-    <button [class.active]="activeTab === 'withdrawal-settings'" (click)="setTab('withdrawal-settings'); mobileMenuOpen = false">Withdrawal & Deposit Settings</button>
-    <button [class.active]="activeTab === 'active-users'" (click)="setTab('active-users'); mobileMenuOpen = false">Active Players & Withdrawals ({{ pendingWithdrawalsList.length }})</button>
-    <button [class.active]="activeTab === 'transactions'" (click)="setTab('transactions'); mobileMenuOpen = false">Transactions</button>
-    <button [class.active]="activeTab === 'users'" (click)="setTab('users'); mobileMenuOpen = false">Users</button>
-    <button *ngIf="isSuperAdmin" [class.active]="activeTab === 'admins'" (click)="setTab('admins'); mobileMenuOpen = false">Admins</button>
-    <button [class.active]="activeTab === 'logs'" (click)="setTab('logs'); mobileMenuOpen = false">Audit Logs</button>
-    <button class="logout-btn" (click)="logout()">Logout</button>
-  </nav>
-
-  <!-- COMPACT OVERVIEW METRICS CARDS -->
-  <section class="stats-bar">
-    <!-- CLICKABLE ONLINE PLAYERS CARD -->
-    <div class="stat-card blue clickable-stat-card" (click)="setTab('active-users')" role="button" tabindex="0" title="Click to view Active Players, Phone Numbers & Balances">
-      <div class="stat-icon-wrapper">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      </div>
-      <div class="stat-info">
-        <div class="stat-label-row">
-          <span class="stat-label">Online Players</span>
-          <span class="micro-click-hint">View List →</span>
-        </div>
-        <strong class="stat-val mono">{{ stats.connectedPlayers }} <span class="stat-sub">({{ stats.onlineUsers }} users)</span></strong>
-      </div>
-    </div>
-
-    <div class="stat-card green">
-      <div class="stat-icon-wrapper">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-      </div>
-      <div class="stat-info">
-        <div class="stat-label-row">
-          <span class="stat-label">Total Deposits</span>
-          <button class="micro-reset-btn" (click)="openResetDepositsModal()" title="Reset Total Deposits Ledger to 0.00 KES">
-            Reset
-          </button>
-        </div>
-        <strong class="stat-val mono">{{ stats.totalDeposits | number:'1.2-2' }} KES</strong>
-      </div>
-    </div>
-
-    <div class="stat-card gold">
-      <div class="stat-icon-wrapper">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/><polyline points="15 15 21 15 21 21"/></svg>
-      </div>
-      <div class="stat-info">
-        <span class="stat-label">Total Withdrawals</span>
-        <strong class="stat-val mono">{{ stats.totalWithdrawals | number:'1.2-2' }} KES</strong>
-      </div>
-    </div>
-
-    <div class="stat-card purple">
-      <div class="stat-icon-wrapper">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-      </div>
-      <div class="stat-info">
-        <span class="stat-label">Total Volume</span>
-        <strong class="stat-val mono">{{ stats.totalVolume | number:'1.2-2' }} KES</strong>
-      </div>
-    </div>
-  </section>
-
+<main class="admin-shell" [class.menu-open]="mobileMenuOpen">
+<a class="admin-skip-link" href="#admin-content">Skip to dashboard content</a>
+<button *ngIf="mobileMenuOpen" class="sidebar-backdrop" type="button" (click)="toggleMobileMenu()" aria-label="Close navigation"></button>
+<aside class="admin-sidebar" [class.is-open]="mobileMenuOpen" id="admin-navigation" aria-label="Admin navigation">
+<div class="sidebar-brand"><span class="brand-mark"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></svg></span><div><strong>LIGIBET<span class="brand-period">.</span></strong><span>Admin workspace</span></div><button type="button" class="sidebar-close" (click)="toggleMobileMenu()" aria-label="Close navigation">&times;</button></div>
+<div class="workspace-badge"><span class="workspace-avatar">{{ isSuperAdmin ? 'SA' : 'AD' }}</span><div><strong>{{ isSuperAdmin ? 'Super administrator' : 'Administrator' }}</strong><span>Platform management</span></div><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m8 12 3 3 5-6"/></svg></div>
+<nav class="sidebar-nav" aria-label="Dashboard sections"><span class="nav-section-label">Workspace</span><button type="button"  [class.active]="activeTab === 'monitor' || activeTab === 'game'" [attr.aria-current]="(activeTab === 'monitor' || activeTab === 'game') ? 'page' : null" (click)="setTab('monitor')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>Overview</span></button>
+<button type="button"  [class.active]="activeTab === 'active-users'" [attr.aria-current]="(activeTab === 'active-users') ? 'page' : null" (click)="setTab('active-users')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Player activity</span><span *ngIf="pendingWithdrawalsList.length" class="badge-count">{{ pendingWithdrawalsList.length }}</span></button>
+<button type="button"  [class.active]="activeTab === 'transactions'" [attr.aria-current]="(activeTab === 'transactions') ? 'page' : null" (click)="setTab('transactions')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></svg><span>Transactions</span></button>
+<button type="button"  [class.active]="activeTab === 'users'" [attr.aria-current]="(activeTab === 'users') ? 'page' : null" (click)="setTab('users')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg><span>Users</span></button>
+<button type="button" *ngIf="isSuperAdmin" [class.active]="activeTab === 'admins'" [attr.aria-current]="(activeTab === 'admins') ? 'page' : null" (click)="setTab('admins')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m8 12 3 3 5-6"/></svg><span>Administrators</span></button>
+<span class="nav-section-label">Configuration</span><button type="button"  [class.active]="activeTab === 'withdrawal-settings'" [attr.aria-current]="(activeTab === 'withdrawal-settings') ? 'page' : null" (click)="setTab('withdrawal-settings')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg><span>Payment settings</span></button>
+<button type="button"  [class.active]="activeTab === 'predator'" [attr.aria-current]="(activeTab === 'predator') ? 'page' : null" (click)="setTab('predator')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M1 12h4m14 0h4"/></svg><span>Predator screen</span></button>
+<button type="button"  [class.active]="activeTab === 'logs'" [attr.aria-current]="(activeTab === 'logs') ? 'page' : null" (click)="setTab('logs')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8m-8 4h5"/></svg><span>Audit log</span></button></nav>
+<div class="sidebar-footer"><div class="sidebar-live"><span class="indicator-dot" [class.connected]="isConnected$ | async"></span><div><strong>{{ (isConnected$ | async) ? 'All updates are live' : 'Connecting to live updates' }}</strong><span>Balances & activity sync automatically</span></div></div><button type="button" class="sidebar-player-link" (click)="backToGame()"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3h7v7m0-7L10 14M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"/></svg>Open player view</button></div>
+</aside>
+<div class="admin-main"><header class="admin-topbar">
+<div class="topbar-left"><button type="button" class="menu-toggle" (click)="toggleMobileMenu()" [attr.aria-expanded]="mobileMenuOpen" aria-controls="admin-navigation" aria-label="Toggle navigation"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><div class="topbar-breadcrumb"><span>Workspace</span><span class="breadcrumb-divider">/</span><strong>{{ tabLabels[activeTab] }}</strong></div></div>
+<div class="topbar-actions"><span class="connection-pill" [class.connected]="isConnected$ | async" role="status"><span class="indicator-dot"></span>{{ (isConnected$ | async) ? 'Live sync' : 'Reconnecting' }}</span><button type="button" class="sanitized-toggle-btn" [class.is-sanitized]="sanitizedMode.isSanitizedMode()" (click)="toggleSanitizedMode()" [attr.aria-pressed]="sanitizedMode.isSanitizedMode()" title="Toggle sanitized view"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m8 12 3 3 5-6"/></svg><span class="view-mode-label">Sanitized view</span><span class="sanitized-pill-indicator"></span></button><button type="button" class="topbar-logout" (click)="logout()" aria-label="Sign out" title="Sign out"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 2 5 5-5 5m5-5H9"/></svg></button></div>
+</header><div class="admin-workspace" id="admin-content" tabindex="-1">
+<section class="workspace-heading"><div><span class="workspace-kicker">Control center</span><h1>{{ tabLabels[activeTab] }}<span class="heading-dot">.</span></h1><p>{{ tabDescriptions[activeTab] }}</p></div><div class="heading-actions" *ngIf="activeTab === 'monitor' || activeTab === 'game'"><button type="button" class="action-btn outline" (click)="setTab('users')"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg>Manage users</button><button type="button" class="action-btn primary" (click)="setTab('transactions')">View transactions<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button></div></section>
+<section class="stats-bar" aria-label="Platform overview"><button type="button" (click)="activeUserPresenceFilter = 'online'; setTab('active-users')" title="View online players" class="stat-card blue clickable-stat-card"><div class="stat-card-top"><span class="stat-label">Online players</span><span class="stat-icon-wrapper"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg></span></div><strong class="stat-val">{{ stats.onlineUsers | number }}</strong><div class="stat-card-footer"><span><span class="small-live-dot"></span>{{ stats.connectedPlayers }} live connections</span><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3h7v7m0-7L10 14M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"/></svg></div></button>
+<article class="stat-card green"><div class="stat-card-top"><span class="stat-label">Total deposits</span><span class="stat-icon-wrapper"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg></span></div><strong class="stat-val"><span class="stat-currency">KES</span>{{ stats.totalDeposits | number:'1.2-2' }}</strong><div class="stat-card-footer"><span>M-Pesa deposits</span><button type="button" class="micro-reset-btn" (click)="openResetDepositsModal()" title="Reset deposits ledger">Reset ledger</button></div></article>
+<article class="stat-card gold"><div class="stat-card-top"><span class="stat-label">Total withdrawals</span><span class="stat-icon-wrapper"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 15V3m-5 5 5-5 5 5M4 16v5h16v-5"/></svg></span></div><strong class="stat-val"><span class="stat-currency">KES</span>{{ stats.totalWithdrawals | number:'1.2-2' }}</strong><div class="stat-card-footer"><span>Player withdrawals</span><span class="stat-footnote">KES</span></div></article>
+<article class="stat-card purple"><div class="stat-card-top"><span class="stat-label">Total volume</span><span class="stat-icon-wrapper"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m3 17 6-6 4 4 8-10m-6 0h6v6"/></svg></span></div><strong class="stat-val"><span class="stat-currency">KES</span>{{ stats.totalVolume | number:'1.2-2' }}</strong><div class="stat-card-footer"><span>{{ stats.totalBets | number }} total bets</span><span class="stat-footnote">All time</span></div></article></section>
   <section *ngIf="error$ | async as error" class="error-banner">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="banner-icon"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
     <span>{{ error }}</span>
@@ -357,6 +208,27 @@
             </div>
           </div>
 
+          <dl class="detail-grid">
+            <div>
+              <dt>Round ID</dt>
+              <dd class="mono">#{{ nextRound.nextRoundId || '--' }}</dd>
+            </div>
+            <div>
+              <dt>Countdown</dt>
+              <dd class="highlight mono">{{ formatCountdown(nextRound.countdownMs) }}</dd>
+            </div>
+            <div>
+              <dt>Generated</dt>
+              <dd class="mono">{{ nextRound.generatedAt ? (nextRound.generatedAt | date:'mediumTime') : '--' }}</dd>
+            </div>
+            <div class="wide">
+              <dt>HMAC-SHA256 Hash</dt>
+              <dd class="mono text-truncate">{{ nextRound.hash || '--' }}</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
           <!-- SECONDARY ROOMS: each gets the same next-crash window and set control -->
           <div class="secondary-rooms">
             <div class="secondary-room-panel" *ngFor="let room of secondaryRooms">
@@ -412,80 +284,6 @@
             </div>
           </div>
 
-          <!-- PREDATOR CLEAN SCREEN CONTROLS & VISIBLE TEXT -->
-          <div class="predator-admin-card">
-            <div class="predator-card-top">
-              <div class="predator-card-title">
-                <span class="predator-dot"></span>
-                <strong>Predator Clean Screen Writings (Sanitized Mode)</strong>
-              </div>
-              <div class="predator-card-top-actions">
-                <button type="button" class="action-btn outline-sm" (click)="togglePredatorPreviewFullscreen()" title="Launch Fullscreen Preview">
-                  ⛶ Fullscreen Preview
-                </button>
-                <button type="button" class="action-btn outline-sm" (click)="setTab('predator')" title="Open Full Predator Configuration Tab">
-                  Full Editor →
-                </button>
-                <button type="button" class="action-btn outline-sm" (click)="openPredator()" title="Open Fullscreen Predator Screen">
-                  Open Screen ↗
-                </button>
-              </div>
-            </div>
-
-            <p class="predator-card-desc">
-              Configure the writings (phone number, instructions, notes, or words) displayed visibly under the next crash on the clean white Predator screen:
-            </p>
-
-            <div class="control-input-row predator-control-row">
-              <textarea
-                rows="2"
-                [(ngModel)]="predatorInputText"
-                class="styled-textarea predator-styled-input"
-                placeholder="Write words, phone number or instructions (e.g. +254 712 345 678 VIP SIGNALS)..."
-              ></textarea>
-              <button class="action-btn primary predator-save-btn" (click)="savePredatorText()">Save Text</button>
-            </div>
-
-            <!-- Quick Add Words in Monitor tab -->
-            <div class="quick-words-pills mini margin-top-xs">
-              <span class="quick-words-mini-label">Quick Add:</span>
-              <button type="button" class="quick-word-pill mini" (click)="appendPredatorWord('+254 ')">+ Phone</button>
-              <button type="button" class="quick-word-pill mini" (click)="appendPredatorWord('VIP SIGNALS')">+ VIP SIGNALS</button>
-              <button type="button" class="quick-word-pill mini" (click)="appendPredatorWord('NEXT CRASH')">+ NEXT CRASH</button>
-              <button type="button" class="quick-word-pill mini" (click)="appendPredatorWord('CASH OUT')">+ CASH OUT</button>
-              <button type="button" class="quick-word-pill mini danger" (click)="clearPredatorText()">Clear</button>
-            </div>
-
-            <div *ngIf="predatorSavedNotice" class="success-callout mono">
-              ✓ {{ predatorSavedNotice }}
-            </div>
-
-            <div class="predator-preview-pill" *ngIf="predatorInputText || sanitizedMode.predatorCustomText()">
-              <span class="preview-tag">Displaying Under Next Crash:</span>
-              <span class="preview-val">{{ predatorInputText || sanitizedMode.predatorCustomText() }}</span>
-            </div>
-          </div>
-
-          <dl class="detail-grid">
-            <div>
-              <dt>Round ID</dt>
-              <dd class="mono">#{{ nextRound.nextRoundId || '--' }}</dd>
-            </div>
-            <div>
-              <dt>Countdown</dt>
-              <dd class="highlight mono">{{ formatCountdown(nextRound.countdownMs) }}</dd>
-            </div>
-            <div>
-              <dt>Generated</dt>
-              <dd class="mono">{{ nextRound.generatedAt ? (nextRound.generatedAt | date:'mediumTime') : '--' }}</dd>
-            </div>
-            <div class="wide">
-              <dt>HMAC-SHA256 Hash</dt>
-              <dd class="mono text-truncate">{{ nextRound.hash || '--' }}</dd>
-            </div>
-          </dl>
-        </article>
-      </section>
 
       <!-- BOTTOM ROW: ACTIVE LIABILITIES & PREVIOUS SETTLEMENT AUDIT -->
       <section class="telemetry-bottom-grid margin-top">
@@ -818,32 +616,32 @@
         <button type="button" [class.active]="txTypeFilter === 'withdrawal'" (click)="setTransactionType('withdrawal')">Withdrawals</button>
       </div>
 
-      <div class="table-responsive margin-top">
+      <div class="table-responsive margin-top" tabindex="0" aria-label="Scrollable account data">
         <table class="admin-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Account</th>
-              <th>Phone</th>
-              <th>Amount</th>
-              <th>Reference / Receipt</th>
-              <th>Status</th>
-              <th>Timestamp</th>
+              <th scope="col">ID</th>
+              <th scope="col">Account</th>
+              <th scope="col">Phone</th>
+              <th scope="col">Amount</th>
+              <th scope="col">Reference / Receipt</th>
+              <th scope="col">Status</th>
+              <th scope="col">Timestamp</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let tx of transactionsList">
-              <td class="mono text-muted">#{{ tx.id }}</td>
-              <td><strong>{{ tx.username }}</strong></td>
-              <td class="mono">{{ tx.phone_number || '--' }}</td>
-              <td><strong class="mono">{{ tx.amount | number:'1.2-2' }} KES</strong></td>
-              <td class="mono text-xs">{{ tx.reference || '--' }}</td>
-              <td>
+              <td class="mono text-muted" data-label="ID">#{{ tx.id }}</td>
+              <td data-label="Account"><strong>{{ tx.username }}</strong></td>
+              <td class="mono" data-label="Phone">{{ tx.phone_number || '--' }}</td>
+              <td data-label="Amount"><strong class="mono">{{ tx.amount | number:'1.2-2' }} KES</strong></td>
+              <td class="mono text-xs" data-label="Reference / Receipt">{{ tx.reference || '--' }}</td>
+              <td data-label="Status">
                 <span class="status-badge" [class.completed]="tx.status === 'completed'" [class.failed]="tx.status === 'failed'" [class.pending]="tx.status === 'pending'">
                   {{ tx.status | uppercase }}
                 </span>
               </td>
-              <td class="mono text-xs">{{ tx.created_at | date:'medium' }}</td>
+              <td class="mono text-xs" data-label="Timestamp">{{ tx.created_at | date:'medium' }}</td>
             </tr>
             <tr *ngIf="transactionsList.length === 0">
               <td colspan="7" class="text-center padding-lg text-muted">No records found matching query.</td>
@@ -859,54 +657,54 @@
     <section class="panel">
       <div class="panel-title-row flex-wrap">
         <div>
-          <h2>User Accounts Registry</h2>
-          <p class="panel-desc">Manage customer accounts, wallet balances, and roles.</p>
+          <h2>User directory</h2>
+          <p class="panel-desc">Find players by phone or username, check live presence, and manage their account.</p>
         </div>
 
         <div class="filter-controls">
-          <select [(ngModel)]="roleFilter" (change)="fetchUsers()" class="styled-select">
+          <select aria-label="Filter by role" [(ngModel)]="roleFilter" (change)="fetchUsers()" class="styled-select">
             <option value="all">All Roles</option>
             <option value="user">Players</option>
             <option value="admin">Admins</option>
           </select>
 
-          <input type="text" [(ngModel)]="searchQuery" (keyup.enter)="fetchUsers()" placeholder="Search username..." class="styled-input" />
-          <button (click)="fetchUsers()" class="action-btn">Filter</button>
+          <div class="user-search-wrap"><svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><input type="search" [(ngModel)]="searchQuery" (ngModelChange)="searchUsers()" placeholder="Search phone or username..." aria-label="Search users by phone number or username" class="styled-input" autocomplete="off" /></div>
+          <select class="styled-select" [(ngModel)]="userPresenceFilter" aria-label="Filter users by online status"><option value="all">Any presence</option><option value="online">Online now</option><option value="offline">Offline</option></select>
           <button (click)="exportUsersCSV()" class="action-btn outline">Export CSV</button>
         </div>
       </div>
 
-      <div class="table-responsive margin-top">
+      <div class="table-responsive margin-top" tabindex="0" aria-label="Scrollable account data">
         <table class="admin-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Username</th>
-              <th>Phone</th>
-              <th>Role</th>
-              <th>Balance</th>
-              <th>Status</th>
-              <th>Withdrawal Popup</th>
-              <th>Actions</th>
+              <th scope="col">ID</th>
+              <th scope="col">Username</th>
+              <th scope="col">Phone</th><th scope="col">Presence</th><th scope="col">Registered (EAT)</th>
+              <th scope="col">Role</th>
+              <th scope="col">Balance</th>
+              <th scope="col">Status</th>
+              <th scope="col">Withdrawal Popup</th>
+              <th scope="col">Actions</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let u of userList">
-              <td class="mono text-muted">#{{ u.id }}</td>
-              <td><strong>{{ u.username }}</strong></td>
-              <td class="mono">{{ u.phone_number || '--' }}</td>
-              <td>
+            <tr *ngFor="let u of displayedUsers">
+              <td class="mono text-muted" data-label="ID">#{{ u.id }}</td>
+              <td data-label="Username"><strong>{{ u.username }}</strong></td>
+              <td class="mono" data-label="Phone">{{ u.phone_number || '--' }}</td><td data-label="Presence"><span class="online-indicator" [class.online]="u.is_online"><span class="indicator-dot"></span>{{ u.is_online ? 'Online' : 'Offline' }}</span></td><td class="registration-cell" data-label="Registered (EAT)"><strong>{{ u.created_at | date:'dd MMM yyyy':'+0300' }}</strong><span>{{ u.created_at | date:'HH:mm:ss':'+0300' }} EAT</span></td>
+              <td data-label="Role">
                 <span class="role-badge" [class.superadmin]="u.role === 'superadmin'" [class.admin]="u.role === 'admin'">
                   {{ u.role | uppercase }}
                 </span>
               </td>
-              <td><strong class="mono">{{ u.balance | number:'1.2-2' }} KES</strong></td>
-              <td>
+              <td data-label="Balance"><strong class="mono">{{ u.balance | number:'1.2-2' }} KES</strong></td>
+              <td data-label="Status">
                 <span class="status-badge" [class.failed]="u.is_suspended" [class.completed]="!u.is_suspended">
                   {{ u.is_suspended ? 'SUSPENDED' : 'ACTIVE' }}
                 </span>
               </td>
-              <td>
+              <td data-label="Withdrawal Popup">
                 <span *ngIf="u.has_custom_withdrawal_popup" class="status-badge completed text-xs" title="Custom withdrawal notice is configured for this player">
                   CUSTOM
                 </span>
@@ -917,17 +715,18 @@
                   Set Withdrawal Popup
                 </button>
               </td>
-              <td>
+              <td class="action-cell" data-label="Actions">
                 <div class="btn-group-sm">
                   <button class="sm-btn" (click)="adjustBalance(u)" title="Adjust Wallet Balance">Balance</button>
                   <button class="sm-btn warning" (click)="toggleSuspend(u)">{{ u.is_suspended ? 'Activate' : 'Suspend' }}</button>
                   <button class="sm-btn info" (click)="resetPassword(u)" title="Reset Password">Password</button>
-                  <button *ngIf="isSuperAdmin && u.role === 'user'" class="sm-btn primary" (click)="setUserRole(u, 'admin')" [disabled]="isSettingRole === u.id" title="Promote to Admin">Promote</button>
-                  <button *ngIf="isSuperAdmin && u.role === 'admin'" class="sm-btn warning" (click)="setUserRole(u, 'user')" [disabled]="isSettingRole === u.id" title="Demote to User">Demote</button>
+                  <button *ngIf="isSuperAdmin && u.role === 'user'" class="sm-btn primary promote-btn" (click)="setUserRole(u, 'admin')" [disabled]="isSettingRole !== null" title="Promote to admin"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m8 12 3 3 5-6"/></svg>{{ isSettingRole === u.id ? 'Promoting...' : 'Promote to admin' }}</button>
+                  <button *ngIf="isSuperAdmin && u.role === 'admin'" class="sm-btn warning" (click)="setUserRole(u, 'user')" [disabled]="isSettingRole !== null" title="Demote to user">{{ isSettingRole === u.id ? 'Updating...' : 'Demote to user' }}</button>
                   <button class="sm-btn danger" (click)="deleteUser(u)" title="Delete Account">Delete</button>
                 </div>
               </td>
             </tr>
+<tr *ngIf="displayedUsers.length === 0"><td colspan="10" class="text-center padding-lg text-muted">{{ isLoadingUsers ? 'Loading users...' : 'No users match your search.' }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -945,34 +744,34 @@
         <button class="action-btn primary" (click)="showCreateAdminModal = true">+ Create Admin Account</button>
       </div>
 
-      <div class="table-responsive margin-top">
+      <div class="table-responsive margin-top" tabindex="0" aria-label="Scrollable account data">
         <table class="admin-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Username</th>
-              <th>Phone</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Created Date</th>
-              <th>Action</th>
+              <th scope="col">ID</th>
+              <th scope="col">Username</th>
+              <th scope="col">Phone</th>
+              <th scope="col">Role</th>
+              <th scope="col">Status</th>
+              <th scope="col">Created Date</th>
+              <th scope="col">Action</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let adm of adminsList">
-              <td class="mono text-muted">#{{ adm.id }}</td>
-              <td><strong>{{ adm.username }}</strong></td>
-              <td class="mono">{{ adm.phone_number || '--' }}</td>
-              <td>
+              <td class="mono text-muted" data-label="ID">#{{ adm.id }}</td>
+              <td data-label="Username"><strong>{{ adm.username }}</strong></td>
+              <td class="mono" data-label="Phone">{{ adm.phone_number || '--' }}</td>
+              <td data-label="Role">
                 <span class="role-badge" [class.superadmin]="adm.role === 'superadmin'" [class.admin]="adm.role === 'admin'">
                   {{ adm.role | uppercase }}
                 </span>
               </td>
-              <td>
+              <td data-label="Status">
                 <span class="status-badge completed">ACTIVE</span>
               </td>
-              <td class="mono text-xs">{{ adm.created_at | date:'medium' }}</td>
-              <td>
+              <td class="mono text-xs" data-label="Created Date">{{ adm.created_at | date:'medium' }}</td>
+              <td class="action-cell" data-label="Action">
                 <button *ngIf="adm.role !== 'superadmin'" class="sm-btn danger" (click)="deleteAdmin(adm)">Remove</button>
                 <span *ngIf="adm.role === 'superadmin'" class="text-muted text-xs">Superadmin</span>
               </td>
@@ -984,7 +783,7 @@
 
     <!-- CREATE ADMIN MODAL -->
     <div *ngIf="showCreateAdminModal" class="modal-backdrop">
-      <div class="modal-card">
+      <div class="modal-card" role="dialog" aria-modal="true" tabindex="-1" aria-label="Create Administrator Account">
         <div class="modal-header-row">
           <h3>Create Administrator Account</h3>
           <button class="modal-close" (click)="showCreateAdminModal = false">
@@ -1024,50 +823,50 @@
         <button class="action-btn outline-sm" (click)="fetchActiveUsers()">Refresh Queue</button>
       </div>
 
-      <div class="table-responsive margin-top">
+      <div class="table-responsive margin-top" tabindex="0" aria-label="Scrollable account data">
         <table class="admin-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Player</th>
-              <th>Requested Amount</th>
-              <th>Current Balance</th>
-              <th>Total Deposits</th>
-              <th>Total Wagers</th>
-              <th>Status</th>
-              <th>Presence</th>
-              <th>Actions</th>
+              <th scope="col">ID</th>
+              <th scope="col">Player</th>
+              <th scope="col">Requested Amount</th>
+              <th scope="col">Current Balance</th>
+              <th scope="col">Total Deposits</th>
+              <th scope="col">Total Wagers</th>
+              <th scope="col">Status</th>
+              <th scope="col">Presence</th>
+              <th scope="col">Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let wd of pendingWithdrawalsList">
-              <td class="mono text-muted">#{{ wd.id }}</td>
-              <td>
+              <td class="mono text-muted" data-label="ID">#{{ wd.id }}</td>
+              <td data-label="Player">
                 <strong>{{ wd.username }}</strong>
                 <div class="text-xs mono text-muted">{{ wd.phone_number || '--' }}</div>
               </td>
-              <td><strong class="text-gold mono">KES {{ wd.amount | number:'1.2-2' }}</strong></td>
-              <td class="mono">KES {{ wd.user_current_balance | number:'1.2-2' }}</td>
-              <td>
+              <td data-label="Requested Amount"><strong class="text-gold mono">KES {{ wd.amount | number:'1.2-2' }}</strong></td>
+              <td class="mono" data-label="Current Balance">KES {{ wd.user_current_balance | number:'1.2-2' }}</td>
+              <td data-label="Total Deposits">
                 <span [class.text-green]="wd.user_total_deposits >= 2500" [class.text-red]="wd.user_total_deposits < 2500" class="mono font-bold">
                   KES {{ wd.user_total_deposits | number:'1.2-2' }}
                 </span>
                 <div class="text-xs text-muted" *ngIf="wd.user_total_deposits < 2500">Below KES 2,500 threshold</div>
               </td>
-              <td>
+              <td data-label="Total Wagers">
                 <span [class.text-green]="wd.user_total_wagers >= withdrawalWagerRequirement" [class.text-red]="wd.user_total_wagers < withdrawalWagerRequirement" class="mono font-bold">
                   KES {{ wd.user_total_wagers | number:'1.2-2' }}
                 </span>
                 <div class="text-xs text-muted" *ngIf="wd.user_total_wagers < withdrawalWagerRequirement">Req: KES {{ withdrawalWagerRequirement | number:'1.2-2' }}</div>
               </td>
-              <td><span class="status-badge pending">PENDING</span></td>
-              <td>
+              <td data-label="Status"><span class="status-badge pending">PENDING</span></td>
+              <td data-label="Presence">
                 <span class="online-indicator" [class.online]="wd.is_online">
                   <span class="indicator-dot"></span>
                   {{ wd.is_online ? 'Online' : 'Offline' }}
                 </span>
               </td>
-              <td>
+              <td class="action-cell" data-label="Actions">
                 <div class="btn-group-row">
                   <button class="sm-btn success" (click)="openWithdrawalModal(wd, 'complete')">Approve</button>
                   <button class="sm-btn danger" (click)="openWithdrawalModal(wd, 'reject')">Decline</button>
@@ -1088,42 +887,42 @@
     <section class="panel">
       <div class="panel-title-row">
         <div>
-          <h2>Active Players, Phone Numbers & Balances</h2>
-          <p class="panel-desc">All registered player accounts with live presence, balances, and individual custom withdrawal popups.</p>
+          <h2>Player presence & balances</h2>
+          <p class="panel-desc">See who is online, their phone number, balance, and exact registration time.</p>
         </div>
-        <button class="action-btn outline-sm" (click)="fetchActiveUsers()">Refresh List</button>
+        <div class="filter-controls"><div class="user-search-wrap"><svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><input type="search" class="styled-input" [(ngModel)]="activeUserSearchQuery" placeholder="Search phone or username..." aria-label="Search player phone number or username" autocomplete="off" /></div><select class="styled-select" [(ngModel)]="activeUserPresenceFilter" aria-label="Filter player presence"><option value="all">All players</option><option value="online">Online now</option><option value="offline">Offline</option></select></div>
       </div>
 
-      <div class="table-responsive margin-top">
+      <div class="table-responsive margin-top" tabindex="0" aria-label="Scrollable account data">
         <table class="admin-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Player Username</th>
-              <th>Phone Number</th>
-              <th>Wallet Balance</th>
-              <th>Total Deposits</th>
-              <th>Total Wagers</th>
-              <th>Live Status</th>
+              <th scope="col">ID</th>
+              <th scope="col">Player Username</th>
+              <th scope="col">Phone Number</th>
+              <th scope="col">Wallet Balance</th>
+              <th scope="col">Total Deposits</th>
+              <th scope="col">Total Wagers</th>
+              <th scope="col">Live Status</th><th scope="col">Registered (EAT)</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let usr of activeUsersList">
-              <td class="mono text-muted">#{{ usr.id }}</td>
-              <td><strong>{{ usr.username }}</strong></td>
-              <td class="mono font-semibold">{{ usr.phone_number || '--' }}</td>
-              <td><strong class="text-green mono">KES {{ usr.balance | number:'1.2-2' }}</strong></td>
-              <td class="mono">KES {{ usr.total_deposits | number:'1.2-2' }}</td>
-              <td class="mono">KES {{ usr.total_wagers | number:'1.2-2' }}</td>
-              <td>
+            <tr *ngFor="let usr of filteredActiveUsers">
+              <td class="mono text-muted" data-label="ID">#{{ usr.id }}</td>
+              <td data-label="Player Username"><strong>{{ usr.username }}</strong></td>
+              <td class="mono font-semibold" data-label="Phone Number">{{ usr.phone_number || '--' }}</td>
+              <td data-label="Wallet Balance"><strong class="text-green mono">KES {{ usr.balance | number:'1.2-2' }}</strong></td>
+              <td class="mono" data-label="Total Deposits">KES {{ usr.total_deposits | number:'1.2-2' }}</td>
+              <td class="mono" data-label="Total Wagers">KES {{ usr.total_wagers | number:'1.2-2' }}</td>
+              <td data-label="Live Status">
                 <span class="online-indicator" [class.online]="usr.is_online">
                   <span class="indicator-dot"></span>
                   {{ usr.is_online ? 'Online' : 'Offline' }}
                 </span>
-              </td>
+              </td><td class="registration-cell" data-label="Registered (EAT)"><strong>{{ usr.created_at | date:'dd MMM yyyy':'+0300' }}</strong><span>{{ usr.created_at | date:'HH:mm:ss':'+0300' }} EAT</span></td>
             </tr>
-            <tr *ngIf="activeUsersList.length === 0 && !isLoadingActiveUsers">
-              <td colspan="7" class="text-center text-muted padding-lg">
+            <tr *ngIf="filteredActiveUsers.length === 0 && !isLoadingActiveUsers">
+              <td colspan="8" class="text-center text-muted padding-lg">
                 No customer accounts found.
               </td>
             </tr>
@@ -1138,7 +937,7 @@
        It previously sat inside the active-users tab, so the Set Withdrawal
        Popup button on the Users tab set the flag but rendered nothing. -->
   <div *ngIf="showNotifyModal" class="modal-backdrop">
-    <div class="modal-card width-lg">
+    <div class="modal-card width-lg" role="dialog" aria-modal="true" tabindex="-1" aria-label="Reset Total Deposits Ledger">
       <div class="modal-header-row">
         <h3>
           <span *ngIf="notifActionType === 'complete'">Approve Withdrawal & Dispatch Notice</span>
@@ -1235,24 +1034,24 @@
         </div>
       </div>
 
-      <div class="table-responsive margin-top">
+      <div class="table-responsive margin-top" tabindex="0" aria-label="Scrollable account data">
         <table class="admin-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Administrator</th>
-              <th>Action Key</th>
-              <th>Operation Details</th>
-              <th>Timestamp</th>
+              <th scope="col">ID</th>
+              <th scope="col">Administrator</th>
+              <th scope="col">Action Key</th>
+              <th scope="col">Operation Details</th>
+              <th scope="col">Timestamp</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let l of adminLogs">
-              <td class="mono text-muted">#{{ l.id }}</td>
-              <td><strong>{{ l.admin_username }}</strong></td>
-              <td><span class="action-tag mono">{{ l.action }}</span></td>
-              <td>{{ l.details }}</td>
-              <td class="mono text-xs">{{ l.created_at | date:'medium' }}</td>
+              <td class="mono text-muted" data-label="ID">#{{ l.id }}</td>
+              <td data-label="Administrator"><strong>{{ l.admin_username }}</strong></td>
+              <td data-label="Action Key"><span class="action-tag mono">{{ l.action }}</span></td>
+              <td data-label="Operation Details">{{ l.details }}</td>
+              <td class="mono text-xs" data-label="Timestamp">{{ l.created_at | date:'medium' }}</td>
             </tr>
           </tbody>
         </table>
@@ -1260,123 +1059,9 @@
     </section>
   </ng-container>
 
-  <!-- TAB: PREDATOR CONTROLS & CLEAN WHITE SCREEN CONFIGURATION -->
-  <ng-container *ngIf="activeTab === 'predator'">
-    <section class="panel predator-dashboard-tab-panel">
-      <div class="panel-title-row">
-        <div>
-          <h2>Predator Signals & Clean White Screen Configuration</h2>
-          <p class="panel-desc">Manage custom text (phone number / notice) and signal telemetries for the clean white screen view.</p>
-        </div>
-        <div class="panel-action-group">
-          <button type="button" class="action-btn primary" (click)="openPredator()">
-            Open Fullscreen Predator Screen ↗
-          </button>
-        </div>
-      </div>
-
-      <div class="predator-tab-layout margin-top">
-        <!-- LEFT: VISIBLE TEXT & CONTACT CONTROLS -->
-        <div class="predator-text-config-box">
-          <div class="config-box-header">
-            <h3>Visible Screen Text / Contact Information</h3>
-            <span class="sanitized-status-badge" [class.on]="sanitizedMode.isSanitizedMode()">
-              {{ sanitizedMode.isSanitizedMode() ? '🛡️ Sanitized Mode Active' : 'Normal Mode' }}
-            </span>
-          </div>
-
-          <p class="config-box-help">
-            This text (e.g. phone number, VIP signal desk contact, or notice) is prominently displayed on the Predator clean white screen:
-          </p>
-
-          <div class="text-editor-area">
-            <label for="predatorTextInput" class="editor-label">Screen Text / Phone Number:</label>
-            <textarea
-              id="predatorTextInput"
-              [(ngModel)]="predatorInputText"
-              rows="3"
-              class="styled-textarea"
-              placeholder="e.g. Desk Contact: +254 712 345 678 or VIP Signal Desk"
-            ></textarea>
-
-            <div class="editor-actions-row">
-              <button type="button" class="action-btn primary" (click)="savePredatorText()">
-                Save Screen Text
-              </button>
-              <button type="button" class="action-btn outline" (click)="predatorInputText = ''; savePredatorText()">
-                Clear
-              </button>
-            </div>
-
-            <div *ngIf="predatorSavedNotice" class="success-callout margin-top-xs">
-              ✓ {{ predatorSavedNotice }}
-            </div>
-
-            <div class="quick-preset-bar margin-top">
-              <span class="preset-label">Quick Templates:</span>
-              <button type="button" class="preset-pill" (click)="predatorInputText = '+254 '; savePredatorText()">+254 Phone</button>
-              <button type="button" class="preset-pill" (click)="predatorInputText = 'VIP Desk: +254 '; savePredatorText()">VIP Desk</button>
-              <button type="button" class="preset-pill" (click)="predatorInputText = 'Signal Channel: +254 '; savePredatorText()">Signal Channel</button>
-              <button type="button" class="preset-pill" (click)="predatorInputText = 'Official Signal Desk'; savePredatorText()">Official Desk</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- RIGHT: LIVE CLEAN WHITE SCREEN PREVIEW -->
-        <div class="predator-preview-column">
-          <div class="config-box-header">
-            <h3>Clean White Screen Live Preview</h3>
-            <span class="preview-mode-tag">Room 1 Only • No Decimals</span>
-          </div>
-
-          <div class="white-screen-preview-card" *ngIf="nextRound$ | async as nr">
-            <div class="mock-header">
-              <div class="mock-brand">
-                <div class="mock-icon">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                  </svg>
-                </div>
-                <span>Signals Monitor</span>
-              </div>
-              <span class="mock-online">Online</span>
-            </div>
-
-            <!-- Visible Text Box -->
-            <div class="mock-text-card">
-              <span class="mock-text-label">Visible Contact / Desk Notes</span>
-              <strong class="mock-text-val">
-                {{ predatorInputText || sanitizedMode.predatorCustomText() || 'No text set yet' }}
-              </strong>
-            </div>
-
-            <!-- Room 1 Signal Box -->
-            <div class="mock-signal-card">
-              <div class="mock-signal-top">
-                <span class="mock-room-badge">Room 1</span>
-                <span class="mock-phase-badge">{{ nr.status === 'Running' ? 'Active' : 'Ready' }}</span>
-              </div>
-              <span class="mock-signal-caption">NEXT SIGNAL</span>
-              <div class="mock-signal-number">
-                {{ formatCrashWhole(nr.nextCrashPoint) }}
-              </div>
-              <span class="mock-signal-sub">Whole number only (no decimals)</span>
-            </div>
-
-            <div class="mock-footer">
-              <button type="button" class="action-btn primary full-width margin-top-xs" (click)="openPredator()">
-                Open Fullscreen Screen Now ↗
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  </ng-container>
-
   <!-- RESET TOTAL DEPOSITS MODAL -->
   <div *ngIf="showResetDepositsModal" class="modal-backdrop">
-    <div class="modal-card">
+    <div class="modal-card" role="dialog" aria-modal="true" tabindex="-1">
       <div class="modal-header-row">
         <h3>Reset Total Deposits Ledger</h3>
         <button class="modal-close" (click)="closeResetDepositsModal()">
@@ -1405,7 +1090,7 @@
 
   <!-- PREMIUM CUSTOM CONFIRMATION MODAL -->
   <div *ngIf="confirmModal.isOpen" class="modal-backdrop" (click)="closeConfirmDialog(false)">
-    <div class="modal-card custom-dialog-card" (click)="$event.stopPropagation()">
+    <div class="modal-card custom-dialog-card" role="dialog" aria-modal="true" tabindex="-1" [attr.aria-label]="confirmModal.title" (click)="$event.stopPropagation()">
       <div class="modal-header-row">
         <div class="dialog-title-group">
           <div class="dialog-icon-badge" [class.danger]="confirmModal.type === 'danger'" [class.warning]="confirmModal.type === 'warning'" [class.primary]="confirmModal.type === 'primary'">
@@ -1433,7 +1118,7 @@
 
   <!-- PREMIUM CUSTOM PROMPT MODAL -->
   <div *ngIf="promptModal.isOpen" class="modal-backdrop" (click)="closePromptDialog(false)">
-    <div class="modal-card custom-dialog-card" (click)="$event.stopPropagation()">
+    <div class="modal-card custom-dialog-card" role="dialog" aria-modal="true" tabindex="-1" [attr.aria-label]="promptModal.title" (click)="$event.stopPropagation()">
       <div class="modal-header-row">
         <h3>{{ promptModal.title }}</h3>
         <button class="modal-close" (click)="closePromptDialog(false)">&times;</button>
@@ -1505,4 +1190,5 @@
       </div>
     </div>
   </div>
+</div></div>
 </main>

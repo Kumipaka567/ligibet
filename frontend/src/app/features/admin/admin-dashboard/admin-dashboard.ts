@@ -6,6 +6,8 @@ import { HttpClient } from '@angular/common/http';
 import { Subscription, finalize, timeout } from 'rxjs';
 import {
   AdminHistoryRow,
+  AdminRealtimeEvent,
+  AdminTransactionUpdate,
   AdminParticipant,
   AdminRoomStatus,
   AdminSocketService
@@ -22,6 +24,7 @@ export interface AdminUser {
   balance: number;
   role: string;
   is_suspended: boolean;
+  is_online?: boolean;
   created_at: string;
   has_custom_withdrawal_popup?: boolean;
   custom_withdrawal_title?: string;
@@ -113,6 +116,23 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public activeTab: 'game' | 'monitor' | 'predator' | 'withdrawal-settings' | 'active-users' | 'transactions' | 'users' | 'admins' | 'logs' = 'monitor';
   public mobileMenuOpen: boolean = false;
   public selectedMiniRoom: number = 1;
+  public readonly tabLabels: Record<AdminDashboardComponent['activeTab'], string> = {
+    monitor: 'Overview', game: 'Live game', 'active-users': 'Player activity',
+    transactions: 'Transactions', users: 'Users', admins: 'Administrators',
+    logs: 'Audit log', 'withdrawal-settings': 'Payment settings', predator: 'Predator'
+  };
+  public readonly tabDescriptions: Record<AdminDashboardComponent['activeTab'], string> = {
+    monitor: 'Your platform at a glance, updated live.',
+    game: 'Follow the action across all game rooms.',
+    'active-users': 'Online players, account activity and withdrawal requests.',
+    transactions: 'Track deposits and withdrawals as they happen.',
+    users: 'Find players and manage their accounts.',
+    admins: 'Manage administrator access to your platform.',
+    logs: 'A clear record of administrator actions.',
+    'withdrawal-settings': 'Configure deposits, withdrawals and player notices.',
+    predator: 'Customize your player-facing screen.'
+  };
+  public lastSyncedAt: Date | null = null;
 
   // Predator Screen Settings & Custom Text
   public predatorInputText: string = '';
@@ -197,6 +217,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown.escape')
   public onEscapeKey(): void {
+    this.mobileMenuOpen = false;
+    this.cdr.markForCheck();
     if (this.isPredatorPreviewFullscreen) {
       this.closePredatorPreviewFullscreen();
     }
@@ -309,7 +331,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     };
     this.toastTimeout = setTimeout(() => {
       this.adminToast = null;
+      this.cdr.markForCheck();
     }, 4000);
+    this.cdr.markForCheck();
   }
 
   public openConfirmDialog(config: {
@@ -374,6 +398,21 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public txStatusFilter: string = 'all';
   public isLoadingTransactions: boolean = false;
   private transactionRequestVersion = 0;
+  private userRequestVersion = 0;
+  private activeUserRequestVersion = 0;
+  private adminRequestVersion = 0;
+  private statsRequestVersion = 0;
+  private statsRequest: Subscription | null = null;
+  private statsRequestInFlight = false;
+  private statsRefreshQueued = false;
+  private destroyed = false;
+  private queuedRealtimeLists = { users: false, transactions: false, activeUsers: false, admins: false };
+  private logRequestVersion = 0;
+  private latestTransactionUpdates = new Map<string, { version: number; transaction: AdminTransactionUpdate }>();
+  private userRequest: Subscription | null = null;
+  private userSearchTimer: ReturnType<typeof setTimeout> | null = null;
+  private realtimeVersion = 0;
+  private latestUserUpdates = new Map<number, { version: number; patch: Partial<AdminUser>; deleted: boolean }>();
   private realtimeSubscriptions: Subscription[] = [];
   private realtimeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingRealtimeRefresh = {
@@ -391,6 +430,49 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public searchQuery: string = '';
   public roleFilter: string = 'all';
   public isLoadingUsers: boolean = false;
+  public userPresenceFilter: 'all' | 'online' | 'offline' = 'all';
+  public activeUserSearchQuery = '';
+  public activeUserPresenceFilter: 'all' | 'online' | 'offline' = 'all';
+
+  public get displayedUsers(): AdminUser[] {
+    return this.userList.filter(user =>
+      this.matchesUserSearch(user, this.searchQuery) &&
+      (this.roleFilter === 'all' || user.role === this.roleFilter) &&
+      (this.userPresenceFilter === 'all' || Boolean(user.is_online) === (this.userPresenceFilter === 'online'))
+    );
+  }
+
+  public get filteredActiveUsers(): ActiveUser[] {
+    return this.activeUsersList.filter(user =>
+      this.matchesUserSearch(user, this.activeUserSearchQuery) &&
+      (this.activeUserPresenceFilter === 'all' || user.is_online === (this.activeUserPresenceFilter === 'online'))
+    );
+  }
+
+  private matchesUserSearch(user: { id: number; username: string; phone_number?: string }, query: string): boolean {
+    const text = query.trim().toLowerCase();
+    if (!text) return true;
+    if (user.username.toLowerCase().includes(text) || String(user.id) === text) return true;
+    const digits = text.replace(/\D/g, '');
+    if (!digits) return false;
+    const phone = (user.phone_number || '').replace(/\D/g, '');
+    const normalize = (value: string) => value.replace(/^254/, '').replace(/^0/, '');
+    return phone.includes(digits) || (normalize(digits).length > 0 && normalize(phone).includes(normalize(digits)));
+  }
+
+  public searchUsers(): void {
+    this.queuedRealtimeLists.users = false;
+    if (this.userSearchTimer !== null) clearTimeout(this.userSearchTimer);
+    ++this.userRequestVersion;
+    this.userRequest?.unsubscribe();
+    this.isLoadingUsers = false;
+    this.lastLoadedAt['users'] = 0;
+    this.userSearchTimer = setTimeout(() => {
+      this.userSearchTimer = null;
+      this.fetchUsers();
+    }, 150);
+    this.cdr.markForCheck();
+  }
 
   // Admins List & New Admin Form State
   public adminsList: AdminUser[] = [];
@@ -427,6 +509,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       return;
     }
 
+    this.subscribeToRealtimeUpdates();
     this.adminSocket.connect(token);
     this.fetchOverview();
     this.sanitizedMode.fetchStatus();
@@ -434,38 +517,70 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     // Load expensive lists only when their tab is opened. Previously every
     // dashboard visit fetched users, transactions, admins, logs, and settings
     // even though the monitor is the default screen.
-    this.subscribeToRealtimeUpdates();
   }
 
 
   public ngOnDestroy(): void {
+    this.destroyed = true;
+    this.statsRequest?.unsubscribe();
     this.realtimeSubscriptions.forEach(subscription => subscription.unsubscribe());
     if (this.realtimeRefreshTimer !== null) clearTimeout(this.realtimeRefreshTimer);
+    if (this.userSearchTimer !== null) clearTimeout(this.userSearchTimer);
+    if (this.toastTimeout !== null) clearTimeout(this.toastTimeout);
+    this.userRequest?.unsubscribe();
     this.adminSocket.disconnect();
   }
 
   private subscribeToRealtimeUpdates(): void {
     this.realtimeSubscriptions.push(
+      this.adminSocket.isConnected$.subscribe(connected => {
+        if (!connected) return;
+        // Events sent while this browser was offline are recovered from the API.
+        this.latestUserUpdates.clear();
+        this.latestTransactionUpdates.clear();
+        this.queueRealtimeRefresh({
+          dashboard: true, users: true, admins: this.isSuperAdmin, activeUsers: true,
+          transactions: true, logs: true, withdrawalSettings: true
+        });
+      }),
+      this.adminSocket.accessRevoked$.subscribe(event => {
+        if (!event) return;
+        this.adminSocket.disconnect();
+        this.showAdminToast(event.reason || 'Your administrator access has changed.', 'error');
+        this.router.navigate(['/play']);
+      }),
+      this.adminSocket.currentRound$.subscribe(round => {
+        this.stats = { ...this.stats, onlineUsers: round.onlineUsers, connectedPlayers: round.connectedPlayers };
+        this.cdr.markForCheck();
+      }),
       this.adminSocket.transactionUpdate$.subscribe(event => {
-        if (event) this.queueRealtimeRefresh({ transactions: true, dashboard: true, activeUsers: true, logs: true });
+        if (!event) return;
+        this.applyTransactionUpdate(event);
+        this.queueRealtimeRefresh({ transactions: true, dashboard: true, users: true, activeUsers: true, logs: true });
       }),
       this.adminSocket.dashboardStatsUpdated$.subscribe(event => {
         if (event) this.queueRealtimeRefresh({ dashboard: true });
       }),
       this.adminSocket.walletUpdated$.subscribe(event => {
-        if (event) this.queueRealtimeRefresh({ dashboard: true, users: true, activeUsers: true });
+        if (!event) return;
+        if (event.userId !== null && typeof event.balance === 'number' && Number.isFinite(event.balance)) {
+          this.applyUserUpdate(event.userId, { balance: event.balance });
+        }
+        this.queueRealtimeRefresh({ dashboard: true, users: true, activeUsers: true });
       }),
       this.adminSocket.transactionsUpdated$.subscribe(event => {
-        if (event) this.queueRealtimeRefresh({ transactions: true, dashboard: true, activeUsers: true });
+        if (event) this.queueRealtimeRefresh({ transactions: true, dashboard: true, users: true, activeUsers: true });
       }),
       this.adminSocket.depositsUpdated$.subscribe(event => {
-        if (event) this.queueRealtimeRefresh({ transactions: true, dashboard: true, activeUsers: true });
+        if (event) this.queueRealtimeRefresh({ transactions: true, dashboard: true, users: true, activeUsers: true });
       }),
       this.adminSocket.withdrawalsUpdated$.subscribe(event => {
-        if (event) this.queueRealtimeRefresh({ transactions: true, dashboard: true, activeUsers: true });
+        if (event) this.queueRealtimeRefresh({ transactions: true, dashboard: true, users: true, activeUsers: true });
       }),
       this.adminSocket.userUpdated$.subscribe(event => {
-        if (event) this.queueRealtimeRefresh({ users: true, admins: this.isSuperAdmin, activeUsers: true, dashboard: true });
+        if (!event) return;
+        this.applyRealtimeUserEvent(event);
+        this.queueRealtimeRefresh({ users: true, admins: this.isSuperAdmin, activeUsers: true, dashboard: true });
       }),
       this.adminSocket.activityUpdated$.subscribe(event => {
         if (!event) return;
@@ -477,38 +592,136 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       this.adminSocket.predatorTextUpdate$.subscribe(text => {
         if (text !== null) {
           this.sanitizedMode.applyPredatorTextUpdate(text);
-          if (!this.predatorInputText) {
-            this.predatorInputText = text;
-          }
+          if (!this.predatorInputText) this.predatorInputText = text;
           this.cdr.markForCheck();
         }
       })
     );
   }
 
-  private queueRealtimeRefresh(refresh: Partial<typeof this.pendingRealtimeRefresh>): void {
-    Object.assign(this.pendingRealtimeRefresh, refresh);
-    if (this.realtimeRefreshTimer !== null) return;
+  private applyRealtimeUserEvent(event: AdminRealtimeEvent): void {
+    if (event.userId === null) return;
+    if (event.action === 'user_deleted') {
+      this.latestUserUpdates.set(event.userId, { version: ++this.realtimeVersion, patch: {}, deleted: true });
+      this.userList = this.userList.filter(user => user.id !== event.userId);
+      this.adminsList = this.adminsList.filter(user => user.id !== event.userId);
+      this.activeUsersList = this.activeUsersList.filter(user => user.id !== event.userId);
+      this.pendingWithdrawalsList = this.pendingWithdrawalsList.filter(withdrawal => withdrawal.user_id !== event.userId);
+      this.cdr.markForCheck();
+      return;
+    }
+    const patch: Partial<AdminUser> = { ...event.user };
+    if (event.role !== undefined) patch.role = event.role;
+    if (event.is_suspended !== undefined) patch.is_suspended = event.is_suspended;
+    if (event.balance !== undefined) patch.balance = event.balance;
+    if (event.is_online !== undefined) patch.is_online = event.is_online;
+    this.applyUserUpdate(event.userId, patch);
+  }
 
-    // A single money mutation emits several specific events. Debounce their
-    // burst so a busy game cannot start overlapping table requests.
+  private applyUserUpdate(userId: number, patch: Partial<AdminUser>): void {
+    const { id: ignoredId, ...accountPatch } = patch;
+    patch = accountPatch;
+    const previous = this.latestUserUpdates.get(userId);
+    const update = { ...previous?.patch, ...patch };
+    this.latestUserUpdates.set(userId, { version: ++this.realtimeVersion, patch: update, deleted: false });
+    const existing = this.userList.find(user => user.id === userId) || this.adminsList.find(user => user.id === userId);
+    this.userList = this.userList.map(user => user.id === userId ? { ...user, ...patch } : user);
+    this.activeUsersList = this.activeUsersList.map(user => user.id === userId ? { ...user, ...patch } : user);
+    this.adminsList = this.adminsList
+      .map(user => user.id === userId ? { ...user, ...patch } : user)
+      .filter(user => user.role === 'admin' || user.role === 'superadmin');
+    if (existing && patch.role === 'admin' && !this.adminsList.some(user => user.id === userId)) {
+      this.adminsList = [{ ...existing, ...patch }, ...this.adminsList];
+    }
+    const withdrawalPatch: Partial<PendingWithdrawal> = {};
+    if (patch.balance !== undefined) {
+      withdrawalPatch.user_current_balance = patch.balance;
+      withdrawalPatch.balance = patch.balance;
+    }
+    for (const key of ['username', 'phone_number', 'is_online', 'has_custom_withdrawal_popup', 'custom_withdrawal_title', 'custom_withdrawal_message'] as const) {
+      if (patch[key] !== undefined) Object.assign(withdrawalPatch, { [key]: patch[key] });
+    }
+    this.pendingWithdrawalsList = this.pendingWithdrawalsList.map(withdrawal => withdrawal.user_id === userId
+      ? { ...withdrawal, ...withdrawalPatch }
+      : withdrawal);
+    if (this.selectedUserForNotif) {
+      const selectedId = 'user_id' in this.selectedUserForNotif ? this.selectedUserForNotif.user_id : this.selectedUserForNotif.id;
+      if (selectedId === userId) {
+        Object.assign(this.selectedUserForNotif, 'user_id' in this.selectedUserForNotif ? withdrawalPatch : patch);
+        if ('user_current_balance' in this.selectedUserForNotif && patch.balance !== undefined) {
+          this.selectedUserForNotif.user_current_balance = patch.balance;
+        }
+      }
+    }
+    this.cdr.markForCheck();
+  }
+
+  private mergeRealtimeUsers<T extends AdminUser>(users: T[], requestedAtVersion: number): T[] {
+    return users.flatMap(user => {
+      const update = this.latestUserUpdates.get(user.id);
+      if (!update || update.version <= requestedAtVersion) return [user];
+      return update.deleted ? [] : [{ ...user, ...update.patch }];
+    });
+  }
+
+  private applyTransactionUpdate(event: AdminTransactionUpdate): void {
+    if (!event.id || (event.type !== 'deposit' && event.type !== 'withdrawal')) return;
+    this.latestTransactionUpdates.set(event.type + ':' + event.id, { version: ++this.realtimeVersion, transaction: event });
+    const matches = event.type === this.txTypeFilter &&
+      (this.txStatusFilter === 'all' || event.status === this.txStatusFilter) &&
+      (!this.txSearchQuery.trim() || this.matchesUserSearch({
+        id: event.user_id, username: event.username || '', phone_number: event.phone_number
+      }, this.txSearchQuery) || (event.reference || '').toLowerCase().includes(this.txSearchQuery.trim().toLowerCase()));
+    const existing = this.transactionsList.find(row => row.id === event.id);
+    if (!matches) {
+      this.transactionsList = this.transactionsList.filter(row => row.id !== event.id);
+    } else if (existing) {
+      this.transactionsList = this.transactionsList.map(row => row.id === event.id ? { ...row, ...event } as AdminTransaction : row);
+    } else if (event.created_at && event.username) {
+      this.transactionsList = [event as AdminTransaction, ...this.transactionsList];
+    }
+    this.cdr.markForCheck();
+  }
+
+  private queueRealtimeRefresh(refresh: Partial<typeof this.pendingRealtimeRefresh>): void {
+    for (const key of Object.keys(refresh) as (keyof typeof this.pendingRealtimeRefresh)[]) {
+      if (refresh[key]) {
+        this.pendingRealtimeRefresh[key] = true;
+        this.lastLoadedAt[key] = 0;
+      }
+    }
+    if (this.realtimeRefreshTimer !== null) return;
+    // Patch rows immediately, then coalesce each mutation's event burst.
     this.realtimeRefreshTimer = setTimeout(() => {
       const requested = { ...this.pendingRealtimeRefresh };
       Object.keys(this.pendingRealtimeRefresh).forEach(key => {
         this.pendingRealtimeRefresh[key as keyof typeof this.pendingRealtimeRefresh] = false;
       });
       this.realtimeRefreshTimer = null;
-
-      console.log(`[${new Date().toISOString()}] [PAYMENT_LOG] Admin UI updated`, requested);
-      if (requested.dashboard && this.activeTab === 'monitor') this.fetchOverviewStats();
-      if (requested.transactions && this.activeTab === 'transactions') this.fetchTransactions();
-      if (requested.users && this.activeTab === 'users') this.fetchUsers();
-      if (requested.admins && this.isSuperAdmin && this.activeTab === 'admins') this.fetchAdmins();
-      if (requested.activeUsers && this.activeTab === 'active-users') this.fetchActiveUsers();
+      if (requested.dashboard) this.fetchOverviewStats();
+      if (requested.transactions && this.activeTab === 'transactions') {
+        if (this.isLoadingTransactions) this.queuedRealtimeLists.transactions = true;
+        else this.fetchTransactions();
+      }
+      if (requested.users && this.activeTab === 'users' && this.userSearchTimer === null) {
+        if (this.isLoadingUsers) this.queuedRealtimeLists.users = true;
+        else this.fetchUsers();
+      }
+      if (requested.admins && this.isSuperAdmin && this.activeTab === 'admins') {
+        if (this.isLoadingAdmins) this.queuedRealtimeLists.admins = true;
+        else this.fetchAdmins();
+      }
+      if (requested.activeUsers && this.activeTab === 'active-users') {
+        if (this.isLoadingActiveUsers) this.queuedRealtimeLists.activeUsers = true;
+        else this.fetchActiveUsers();
+      }
       if (requested.logs && this.activeTab === 'logs') this.fetchLogs();
-      if (requested.withdrawalSettings && this.activeTab === 'withdrawal-settings') this.fetchWithdrawalSettings();
-      if (requested.withdrawalSettings && this.activeTab === 'withdrawal-settings') this.fetchDepositSettings();
-    }, 500);
+      if (requested.withdrawalSettings && this.activeTab === 'withdrawal-settings') {
+        this.fetchWithdrawalSettings();
+        this.fetchDepositSettings();
+      }
+      this.cdr.markForCheck();
+    }, 150);
   }
 
   public toggleMobileMenu(): void {
@@ -545,20 +758,41 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public fetchActiveUsers(): void {
     const token = this.authService.getToken();
     if (!token) return;
-
+    this.queuedRealtimeLists.activeUsers = false;
+    const requestVersion = ++this.activeUserRequestVersion;
+    const realtimeVersion = this.realtimeVersion;
     this.isLoadingActiveUsers = true;
     this.http.get<{ activeUsers: ActiveUser[]; pendingWithdrawals: PendingWithdrawal[] }>(
-      `${this.baseUrl}/api/admin/active-users`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      this.baseUrl + '/api/admin/active-users',
+      { headers: { Authorization: 'Bearer ' + token } }
+    ).pipe(
+      timeout(15000),
+      finalize(() => {
+        if (requestVersion === this.activeUserRequestVersion) {
+          this.isLoadingActiveUsers = false;
+          if (!this.destroyed && this.queuedRealtimeLists.activeUsers && this.activeTab === 'active-users') {
+            this.fetchActiveUsers();
+          }
+        }
+        this.cdr.markForCheck();
+      })
     ).subscribe({
-      next: (res) => {
-        this.activeUsersList = res.activeUsers || [];
-        this.pendingWithdrawalsList = res.pendingWithdrawals || [];
-        this.isLoadingActiveUsers = false;
+      next: res => {
+        if (requestVersion !== this.activeUserRequestVersion) return;
+        this.activeUsersList = this.mergeRealtimeUsers(res.activeUsers || [], realtimeVersion);
+        this.pendingWithdrawalsList = (res.pendingWithdrawals || []).map(withdrawal => {
+          const update = this.latestUserUpdates.get(withdrawal.user_id);
+          if (!update || update.version <= realtimeVersion) return withdrawal;
+          return {
+            ...withdrawal,
+            user_current_balance: update.patch.balance ?? withdrawal.user_current_balance,
+            is_online: update.patch.is_online ?? withdrawal.is_online
+          };
+        });
+        this.markLoaded('activeUsers');
+        this.cdr.markForCheck();
       },
-      error: () => {
-        this.isLoadingActiveUsers = false;
-      }
+      error: () => {}
     });
   }
 
@@ -571,6 +805,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       { headers: { Authorization: `Bearer ${token}` } }
     ).subscribe({
       next: (res) => {
+        this.cdr.markForCheck();
         this.withdrawalWagerRequirement = Number(res.minimum_total_wager) || 0;
         this.withdrawalInitiationTitle = res.initiation_title || this.withdrawalInitiationTitle;
         this.withdrawalInitiationMessage = res.initiation_message || this.withdrawalInitiationMessage;
@@ -975,7 +1210,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (key === 'logs' && this.activeTab === 'logs') this.fetchLogs();
     if (key === 'users' && this.activeTab === 'users') this.fetchUsers();
     if (key === 'transactions' && this.activeTab === 'transactions') this.fetchTransactions();
-    if (key === 'dashboard' && this.activeTab === 'monitor') this.fetchOverviewStats();
+    if (key === 'dashboard') this.fetchOverviewStats();
   }
 
   private markLoaded(...keys: string[]): void {
@@ -991,59 +1226,103 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public fetchOverview(): void {
     const token = this.authService.getToken();
     if (!token) return;
-
-    this.http.get<any>(`${this.baseUrl}/api/admin/overview`, { headers: { Authorization: `Bearer ${token}` } }).subscribe({
-      next: (res) => {
-        if (res?.stats) this.stats = { ...this.stats, ...res.stats };
-        if (Array.isArray(res?.users)) this.userList = res.users;
-        if (Array.isArray(res?.logs)) this.adminLogs = res.logs;
-        // The ledger is not seeded from here: the overview's transactions are the
-        // latest 100 of every type, so bet payouts crowd deposits out of it.
-        // The Transactions tab fetches its own deposit/withdrawal page instead.
-        this.markLoaded('dashboard', 'users', 'logs');
-        this.isLoadingUsers = false;
-      },
-      error: () => {
-        // Fall back to the individual endpoints if the bootstrap is unavailable.
-        this.fetchOverviewStats();
-      }
-    });
+    const statsVersion = ++this.statsRequestVersion;
+    const userVersion = this.userRequestVersion;
+    const logVersion = this.logRequestVersion;
+    const realtimeVersion = this.realtimeVersion;
+    this.http.get<any>(this.baseUrl + '/api/admin/overview', { headers: { Authorization: 'Bearer ' + token } })
+      .pipe(timeout(15000)).subscribe({
+        next: res => {
+          if (res?.stats && statsVersion === this.statsRequestVersion) {
+            this.stats = { ...this.stats, ...res.stats };
+            this.lastSyncedAt = new Date();
+            this.markLoaded('dashboard');
+          }
+          if (Array.isArray(res?.users) && userVersion === this.userRequestVersion && !this.searchQuery && this.roleFilter === 'all') {
+            this.userList = this.mergeRealtimeUsers(res.users, realtimeVersion);
+            this.markLoaded('users');
+          }
+          if (Array.isArray(res?.logs) && logVersion === this.logRequestVersion) {
+            this.adminLogs = res.logs;
+            this.markLoaded('logs');
+          }
+          this.cdr.markForCheck();
+        },
+        error: () => this.fetchOverviewStats()
+      });
   }
 
   public fetchOverviewStats(): void {
     const token = this.authService.getToken();
-    if (!token) return;
-
-    this.http.get<any>(`${this.baseUrl}/api/admin/stats`, { headers: { Authorization: `Bearer ${token}` } }).subscribe({
-      next: (res) => {
-        this.stats = { ...this.stats, ...res };
-      }
-    });
+    if (!token || this.destroyed) return;
+    if (this.statsRequestInFlight) {
+      this.statsRefreshQueued = true;
+      return;
+    }
+    this.statsRequestInFlight = true;
+    this.statsRefreshQueued = false;
+    const requestVersion = ++this.statsRequestVersion;
+    this.statsRequest = this.http.get<any>(this.baseUrl + '/api/admin/stats', { headers: { Authorization: 'Bearer ' + token } })
+      .pipe(
+        timeout(15000),
+        finalize(() => {
+          this.statsRequestInFlight = false;
+          if (this.destroyed) return;
+          if (this.statsRefreshQueued) this.fetchOverviewStats();
+          this.cdr.markForCheck();
+        })
+      ).subscribe({
+        next: res => {
+          if (requestVersion !== this.statsRequestVersion) return;
+          this.stats = { ...this.stats, ...res };
+          this.lastSyncedAt = new Date();
+          this.markLoaded('dashboard');
+          this.cdr.markForCheck();
+        },
+        error: () => {}
+      });
   }
 
   public fetchTransactions(): void {
     const token = this.authService.getToken();
     if (!token) return;
-
-    // A user can switch between Deposits and Withdrawals before an earlier
-    // request finishes. Keep an older response from replacing the rows for
-    // the tab that is currently selected.
+    this.queuedRealtimeLists.transactions = false;
     const requestVersion = ++this.transactionRequestVersion;
     const requestedType = this.txTypeFilter;
+    const requestedSearch = this.txSearchQuery;
+    const requestedStatus = this.txStatusFilter;
+    const realtimeVersion = this.realtimeVersion;
     this.isLoadingTransactions = true;
-    const url = `${this.baseUrl}/api/admin/transactions?type=${requestedType}&search=${encodeURIComponent(this.txSearchQuery)}&status=${this.txStatusFilter}`;
-    this.http.get<{ transactions: AdminTransaction[] }>(url, { headers: { Authorization: `Bearer ${token}` } }).subscribe({
-      next: (res) => {
-        if (requestVersion !== this.transactionRequestVersion || requestedType !== this.txTypeFilter) return;
-        // Defensive filtering also ensures a tab never renders a row from the
-        // other transaction type if an unexpected response is received.
-        this.transactionsList = (res.transactions || []).filter(tx => tx.type === requestedType);
-        this.isLoadingTransactions = false;
+    const url = this.baseUrl + '/api/admin/transactions?type=' + requestedType +
+      '&search=' + encodeURIComponent(requestedSearch) + '&status=' + encodeURIComponent(requestedStatus);
+    this.http.get<{ transactions: AdminTransaction[] }>(url, { headers: { Authorization: 'Bearer ' + token } }).pipe(
+      timeout(15000),
+      finalize(() => {
+        if (requestVersion === this.transactionRequestVersion) {
+          this.isLoadingTransactions = false;
+          if (!this.destroyed && this.queuedRealtimeLists.transactions && this.activeTab === 'transactions') {
+            this.fetchTransactions();
+          }
+        }
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: res => {
+        if (requestVersion !== this.transactionRequestVersion || requestedType !== this.txTypeFilter ||
+          requestedSearch !== this.txSearchQuery || requestedStatus !== this.txStatusFilter) return;
+        let rows = (res.transactions || []).filter(transaction => transaction.type === requestedType);
+        for (const update of this.latestTransactionUpdates.values()) {
+          if (update.version <= realtimeVersion || update.transaction.type !== requestedType) continue;
+          const event = update.transaction;
+          const existing = rows.find(row => row.id === event.id);
+          if (existing) rows = rows.map(row => row.id === event.id ? { ...row, ...event } as AdminTransaction : row);
+          else if (event.created_at && event.username) rows = [event as AdminTransaction, ...rows];
+        }
+        this.transactionsList = rows.filter(transaction => requestedStatus === 'all' || transaction.status === requestedStatus);
+        this.markLoaded('transactions');
+        this.cdr.markForCheck();
       },
-      error: () => {
-        if (requestVersion !== this.transactionRequestVersion || requestedType !== this.txTypeFilter) return;
-        this.isLoadingTransactions = false;
-      }
+      error: () => {}
     });
   }
 
@@ -1056,33 +1335,68 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public fetchUsers(): void {
     const token = this.authService.getToken();
     if (!token) return;
-
+    if (this.userSearchTimer !== null) {
+      clearTimeout(this.userSearchTimer);
+      this.userSearchTimer = null;
+    }
+    this.queuedRealtimeLists.users = false;
+    const requestVersion = ++this.userRequestVersion;
+    this.userRequest?.unsubscribe();
+    const requestedSearch = this.searchQuery;
+    const requestedRole = this.roleFilter;
+    const realtimeVersion = this.realtimeVersion;
     this.isLoadingUsers = true;
-    const url = `${this.baseUrl}/api/admin/users?search=${encodeURIComponent(this.searchQuery)}&role=${this.roleFilter}`;
-    this.http.get<{ users: AdminUser[] }>(url, { headers: { Authorization: `Bearer ${token}` } }).subscribe({
-      next: (res) => {
-        this.userList = res.users;
-        this.isLoadingUsers = false;
+    const url = this.baseUrl + '/api/admin/users?search=' + encodeURIComponent(requestedSearch) +
+      '&role=' + encodeURIComponent(requestedRole);
+    this.userRequest = this.http.get<{ users: AdminUser[] }>(url, { headers: { Authorization: 'Bearer ' + token } }).pipe(
+      timeout(15000),
+      finalize(() => {
+        if (requestVersion === this.userRequestVersion) {
+          this.isLoadingUsers = false;
+          if (!this.destroyed && this.queuedRealtimeLists.users && this.activeTab === 'users' && this.userSearchTimer === null) {
+            this.fetchUsers();
+          }
+        }
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: res => {
+        if (requestVersion !== this.userRequestVersion || requestedSearch !== this.searchQuery || requestedRole !== this.roleFilter) return;
+        this.userList = this.mergeRealtimeUsers(res.users || [], realtimeVersion);
+        this.markLoaded('users');
+        this.cdr.markForCheck();
       },
-      error: () => {
-        this.isLoadingUsers = false;
-      }
+      error: () => {}
     });
   }
 
   public fetchAdmins(): void {
     const token = this.authService.getToken();
-    if (!token) return;
-
+    if (!token || !this.isSuperAdmin) return;
+    this.queuedRealtimeLists.admins = false;
+    const requestVersion = ++this.adminRequestVersion;
+    const realtimeVersion = this.realtimeVersion;
     this.isLoadingAdmins = true;
-    this.http.get<{ admins: AdminUser[] }>(`${this.baseUrl}/api/admin/admins`, { headers: { Authorization: `Bearer ${token}` } }).subscribe({
-      next: (res) => {
-        this.adminsList = res.admins;
-        this.isLoadingAdmins = false;
+    this.http.get<{ admins: AdminUser[] }>(this.baseUrl + '/api/admin/admins', { headers: { Authorization: 'Bearer ' + token } }).pipe(
+      timeout(15000),
+      finalize(() => {
+        if (requestVersion === this.adminRequestVersion) {
+          this.isLoadingAdmins = false;
+          if (!this.destroyed && this.queuedRealtimeLists.admins && this.activeTab === 'admins') {
+            this.fetchAdmins();
+          }
+        }
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: res => {
+        if (requestVersion !== this.adminRequestVersion) return;
+        this.adminsList = this.mergeRealtimeUsers(res.admins || [], realtimeVersion)
+          .filter(user => user.role === 'admin' || user.role === 'superadmin');
+        this.markLoaded('admins');
+        this.cdr.markForCheck();
       },
-      error: () => {
-        this.isLoadingAdmins = false;
-      }
+      error: () => {}
     });
   }
 
@@ -1101,6 +1415,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       { headers: { Authorization: `Bearer ${token}` } }
     ).subscribe({
       next: (res) => {
+        this.cdr.markForCheck();
         alert(res.message);
         this.showCreateAdminModal = false;
         this.newAdminUsername = '';
@@ -1110,6 +1425,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.invalidate('logs');
       },
       error: (err) => {
+        this.cdr.markForCheck();
         this.showAdminToast(err?.error?.error || 'Failed to create admin', 'error');
       }
     });
@@ -1126,14 +1442,17 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       confirmText: user.is_suspended ? 'Activate Account' : 'Suspend Account',
       type: user.is_suspended ? 'primary' : 'warning',
       onConfirm: () => {
+        const suspended = !user.is_suspended;
         this.http.post(
           `${this.baseUrl}/api/admin/users/${user.id}/suspend`,
-          { suspend: !user.is_suspended },
+          { suspend: suspended },
           { headers: { Authorization: `Bearer ${token}` } }
         ).subscribe({
           next: () => {
-            user.is_suspended = !user.is_suspended;
-            this.showAdminToast(`User "${user.username}" ${user.is_suspended ? 'suspended' : 'activated'} successfully.`, 'success');
+            this.cdr.markForCheck();
+            this.applyUserUpdate(user.id, { is_suspended: suspended });
+            this.queueRealtimeRefresh({ users: true, activeUsers: true });
+            this.showAdminToast(`User "${user.username}" ${suspended ? 'suspended' : 'activated'} successfully.`, 'success');
             this.invalidate('logs');
           },
           error: (err) => this.showAdminToast(err?.error?.error || 'Failed to update status', 'error')
@@ -1150,8 +1469,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       inputType: 'number',
       confirmText: 'Apply Adjustment',
       onConfirm: (amountStr) => {
-        const amount = parseFloat(amountStr);
-        if (isNaN(amount)) {
+        const amount = Number(amountStr);
+        if (!amountStr.trim() || !Number.isFinite(amount)) {
           this.showAdminToast('Please enter a valid numeric amount.', 'error');
           return;
         }
@@ -1162,7 +1481,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           { headers: { Authorization: `Bearer ${token}` } }
         ).subscribe({
           next: (res) => {
-            user.balance = res.newBalance;
+            this.cdr.markForCheck();
+            this.applyUserUpdate(user.id, { balance: res.newBalance });
+            this.queueRealtimeRefresh({ dashboard: true, users: true, activeUsers: true, transactions: true });
             this.showAdminToast(`Balance for ${user.username} updated to ${res.newBalance.toFixed(2)} KES.`, 'success');
             this.invalidate('logs');
           },
@@ -1191,6 +1512,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           { headers: { Authorization: `Bearer ${token}` } }
         ).subscribe({
           next: () => {
+            this.cdr.markForCheck();
             this.showAdminToast(`Password reset successfully for ${user.username}.`, 'success');
             this.invalidate('logs');
           },
@@ -1210,6 +1532,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         const token = this.authService.getToken();
         this.http.delete(`${this.baseUrl}/api/admin/users/${user.id}`, { headers: { Authorization: `Bearer ${token}` } }).subscribe({
           next: () => {
+            this.cdr.markForCheck();
             this.showAdminToast(`User "${user.username}" deleted.`, 'success');
             // Drop the row immediately; no round trip needed to show the result.
             this.userList = this.userList.filter(row => row.id !== user.id);
@@ -1222,32 +1545,39 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Superadmin only — promote or demote a user's role */
+  /** Administrator access changes are authorized by the server for superadmins. */
   public setUserRole(user: AdminUser, role: 'user' | 'admin'): void {
-    if (!this.isSuperAdmin) return;
+    if (!this.isSuperAdmin || user.role === 'superadmin' || user.role === role || this.isSettingRole !== null) return;
+    const promoting = role === 'admin';
     this.openConfirmDialog({
-      title: `Change Role: ${user.username}`,
-      message: `Promote / Demote "${user.username}" to "${role.toUpperCase()}"?`,
-      confirmText: `Set Role to ${role.toUpperCase()}`,
-      type: role === 'admin' ? 'primary' : 'warning',
+      title: promoting ? 'Promote to administrator' : 'Remove administrator access',
+      message: promoting
+        ? 'Give ' + user.username + ' administrator access to users, payments and game controls?'
+        : 'Remove administrator access for ' + user.username + '? Their player account will remain active.',
+      confirmText: promoting ? 'Promote to admin' : 'Remove access',
+      type: promoting ? 'primary' : 'warning',
       onConfirm: () => {
         const token = this.authService.getToken();
+        if (!token || !this.isSuperAdmin || this.isSettingRole !== null) return;
         this.isSettingRole = user.id;
         this.http.post<{ message: string }>(
-          `${this.baseUrl}/api/admin/users/${user.id}/set-role`,
+          this.baseUrl + '/api/admin/users/' + user.id + '/set-role',
           { role },
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: 'Bearer ' + token } }
+        ).pipe(
+          timeout(15000),
+          finalize(() => {
+            this.isSettingRole = null;
+            this.cdr.markForCheck();
+          })
         ).subscribe({
           next: () => {
-            user.role = role;
-            this.isSettingRole = null;
-            this.showAdminToast(`User role updated to ${role}.`, 'success');
-            this.invalidate('logs');
+            this.cdr.markForCheck();
+            this.applyUserUpdate(user.id, { role });
+            this.queueRealtimeRefresh({ users: true, admins: true, logs: true, dashboard: true });
+            this.showAdminToast(promoting ? user.username + ' is now an administrator.' : 'Administrator access removed for ' + user.username + '.', 'success');
           },
-          error: (err) => {
-            this.isSettingRole = null;
-            this.showAdminToast(err?.error?.error || 'Failed to update role.', 'error');
-          }
+          error: err => this.showAdminToast(err?.error?.error || 'Failed to update role. Please try again.', 'error')
         });
       }
     });
@@ -1265,6 +1595,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         const token = this.authService.getToken();
         this.http.delete(`${this.baseUrl}/api/admin/users/${admin.id}`, { headers: { Authorization: `Bearer ${token}` } }).subscribe({
           next: () => {
+            this.cdr.markForCheck();
             this.adminsList = this.adminsList.filter(a => a.id !== admin.id);
             this.showAdminToast(`Administrator "${admin.username}" removed.`, 'success');
             this.invalidate('logs');
@@ -1301,14 +1632,18 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public fetchLogs(): void {
     const token = this.authService.getToken();
     if (!token) return;
-
-    this.http.get<{ logs: AdminLog[] }>(`${this.baseUrl}/api/admin/logs`, { headers: { Authorization: `Bearer ${token}` } }).subscribe({
-      next: (res) => {
-        this.adminLogs = res.logs;
-      }
-    });
+    const requestVersion = ++this.logRequestVersion;
+    this.http.get<{ logs: AdminLog[] }>(this.baseUrl + '/api/admin/logs', { headers: { Authorization: 'Bearer ' + token } })
+      .pipe(timeout(15000)).subscribe({
+        next: res => {
+          if (requestVersion !== this.logRequestVersion) return;
+          this.adminLogs = res.logs || [];
+          this.markLoaded('logs');
+          this.cdr.markForCheck();
+        },
+        error: () => {}
+      });
   }
-
 
   public formatCountdown(ms: number): string {
     const seconds = Math.max(0, Math.ceil(ms / 1000));
@@ -1405,6 +1740,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       { headers: { Authorization: `Bearer ${token}` } }
     ).subscribe({
       next: (res) => {
+        this.cdr.markForCheck();
         this.isResettingDeposits = false;
         this.showResetDepositsModal = false;
         this.resetDepositsSuccess = true;
@@ -1415,6 +1751,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.showAdminToast('Total deposits table has been reset to 0.00 KES successfully.', 'success');
       },
       error: (err) => {
+        this.cdr.markForCheck();
         this.isResettingDeposits = false;
         this.showAdminToast(err?.error?.error || 'Failed to reset deposits table', 'error');
       }
