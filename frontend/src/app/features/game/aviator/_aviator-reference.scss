@@ -4,6 +4,20 @@
   color: #eee;
   font-family: Arial, Helvetica, sans-serif;
 
+  .game-loading-splash { position: fixed; inset: 0; z-index: 100000; background: #000; animation: none; }
+  .splash-inner { gap: 4px; animation: none; }
+  .splash-powered-label { margin: 0; color: #525252; font-family: Arial, Helvetica, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0; }
+  .splash-logo-window { position: relative; width: 150px; height: 52px; overflow: hidden; }
+  .splash-reference-logo { position: absolute; left: -65px; top: -97px; display: block; width: auto; max-width: none; height: auto; }
+  .splash-dots { gap: 5px; margin-top: 20px; }
+  .splash-dots .dot { width: 9px; height: 9px; background: #b81100; }
+  .splash-dots .dot:nth-child(2) { background: #c31600; }
+  .splash-connection { position: relative; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: 400; color: #fff; }
+  .splash-connection>p { margin: 0; }
+  .connection-slow-note { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; width: min(280px, 80vw); gap: 12px; text-align: center; color: #999; }
+  .connection-slow-note small { font-size: 12px; }
+  .connection-slow-note button { padding: 8px 14px; border: 1px solid #444; border-radius: 6px; background: #171717; color: #eee; font-size: 12px; cursor: pointer; }
+
   .top-nav { flex: 0 0 auto; border: 0; background: #17232f; }
   .top-nav-utility { height: 46px; min-height: 46px; padding: 0 12px; background: #17232f; border: 0; }
   .go-back-btn, .fullscreen-top-btn { color: #fff; font-size: 12px; font-weight: 600; }
@@ -50,12 +64,12 @@
   .banner-text { font-size: 14px; letter-spacing: -.4px; color: #cecece; }
   .tournament-arrow { display: flex; flex: 0 0 32px; align-items: center; justify-content: center; height: 32px; border-radius: 50%; background: #ffcc16; color: #111; box-shadow: 0 0 8px #ffc91466; }
   .tournament-arrow svg { width: 20px; height: 20px; }
-  .history-bar-container { display: flex; flex: 0 0 33px; align-items: center; gap: 0; }
-  .multiplier-ribbon { width: 100%; height: 100%; padding: 0 42px 0 10px; gap: 12px; }
-  .mult-pill { font-size: 12px; color: #00bfff; }
+  .history-bar-container { display: flex; flex: 0 0 auto; min-height: 33px; align-items: flex-start; gap: 8px; padding: 8px 7px; box-sizing: border-box; }
+  .multiplier-ribbon { flex: 1; width: auto; height: auto; min-width: 0; min-height: 18px; padding: 0; display: flex; flex-wrap: wrap; overflow: visible; gap: 7px 12px; }
+  .mult-pill { font-size: 12px; line-height: 18px; white-space: nowrap; color: #00bfff; }
   .mult-pill.mid { color: #9d43d1; }
   .mult-pill.high { color: #e12bc6; }
-  .more-ribbon-btn { top: 11px; bottom: auto; right: 7px; width: 25px; height: 16px; background: #2b2b2e; border-radius: 12px; }
+  .more-ribbon-btn { position: static; order: -1; flex: 0 0 25px; margin-top: 1px; width: 25px; height: 16px; background: #2b2b2e; border-radius: 12px; }
   .more-ribbon-btn::after { font-size: 9px; line-height: 16px; }
   .canvas-viewport { flex: 1 1 0; min-height: 220px; border-radius: 22px; border-color: #2d2e2e; background: #000; }
   .live-multiplier-display { margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: clamp(68px, 5.3vw, 104px); font-weight: 700; letter-spacing: -3px; line-height: 1; text-shadow: none; filter: none; }
@@ -157,10 +171,10 @@
     .banner-text { text-align: left; font-size: clamp(11px, 2.9vw, 21px); letter-spacing: -.5px; }
     .tournament-arrow { flex-basis: clamp(28px, 7.7vw, 55px); height: clamp(28px, 7.7vw, 55px); }
     .tournament-arrow svg { width: clamp(18px, 4.6vw, 33px); height: clamp(18px, 4.6vw, 33px); }
-    .history-bar-container { flex-basis: clamp(27px, 8vw, 58px); }
-    .multiplier-ribbon { gap: clamp(10px, 2.8vw, 20px); padding-inline: 10px 36px; }
-    .mult-pill { font-size: clamp(10px, 2.5vw, 18px); }
-    .more-ribbon-btn { top: 50%; transform: translateY(-50%); right: 7px; width: clamp(22px, 5.5vw, 40px); height: clamp(14px, 3.8vw, 27px); }
+    .history-bar-container { flex-basis: auto; min-height: clamp(27px, 8vw, 58px); padding: 8px 7px; }
+    .multiplier-ribbon { gap: 7px clamp(10px, 2.8vw, 20px); padding: 0; }
+    .mult-pill { font-size: clamp(11px, 2.5vw, 18px); line-height: clamp(18px, 3.8vw, 27px); }
+    .more-ribbon-btn { position: static; flex-basis: clamp(22px, 5.5vw, 40px); transform: none; width: clamp(22px, 5.5vw, 40px); height: clamp(14px, 3.8vw, 27px); }
     .more-ribbon-btn::after { line-height: clamp(14px, 3.8vw, 27px); }
     .canvas-viewport { flex: 0 0 auto; width: 100%; height: auto; min-height: 0; aspect-ratio: 1.366; border-radius: clamp(18px, 4.8vw, 34px); }
     .live-multiplier-display, .crashed-multiplier-display { font-size: clamp(54px, 16.2vw, 117px); letter-spacing: -2px; }

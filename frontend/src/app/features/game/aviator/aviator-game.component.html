@@ -1,26 +1,22 @@
 <div class="aviator-root dark-theme" [class.mini-mode]="isMiniView" [class.reference-interface]="!isMiniView && !isSanitized()" [attr.id]="!isMiniView && !isSanitized() ? 'aviator-board' : null">
 
   <!-- ═══════════════════════════════════════════════════════════
-       GAME LOADING SPLASH SCREEN — shown for 3s after login
+       OPENING SCREENS — brand, connection, then the live board
        ═══════════════════════════════════════════════════════════ -->
-  <div class="game-loading-splash" *ngIf="gameLoading() && !isMiniView && !isSanitized()">
-    <div class="splash-inner">
+  <div class="game-loading-splash" *ngIf="(gameLoading() || connectionLoading()) && !isMiniView && !isSanitized()" role="status" aria-live="polite" aria-busy="true">
+    <div class="splash-inner" *ngIf="gameLoading()">
       <p class="splash-powered-label">POWERED BY</p>
-      <div class="splash-logo-row">
-        <div class="splash-logo-icon">
-          <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" fill="none">
-            <circle cx="24" cy="24" r="22" stroke="white" stroke-width="2" stroke-dasharray="4 3" opacity="0.6"/>
-            <circle cx="24" cy="24" r="14" stroke="white" stroke-width="1.5" stroke-dasharray="2 2" opacity="0.4"/>
-            <circle cx="24" cy="24" r="6" fill="white" opacity="0.8"/>
-          </svg>
-        </div>
-        <span class="splash-logo-name">SPRIBE</span>
-      </div>
-      <p class="splash-logo-tagline">INSIGHTFUL ENTERTAINMENT</p>
+      <div class="splash-logo-window"><img class="splash-reference-logo" src="/assets/images/aviator-loading-reference.png" alt="SPRIBE — Insightful Entertainment" /></div>
       <div class="splash-dots">
         <span class="dot"></span>
         <span class="dot"></span>
-        <span class="dot"></span>
+      </div>
+    </div>
+    <div class="splash-connection" *ngIf="connectionLoading()">
+      <p>Connection...</p>
+      <div class="connection-slow-note" *ngIf="connectionLoadingSlow()">
+        <small>Connecting is taking longer than usual.</small>
+        <button type="button" (click)="goBack()">Go Back</button>
       </div>
     </div>
   </div>
@@ -404,9 +400,9 @@
       <div class="history-bar-container glass-card" [class.mini-history-bar]="isMiniView">
 
 
-        <div class="multiplier-ribbon">
+        <div class="multiplier-ribbon" role="list" aria-label="Recent rounds, newest first">
           <div *ngFor="let mult of history()"
-               class="mult-pill"
+               class="mult-pill" role="listitem"
                [class.low]="mult < 2.0"
                [class.mid]="mult >= 2.0 && mult < 10.0"
                [class.high]="mult >= 10.0">
@@ -870,19 +866,21 @@
          RIGHT SIDEBAR: REAL-TIME SPRIBE / BETIKA PLAYER CHAT
          ═══════════════════════════════════════════════════════════ -->
     <aside class="chat-right-panel" *ngIf="showChatModal()">
+      <div class="chat-utility-bar">
+        <button type="button" class="fullscreen-top-btn" (click)="toggleFullscreen()" title="Toggle Fullscreen">
+          <span>View Fullscreen</span>
+          <svg class="fs-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg>
+        </button>
+      </div>
       <!-- TOP HEADER (Info, Online Count, Close) -->
       <div class="chat-header-bar">
         <button type="button" class="chat-info-btn" (click)="showChatInfoModal.set(true)" title="Chat Community Rules">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="16" x2="12" y2="12"/>
-            <line x1="12" y1="8" x2="12.01" y2="8"/>
-          </svg>
+          <span class="chat-info-glyph" aria-hidden="true">i</span>
         </button>
 
         <div class="chat-online-pill">
           <span class="online-label">Online:</span>
-          <strong class="online-count">{{ onlineChatUsers() | number }}</strong>
+          <strong class="online-count">{{ onlineChatUsers() }}</strong>
         </div>
 
         <button type="button" class="chat-close-btn" (click)="closeChat()" title="Close Chat">
@@ -903,9 +901,9 @@
 
           <!-- 1. Normal User Avatar -->
           <div *ngIf="msg.type !== 'rain' && msg.type !== 'system' && !msg.rainData" class="chat-user-avatar">
-            <img *ngIf="msg.avatarIcon && msg.avatarIcon.startsWith('data:image')" [src]="msg.avatarIcon" class="avatar-photo-img" alt="Avatar" />
-            <span *ngIf="!msg.avatarIcon || !msg.avatarIcon.startsWith('data:image')" class="avatar-letter" [style.background-color]="msg.isSelf ? '#16a34a' : (msg.avatarColor || '#0284c7')">
-              {{ msg.isSelf ? 'U' : (msg.displayName ? msg.displayName.charAt(0) : '2') }}
+            <img *ngIf="msg.avatarUrl || (msg.avatarIcon && msg.avatarIcon.startsWith('data:image'))" [src]="msg.avatarUrl || msg.avatarIcon" class="avatar-photo-img" alt="Avatar" />
+            <span *ngIf="!msg.avatarUrl && (!msg.avatarIcon || !msg.avatarIcon.startsWith('data:image'))" class="avatar-letter" [style.background-color]="msg.isSelf ? '#16a34a' : (msg.avatarColor || '#0284c7')">
+              {{ msg.avatarIcon || (msg.isSelf ? 'U' : (msg.displayName ? msg.displayName.charAt(0) : '2')) }}
             </span>
           </div>
 
@@ -994,8 +992,8 @@
           </div>
 
           <!-- Like Heart Icon (Only on other players' messages) -->
-          <button *ngIf="!msg.isSelf" type="button" class="chat-like-btn" [class.liked]="msg.hasLiked || userLikedMessageIds.has(msg.id)" (click)="likeMessage(msg, $event)">
-            <svg viewBox="0 0 24 24" class="heart-icon" [attr.fill]="(msg.hasLiked || userLikedMessageIds.has(msg.id)) ? '#ef4444' : '#4b5563'" stroke="none">
+          <button *ngIf="!msg.isSelf" type="button" class="chat-like-btn" [class.liked]="msg.hasLiked || userLikedMessageIds.has(msg.id)" [attr.aria-pressed]="msg.hasLiked || userLikedMessageIds.has(msg.id)" aria-label="Like message" (click)="likeMessage(msg, $event)">
+            <svg viewBox="0 0 24 24" class="heart-icon" [attr.fill]="(msg.hasLiked || userLikedMessageIds.has(msg.id)) ? '#ef4444' : '#575757'" stroke="none">
               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
             </svg>
             <span *ngIf="msg.likes > 0" class="like-count">{{ msg.likes }}</span>
@@ -1022,10 +1020,18 @@
             (focus)="onChatInputFocus()"
             maxlength="160"
             placeholder="Your message..."
+            aria-label="Your message"
             #chatTextInput
           />
 
-          <span class="chat-char-counter">AA {{ 160 - (chatInputText.length || 0) }}</span>
+          <details class="chat-emoji-picker" #chatEmojiPicker>
+            <summary aria-label="Choose an emoji" title="Choose an emoji"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M12 1a11 11 0 1 0 0 22 11 11 0 0 0 0-22ZM7.5 7a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm9 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM6 13h2a4 4 0 0 0 8 0h2a6 6 0 0 1-12 0Z"/></svg></summary>
+            <div class="chat-emoji-grid" role="group" aria-label="Emojis">
+              <button *ngFor="let emoji of ['😀', '😊', '😂', '😍', '🥳', '😎', '👍', '👏', '❤️', '🔥', '✈️', '🎉']" type="button" [attr.aria-label]="'Insert ' + emoji" (click)="chatInputText = chatInputText.length + emoji.length <= 160 ? chatInputText + emoji : chatInputText; chatEmojiPicker.removeAttribute('open'); chatTextInput.focus()">{{ emoji }}</button>
+            </div>
+          </details>
+
+          <span class="chat-char-counter"><span class="chat-counter-case">ᴀA</span> {{ 160 - (chatInputText.length || 0) }}</span>
 
           <button
             type="button"
@@ -1036,7 +1042,7 @@
             title="Send Message"
           >
             <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor">
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+              <path d="M21 3c-2-2-8 0-16 3-4 2-5 5 0 7l3 1 2 6c2 4 5 3 7-1 4-9 6-14 4-16ZM8 11l9-5-6 8-3-3Z" fill-rule="evenodd"/>
             </svg>
           </button>
         </div>
@@ -1363,7 +1369,7 @@
 
 
   <!-- CHAT INFO & RULES MODAL -->
-  <div *ngIf="showChatInfoModal()" class="modal-backdrop" (click)="showChatInfoModal.set(false)">
+  <div *ngIf="showChatInfoModal()" class="modal-backdrop chat-info-backdrop" (click)="showChatInfoModal.set(false)">
     <div class="modal-card glass-card info-modal" (click)="$event.stopPropagation()">
       <button class="modal-close" (click)="showChatInfoModal.set(false)">✕</button>
       <h2 class="modal-title">{{ isSanitized() ? 'COMMUNITY RULES' : 'AVIATOR CHAT RULES' }}</h2>

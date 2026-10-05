@@ -213,6 +213,10 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Game loading splash screen (shown for 3s after login)
   public gameLoading = signal<boolean>(true);
+  public connectionLoading = signal<boolean>(false);
+  public connectionLoadingSlow = signal<boolean>(false);
+  private connectionScreenReady = false;
+  private loadingPresentationTimers: ReturnType<typeof setTimeout>[] = [];
 
   // Transaction History State
   public transactionHistory: TransactionRecord[] = [];
@@ -388,8 +392,19 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.authService.getToken()) {
       this.startStandaloneGameLoop();
     }
-    // Show loading splash for 3 seconds after login
-    setTimeout(() => this.gameLoading.set(false), 3000);
+    // Opening presentation only: the room stream continues behind these screens.
+    this.loadingPresentationTimers.push(setTimeout(() => {
+      this.gameLoading.set(false);
+      if (this.isMiniView || this.isSanitized()) return;
+      this.connectionLoading.set(true);
+      this.loadingPresentationTimers.push(setTimeout(() => {
+        this.connectionScreenReady = true;
+        if (this.isConnected() || !this.authService.getToken()) this.connectionLoading.set(false);
+      }, 650));
+      this.loadingPresentationTimers.push(setTimeout(() => {
+        if (this.connectionLoading()) this.connectionLoadingSlow.set(true);
+      }, 15000));
+    }, 3000));
   }
 
   private initPlaneImage() {
@@ -650,6 +665,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.loadingPresentationTimers.forEach(timer => clearTimeout(timer));
     this.subs.forEach(s => s.unsubscribe());
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
@@ -728,6 +744,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
       }),
       this.gameSocket.isConnected$.subscribe(connected => {
         this.isConnected.set(connected);
+        if (connected && this.connectionScreenReady) this.connectionLoading.set(false);
         if (connected) {
           if (this.mockLoopIntervalId) {
             clearInterval(this.mockLoopIntervalId);
