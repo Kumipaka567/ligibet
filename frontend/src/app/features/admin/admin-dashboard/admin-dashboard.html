@@ -5,6 +5,7 @@
 <div class="sidebar-brand"><span class="brand-mark"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></svg></span><div><strong>LIGIBET<span class="brand-period">.</span></strong><span>Admin workspace</span></div><button type="button" class="sidebar-close" (click)="toggleMobileMenu()" aria-label="Close navigation">&times;</button></div>
 <div class="workspace-badge"><span class="workspace-avatar">{{ isSuperAdmin ? 'SA' : 'AD' }}</span><div><strong>{{ isSuperAdmin ? 'Super administrator' : 'Administrator' }}</strong><span>Platform management</span></div><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m8 12 3 3 5-6"/></svg></div>
 <nav class="sidebar-nav" aria-label="Dashboard sections"><span class="nav-section-label">Workspace</span><button type="button"  [class.active]="activeTab === 'monitor' || activeTab === 'game'" [attr.aria-current]="(activeTab === 'monitor' || activeTab === 'game') ? 'page' : null" (click)="setTab('monitor')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>Overview</span></button>
+<button type="button" [class.active]="activeTab === 'online-users'" [attr.aria-current]="activeTab === 'online-users' ? 'page' : null" (click)="openOnlinePlayers()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg><span>Online players</span></button>
 <button type="button"  [class.active]="activeTab === 'active-users'" [attr.aria-current]="(activeTab === 'active-users') ? 'page' : null" (click)="setTab('active-users')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Player activity</span><span *ngIf="pendingWithdrawalsList.length" class="badge-count">{{ pendingWithdrawalsList.length }}</span></button>
 <button type="button"  [class.active]="activeTab === 'transactions'" [attr.aria-current]="(activeTab === 'transactions') ? 'page' : null" (click)="setTab('transactions')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></svg><span>Transactions</span></button>
 <button type="button"  [class.active]="activeTab === 'users'" [attr.aria-current]="(activeTab === 'users') ? 'page' : null" (click)="setTab('users')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg><span>Users</span></button>
@@ -19,7 +20,16 @@
 <div class="topbar-actions"><span class="connection-pill" [class.connected]="isConnected$ | async" role="status"><span class="indicator-dot"></span>{{ (isConnected$ | async) ? 'Live sync' : 'Reconnecting' }}</span><button type="button" class="sanitized-toggle-btn" [class.is-sanitized]="sanitizedMode.isSanitizedMode()" (click)="toggleSanitizedMode()" [attr.aria-pressed]="sanitizedMode.isSanitizedMode()" title="Toggle sanitized view"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m8 12 3 3 5-6"/></svg><span class="view-mode-label">Sanitized view</span><span class="sanitized-pill-indicator"></span></button><button type="button" class="topbar-logout" (click)="logout()" aria-label="Sign out" title="Sign out"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 2 5 5-5 5m5-5H9"/></svg></button></div>
 </header><div class="admin-workspace" id="admin-content" tabindex="-1">
 <section class="workspace-heading"><div><span class="workspace-kicker">Control center</span><h1>{{ tabLabels[activeTab] }}<span class="heading-dot">.</span></h1><p>{{ tabDescriptions[activeTab] }}</p></div><div class="heading-actions" *ngIf="activeTab === 'monitor' || activeTab === 'game'"><button type="button" class="action-btn outline" (click)="setTab('users')"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg>Manage users</button><button type="button" class="action-btn primary" (click)="setTab('transactions')">View transactions<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button></div></section>
-<section class="stats-bar" aria-label="Platform overview"><button type="button" (click)="activeUserPresenceFilter = 'online'; setTab('active-users')" title="View online players" class="stat-card blue clickable-stat-card"><div class="stat-card-top"><span class="stat-label">Online players</span><span class="stat-icon-wrapper"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg></span></div><strong class="stat-val">{{ stats.onlineUsers | number }}</strong><div class="stat-card-footer"><span><span class="small-live-dot"></span>{{ stats.connectedPlayers }} live connections</span><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3h7v7m0-7L10 14M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"/></svg></div></button>
+<section class="stats-bar" aria-label="Platform overview"><button type="button" (click)="openOnlinePlayers()" title="View connected players across all rooms" class="stat-card blue clickable-stat-card online-player-card">
+  <span class="stat-card-top"><span class="stat-label">Online players</span><span class="stat-icon-wrapper"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg></span></span>
+  <strong class="stat-val">{{ onlinePlayersSummary ? (onlinePlayersSummary.onlineUsers | number) : '--' }}</strong>
+  <span class="online-card-caption" *ngIf="onlinePlayersSummary?.topPlayers?.length">Top online by balance</span>
+  <span class="online-card-list" role="list" aria-label="Top online players">
+    <span class="online-card-player" role="listitem" *ngFor="let player of onlinePlayersSummary?.topPlayers; trackBy: trackById"><span class="online-card-name">{{ player.username }}</span><span class="online-card-phone">{{ player.phone_number || 'No phone' }}</span></span>
+  </span>
+  <span class="online-card-empty" *ngIf="onlinePlayersSummary && !onlinePlayersSummary.onlineUsers">No players online</span>
+  <span class="stat-card-footer"><span><span class="small-live-dot"></span>{{ onlinePlayersSummary ? ((isConnected$ | async) ? 'Live unique players' : 'Last known presence') : 'Checking presence...' }}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3h7v7m0-7L10 14M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"/></svg></span>
+</button>
 <article class="stat-card payhero-card" [class.balance-unavailable]="!!payHeroError" aria-label="PayHero service-token balance">
   <div class="stat-card-top"><span class="stat-label">PayHero service tokens</span><span class="stat-icon-wrapper"><button type="button" class="micro-refresh-btn" (click)="fetchPayHeroBalance(true)" title="Refresh PayHero service tokens" [disabled]="isLoadingPayHeroBalance" aria-label="Refresh PayHero service tokens"><svg class="refresh-icon" [class.spinning]="isLoadingPayHeroBalance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg></button></span></div>
   <strong class="stat-val payhero-balance-val"><span class="stat-currency">Tokens</span>{{ payHeroBalance !== null ? (payHeroBalance | number:'1.2-2') : 'Unavailable' }}</strong>
@@ -819,6 +829,35 @@
   </ng-container>
 
   <!-- TAB: ACTIVE PLAYERS & WITHDRAWALS -->
+  <section class="panel online-players-panel" *ngIf="activeTab === 'online-users'">
+    <div class="panel-title-row">
+      <div><h2>Connected players</h2><p class="panel-desc">Verified player accounts with an active connection. Multiple tabs count as one player.</p></div>
+      <div class="filter-controls">
+        <div class="user-search-wrap"><input type="search" class="styled-input" [(ngModel)]="onlineSearchQuery" (ngModelChange)="searchOnlinePlayers()" placeholder="Search phone or username..." aria-label="Search online player phone or username" autocomplete="off" /></div>
+        <button type="button" class="action-btn outline-sm" (click)="fetchOnlinePlayers()" [disabled]="isLoadingOnlinePlayers">{{ isSearchingOnlinePlayers ? 'Checking...' : 'Refresh players' }}</button>
+      </div>
+    </div>
+    <p class="text-red" role="alert" *ngIf="onlinePlayersError">{{ onlinePlayersError }}</p>
+    <div class="table-responsive margin-top" tabindex="0" aria-label="Connected player data">
+      <table class="admin-table"><thead><tr><th scope="col">Player</th><th scope="col">Phone</th><th scope="col">Balance</th><th scope="col">Presence</th><th scope="col">Registered (EAT)</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let player of visibleOnlinePlayers; trackBy: trackById">
+            <td data-label="Player"><strong>{{ player.username }}</strong><span class="text-xs text-muted"> #{{ player.id }}</span></td>
+            <td data-label="Phone" class="mono">{{ player.phone_number || '--' }}</td>
+            <td data-label="Balance" class="mono">KES {{ player.balance | number:'1.2-2' }}</td>
+            <td data-label="Presence"><span class="online-indicator online"><span class="indicator-dot"></span>Online</span></td>
+            <td data-label="Registered (EAT)" class="registration-cell"><strong>{{ player.created_at | date:'dd MMM yyyy':'+0300' }}</strong><span>{{ player.created_at | date:'HH:mm:ss':'+0300' }} EAT</span></td>
+          </tr>
+          <tr *ngIf="!visibleOnlinePlayers.length && !isSearchingOnlinePlayers && !onlinePlayersError"><td colspan="5" class="text-center text-muted padding-lg">{{ onlineSearchQuery ? 'No online players match this search.' : 'No players are online right now.' }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <nav class="table-pagination" aria-label="Online player pages" *ngIf="onlinePlayerTotal">
+      <span>{{ onlinePlayerTotal | number }} matching online players</span>
+      <div class="pagination-actions"><button type="button" class="action-btn outline-sm" (click)="changeOnlinePlayerPage(-1)" [disabled]="onlinePlayerPage === 1 || isSearchingOnlinePlayers" aria-label="Previous online player page">Previous</button><span>Page {{ onlinePlayerPage }} of {{ onlinePlayerTotalPages }}</span><button type="button" class="action-btn outline-sm" (click)="changeOnlinePlayerPage(1)" [disabled]="onlinePlayerPage === onlinePlayerTotalPages || isSearchingOnlinePlayers" aria-label="Next online player page">Next</button></div>
+    </nav>
+  </section>
+
   <ng-container *ngIf="activeTab === 'active-users'">
     <!-- SECTION 1: PENDING WITHDRAWALS REVIEW -->
     <section class="panel margin-bottom-lg">

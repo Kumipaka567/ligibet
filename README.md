@@ -108,6 +108,19 @@ Local `.env` files are ignored by Git and do not replace Render's configured
 environment variables. Deploy the same commit to Render and Vercel for both the
 API response and the updated admin card.
 
+### Online players
+
+The admin Online players card counts distinct verified player accounts with
+active game connections across all rooms. Guests, admin previews, old bets and
+withdrawal attempts do not add to that count. Multiple tabs count once; the last
+disconnect removes the player. The compact top-five list ranks online players by
+wallet balance and includes their phone numbers.
+
+Clicking the card opens a separate online-only view with phone search and 25-row
+server pagination. Its presence endpoints use connected-account snapshots and
+never query withdrawals or aggregate wagers. Live presence updates are sent only
+when presence or the card's top list changes.
+
 ### Vercel — frontend
 
 Import the repository with the root directory left at the repository root;

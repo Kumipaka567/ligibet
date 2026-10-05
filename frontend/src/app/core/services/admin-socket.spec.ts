@@ -61,4 +61,13 @@ describe('Admin socket live delivery', () => {
     expect(service.isConnected$.value).toBe(false);
     expect(service.error$.value).toBe(event.reason);
   });
+
+  it('receives authoritative online-player summaries and clears them for a new session', () => {
+    service.connect('token');
+    const summary = { onlineUsers: 3, connectedPlayers: 8, topPlayers: [], version: 1, updatedAt: 'now' };
+    handlers.get('admin_online_players')!(summary);
+    expect(service.onlinePlayers$.value).toEqual(summary);
+    service.connect('new-token');
+    expect(service.onlinePlayers$.value).toBeNull();
+  });
 });

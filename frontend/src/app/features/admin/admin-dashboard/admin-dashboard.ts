@@ -9,6 +9,8 @@ import {
   AdminRealtimeEvent,
   AdminTransactionUpdate,
   AdminParticipant,
+  AdminOnlinePlayer,
+  AdminOnlinePlayersSummary,
   AdminRoomStatus,
   AdminSocketService
 } from '../../../core/services/admin-socket.service';
@@ -113,11 +115,11 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     );
   }
 
-  public activeTab: 'game' | 'monitor' | 'predator' | 'withdrawal-settings' | 'active-users' | 'transactions' | 'users' | 'admins' | 'logs' = 'monitor';
+  public activeTab: 'game' | 'monitor' | 'predator' | 'withdrawal-settings' | 'active-users' | 'online-users' | 'transactions' | 'users' | 'admins' | 'logs' = 'monitor';
   public mobileMenuOpen: boolean = false;
   public selectedMiniRoom: number = 1;
   public readonly tabLabels: Record<AdminDashboardComponent['activeTab'], string> = {
-    monitor: 'Overview', game: 'Live game', 'active-users': 'Player activity',
+    monitor: 'Overview', game: 'Live game', 'active-users': 'Player activity', 'online-users': 'Online players',
     transactions: 'Transactions', users: 'Users', admins: 'Administrators',
     logs: 'Audit log', 'withdrawal-settings': 'Payment settings', predator: 'Predator'
   };
@@ -125,6 +127,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     monitor: 'Your platform at a glance, updated live.',
     game: 'Follow the action across all game rooms.',
     'active-users': 'Online players, account activity and withdrawal requests.',
+    'online-users': 'Connected players across all game rooms, counted once per account.',
     transactions: 'Track deposits and withdrawals as they happen.',
     users: 'Find players and manage their accounts.',
     admins: 'Manage administrator access to your platform.',
@@ -270,6 +273,19 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   private activeUserRequest?: Subscription;
   public isLoadingActiveUsers: boolean = false;
   public activeUsersError: string | null = null;
+  public onlinePlayersSummary: AdminOnlinePlayersSummary | null = null;
+  public onlinePlayerRows: AdminOnlinePlayer[] = [];
+  public onlineSearchQuery = '';
+  public onlinePlayerPage = 1;
+  public onlinePlayerTotal = 0;
+  public onlinePlayerTotalPages = 1;
+  public isLoadingOnlinePlayers = false;
+  public onlinePlayersError: string | null = null;
+  private onlinePlayerRequest?: Subscription;
+  private onlineSummaryRequest?: Subscription;
+  private onlineRefreshQueued = false;
+  private onlineSearchTimer: ReturnType<typeof setTimeout> | null = null;
+  private onlineRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   public withdrawalWagerRequirement: number = 2500;
   public withdrawalInitiationTitle: string = 'Withdrawal Notice';
   public withdrawalInitiationMessage: string = 'Your withdrawal request has been received and is awaiting review.';
@@ -624,7 +640,11 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.adminSocket.connect(token);
     this.fetchOverview();
     this.fetchPayHeroBalance();
-    this.payHeroPollTimer = setInterval(() => this.fetchPayHeroBalance(), 30000);
+    this.fetchOnlinePlayersSummary();
+    this.payHeroPollTimer = setInterval(() => {
+      this.fetchPayHeroBalance();
+      if (!this.adminSocket.isConnected$.value) this.fetchOnlinePlayersSummary();
+    }, 30000);
     this.sanitizedMode.fetchStatus();
     this.predatorInputText = this.sanitizedMode.predatorCustomText();
     // Load expensive lists only when their tab is opened. Previously every
@@ -644,6 +664,10 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (this.toastTimeout !== null) clearTimeout(this.toastTimeout);
     this.userRequest?.unsubscribe();
     this.activeUserRequest?.unsubscribe();
+    this.onlinePlayerRequest?.unsubscribe();
+    this.onlineSummaryRequest?.unsubscribe();
+    if (this.onlineSearchTimer !== null) clearTimeout(this.onlineSearchTimer);
+    if (this.onlineRefreshTimer !== null) clearTimeout(this.onlineRefreshTimer);
     this.adminSocket.disconnect();
   }
 
@@ -651,6 +675,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.realtimeSubscriptions.push(
       this.adminSocket.isConnected$.subscribe(connected => {
         if (!connected) return;
+        this.onlineSummaryRequest?.unsubscribe();
+        this.onlinePlayersSummary = null;
+        if (this.activeTab === 'online-users') this.fetchOnlinePlayers(true);
         this.fetchPayHeroBalance(true);
         // Events sent while this browser was offline are recovered from the API.
         this.latestUserUpdates.clear();
@@ -666,10 +693,10 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.showAdminToast(event.reason || 'Your administrator access has changed.', 'error');
         this.router.navigate(['/play']);
       }),
-      this.adminSocket.currentRound$.subscribe(round => {
-        if (this.stats.onlineUsers === round.onlineUsers && this.stats.connectedPlayers === round.connectedPlayers) return;
-        this.stats = { ...this.stats, onlineUsers: round.onlineUsers, connectedPlayers: round.connectedPlayers };
-        this.cdr.markForCheck();
+      this.adminSocket.onlinePlayers$.subscribe(summary => {
+        if (!summary) return;
+        this.applyOnlineSummary(summary);
+        this.queueOnlinePlayerRefresh();
       }),
       this.adminSocket.depositInitiated$.subscribe(event => {
         if (!event) return;
@@ -686,6 +713,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.queueRealtimeRefresh({ transactions: true, dashboard: true, users: true, activeUsers: true, logs: true });
       }),
       this.adminSocket.dashboardStatsUpdated$.subscribe(event => {
+        if (event?.action === 'user_online' || event?.action === 'user_offline') return;
         if (event?.action === 'payhero_service_wallet_changed') {
           this.fetchPayHeroBalance(true);
           return;
@@ -698,6 +726,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           this.applyUserUpdate(event.userId, { balance: event.balance });
         }
         this.queueRealtimeRefresh({ dashboard: true, users: true, activeUsers: true });
+        this.queueOnlinePlayerRefresh();
       }),
       this.adminSocket.transactionsUpdated$.subscribe(event => {
         if (event) this.queueRealtimeRefresh({ transactions: true, dashboard: true, users: true, activeUsers: true });
@@ -711,7 +740,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       this.adminSocket.userUpdated$.subscribe(event => {
         if (!event) return;
         this.applyRealtimeUserEvent(event);
-        this.queueRealtimeRefresh({ users: true, admins: this.isSuperAdmin, activeUsers: true, dashboard: true });
+        const presenceOnly = event.action === 'user_online' || event.action === 'user_offline';
+        this.queueRealtimeRefresh({ users: true, admins: this.isSuperAdmin, activeUsers: true, dashboard: !presenceOnly });
       }),
       this.adminSocket.activityUpdated$.subscribe(event => {
         if (!event) return;
@@ -737,6 +767,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       this.userList = this.userList.filter(user => user.id !== event.userId);
       this.adminsList = this.adminsList.filter(user => user.id !== event.userId);
       this.activeUsersList = this.activeUsersList.filter(user => user.id !== event.userId);
+      this.onlinePlayerRows = this.onlinePlayerRows.filter(user => user.id !== event.userId);
+      this.queueOnlinePlayerRefresh();
       this.pendingWithdrawalsList = this.pendingWithdrawalsList.filter(withdrawal => withdrawal.user_id !== event.userId);
       this.cdr.markForCheck();
       return;
@@ -747,6 +779,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (event.balance !== undefined) patch.balance = event.balance;
     if (event.is_online !== undefined) patch.is_online = event.is_online;
     this.applyUserUpdate(event.userId, patch);
+    if (event.is_online !== undefined || event.role !== undefined || event.user || event.action === 'user_deleted') this.queueOnlinePlayerRefresh();
   }
 
   private applyUserUpdate(userId: number, patch: Partial<AdminUser>): void {
@@ -758,6 +791,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     const existing = this.userList.find(user => user.id === userId) || this.adminsList.find(user => user.id === userId);
     this.userList = this.userList.map(user => user.id === userId ? { ...user, ...patch } : user);
     this.activeUsersList = this.activeUsersList.map(user => user.id === userId ? { ...user, ...patch } : user);
+    this.onlinePlayerRows = this.onlinePlayerRows.map(user => user.id === userId ? { ...user, ...patch } : user)
+      .filter(user => user.is_online && user.role === 'user' && !user.is_suspended);
     this.adminsList = this.adminsList
       .map(user => user.id === userId ? { ...user, ...patch } : user)
       .filter(user => user.role === 'admin' || user.role === 'superadmin');
@@ -859,7 +894,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.mobileMenuOpen = !this.mobileMenuOpen;
   }
 
-  public setTab(tab: 'game' | 'monitor' | 'predator' | 'withdrawal-settings' | 'active-users' | 'transactions' | 'users' | 'admins' | 'logs'): void {
+  public setTab(tab: AdminDashboardComponent['activeTab']): void {
     // Admins tab is superadmin-only
     if (tab === 'admins' && !this.isSuperAdmin) return;
     this.activeTab = tab;
@@ -876,6 +911,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       if (this.isStale('activeUsers')) this.fetchActiveUsers();
       this.fetchWithdrawalSettings();
     }
+    if (tab === 'online-users') this.fetchOnlinePlayers();
     if (tab === 'transactions' && this.isStale('transactions')) this.fetchTransactions();
     if (tab === 'users' && this.isStale('users')) this.fetchUsers();
     if (tab === 'admins' && this.isStale('admins')) this.fetchAdmins();
@@ -884,6 +920,119 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   private get baseUrl(): string {
     return getBackendOrigin();
+  }
+
+  public openOnlinePlayers(): void {
+    this.onlineSearchQuery = '';
+    this.onlinePlayerPage = 1;
+    this.setTab('online-users');
+  }
+
+  public get visibleOnlinePlayers(): AdminOnlinePlayer[] {
+    return this.onlineSearchQuery.trim()
+      ? this.onlinePlayerRows.filter(user => this.matchesUserSearch(user, this.onlineSearchQuery))
+      : this.onlinePlayerRows;
+  }
+
+  public get isSearchingOnlinePlayers(): boolean {
+    return this.isLoadingOnlinePlayers || this.onlineSearchTimer !== null;
+  }
+
+  public searchOnlinePlayers(): void {
+    this.onlinePlayerPage = 1;
+    this.onlineRefreshQueued = false;
+    this.onlinePlayerRequest?.unsubscribe();
+    if (this.onlineSearchTimer !== null) clearTimeout(this.onlineSearchTimer);
+    this.onlineSearchTimer = setTimeout(() => {
+      this.onlineSearchTimer = null;
+      this.fetchOnlinePlayers(true);
+    }, 150);
+    this.cdr.markForCheck();
+  }
+
+  public changeOnlinePlayerPage(direction: number): void {
+    this.onlinePlayerPage = Math.max(1, Math.min(this.onlinePlayerPage + direction, this.onlinePlayerTotalPages));
+    this.fetchOnlinePlayers(true);
+  }
+
+  private applyOnlineSummary(summary: AdminOnlinePlayersSummary): void {
+    if (!summary || !Number.isSafeInteger(summary.onlineUsers) || summary.onlineUsers < 0 ||
+        !Number.isSafeInteger(summary.version) || !Array.isArray(summary.topPlayers)) return;
+    if (this.onlinePlayersSummary && summary.version < this.onlinePlayersSummary.version) return;
+    this.onlinePlayersSummary = { ...summary, topPlayers: summary.topPlayers.slice(0, 5) };
+    this.stats = { ...this.stats, onlineUsers: summary.onlineUsers, connectedPlayers: summary.connectedPlayers };
+    this.cdr.markForCheck();
+  }
+
+  public fetchOnlinePlayersSummary(): void {
+    const token = this.authService.getToken();
+    if (!token || this.destroyed) return;
+    this.onlineSummaryRequest?.unsubscribe();
+    this.onlineSummaryRequest = this.http.get<AdminOnlinePlayersSummary>(this.baseUrl + '/api/admin/online-players/summary', {
+      headers: { Authorization: `Bearer ${token}` }
+    }).pipe(timeout(8000)).subscribe({
+      next: summary => this.applyOnlineSummary(summary),
+      error: () => { this.cdr.markForCheck(); }
+    });
+  }
+
+  private queueOnlinePlayerRefresh(): void {
+    if (this.activeTab !== 'online-users' || this.onlineRefreshTimer !== null || this.destroyed) return;
+    this.onlineRefreshTimer = setTimeout(() => {
+      this.onlineRefreshTimer = null;
+      if (this.activeTab === 'online-users' && this.onlineSearchTimer === null) this.fetchOnlinePlayers();
+    }, 250);
+  }
+
+  public fetchOnlinePlayers(replace = false): void {
+    const token = this.authService.getToken();
+    if (!token || this.destroyed) return;
+    if (replace) {
+      this.onlineRefreshQueued = false;
+      this.onlinePlayerRequest?.unsubscribe();
+    }
+    if (this.isLoadingOnlinePlayers) {
+      this.onlineRefreshQueued = true;
+      return;
+    }
+    this.onlineRefreshQueued = false;
+    this.isLoadingOnlinePlayers = true;
+    this.onlinePlayersError = null;
+    const query = this.onlineSearchQuery;
+    const realtimeVersion = this.realtimeVersion;
+    const url = `${this.baseUrl}/api/admin/online-players?search=${encodeURIComponent(query)}&page=${this.onlinePlayerPage}&pageSize=25`;
+    this.onlinePlayerRequest = this.http.get<AdminOnlinePlayersSummary & {
+      players: AdminOnlinePlayer[]; total: number; page: number; totalPages: number;
+    }>(url, { headers: { Authorization: `Bearer ${token}` } }).pipe(
+      timeout(8000),
+      finalize(() => {
+        this.isLoadingOnlinePlayers = false;
+        if (this.destroyed) return;
+        if (this.onlineRefreshQueued && this.activeTab === 'online-users') this.fetchOnlinePlayers();
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: res => {
+        if (query !== this.onlineSearchQuery) return;
+        if (!res || !Array.isArray(res.players)) {
+          this.onlinePlayersError = 'The server did not return a verified online-player list. Try refreshing.';
+          return;
+        }
+        this.applyOnlineSummary(res);
+        this.onlinePlayerRows = res.players.slice(0, 25).map(user => {
+          const update = this.latestUserUpdates.get(user.id);
+          return update && update.version > realtimeVersion ? { ...user, ...update.patch, is_online: update.deleted ? false : (update.patch.is_online ?? user.is_online) } : user;
+        }).filter(user => user.is_online && user.role === 'user' && !user.is_suspended);
+        this.onlinePlayerTotal = res.total;
+        this.onlinePlayerPage = res.page;
+        this.onlinePlayerTotalPages = res.totalPages;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.onlinePlayersError = 'Online players could not be checked. Try refreshing.';
+        this.cdr.markForCheck();
+      }
+    });
   }
 
   public fetchActiveUsers(): void {
@@ -1376,6 +1525,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         next: res => {
           if (res?.stats && statsVersion === this.statsRequestVersion) {
             this.stats = { ...this.stats, ...res.stats };
+            if (this.onlinePlayersSummary) this.stats = { ...this.stats, onlineUsers: this.onlinePlayersSummary.onlineUsers, connectedPlayers: this.onlinePlayersSummary.connectedPlayers };
             this.lastSyncedAt = new Date();
             this.markLoaded('dashboard');
           }
@@ -1416,6 +1566,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         next: res => {
           if (requestVersion !== this.statsRequestVersion) return;
           this.stats = { ...this.stats, ...res };
+          if (this.onlinePlayersSummary) this.stats = { ...this.stats, onlineUsers: this.onlinePlayersSummary.onlineUsers, connectedPlayers: this.onlinePlayersSummary.connectedPlayers };
           this.lastSyncedAt = new Date();
           this.markLoaded('dashboard');
           this.cdr.markForCheck();

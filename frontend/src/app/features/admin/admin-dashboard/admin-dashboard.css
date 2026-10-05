@@ -1576,6 +1576,13 @@
 .stat-footnote { color:#708297; font-size:9px; white-space:nowrap; }
 .small-live-dot { display:inline-block; width:5px; height:5px; background:#a4edc9; border-radius:50%; margin-right:5px; vertical-align:middle; }
 .clickable-stat-card:hover { background:#1b2834; border-color:#627985; transform:translateY(-2px); }
+.online-card-caption { display:block; margin:13px 0 7px; color:#8d9eb1; font-size:9px; }
+.online-card-list { display:flex; flex-direction:column; gap:5px; }
+.online-card-player { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:2px 8px; font-size:10px; line-height:1.4; min-width:0; }
+.online-card-name { color:#d4e0ed; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
+.online-card-phone { color:#94a7bb; font-variant-numeric:tabular-nums; }
+.online-card-empty { color:#8d9eb1; font-size:10px; margin-top:12px; }
+.online-player-card .stat-card-footer { margin-top:auto; padding-top:14px; }
 .micro-reset-btn { background:transparent; color:#a8b7c6; border:0; font-size:9px!important; padding:2px 0; text-decoration:underline; text-underline-offset:3px; }
 .micro-reset-btn:hover { color:#f2c899; background:transparent; }
 .font-semibold { font-weight:600; }

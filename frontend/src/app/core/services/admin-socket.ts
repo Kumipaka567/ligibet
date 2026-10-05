@@ -100,6 +100,25 @@ export interface AdminRealtimeEvent {
   };
 }
 
+export interface AdminOnlinePlayer {
+  id: number;
+  username: string;
+  phone_number: string;
+  balance: number;
+  role: string;
+  is_suspended: boolean;
+  is_online: boolean;
+  created_at: string | null;
+}
+
+export interface AdminOnlinePlayersSummary {
+  onlineUsers: number;
+  connectedPlayers: number;
+  topPlayers: AdminOnlinePlayer[];
+  version: number;
+  updatedAt: string;
+}
+
 export interface AdminTransactionUpdate {
   id?: number;
   user_id: number;
@@ -186,6 +205,7 @@ export class AdminSocketService {
   public withdrawalsUpdated$ = new BehaviorSubject<AdminRealtimeEvent | null>(null);
   public userUpdated$ = new BehaviorSubject<AdminRealtimeEvent | null>(null);
   public activityUpdated$ = new BehaviorSubject<AdminRealtimeEvent | null>(null);
+  public onlinePlayers$ = new BehaviorSubject<AdminOnlinePlayersSummary | null>(null);
   public accessRevoked$ = new BehaviorSubject<{ userId: number; reason: string } | null>(null);
   public predatorTextUpdate$ = new BehaviorSubject<string | null>(null);
 
@@ -269,6 +289,10 @@ export class AdminSocketService {
 
     this.listen('admin_current_round', (currentRound: AdminCurrentRound) => {
       this.currentRound$.next(currentRound);
+    });
+
+    this.listen('admin_online_players', (summary: AdminOnlinePlayersSummary) => {
+      this.onlinePlayers$.next(summary);
     });
 
     this.listen('admin_previous_round', (data: { previousRound: AdminPreviousRound }) => {
@@ -367,6 +391,7 @@ export class AdminSocketService {
     this.withdrawalsUpdated$.next(null);
     this.userUpdated$.next(null);
     this.activityUpdated$.next(null);
+    this.onlinePlayers$.next(null);
     this.accessRevoked$.next(null);
   }
 

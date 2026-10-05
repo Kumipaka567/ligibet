@@ -33,7 +33,7 @@ describe('Admin dashboard live account management', () => {
       ...Object.fromEntries([
         'transactionUpdate$', 'dashboardStatsUpdated$', 'walletUpdated$',
         'transactionsUpdated$', 'depositsUpdated$', 'withdrawalsUpdated$',
-        'userUpdated$', 'activityUpdated$', 'predatorTextUpdate$', 'accessRevoked$', 'depositInitiated$'
+        'userUpdated$', 'activityUpdated$', 'predatorTextUpdate$', 'accessRevoked$', 'depositInitiated$', 'onlinePlayers$'
       ].map(key => [key, new BehaviorSubject(null)]))
     };
     auth = {
@@ -64,6 +64,9 @@ describe('Admin dashboard live account management', () => {
     http.expectOne(request => request.url.endsWith('/api/admin/overview')).flush({ users: [], stats: {}, logs: [] });
     http.expectOne(request => request.url.endsWith('/api/admin/payhero/balance')).flush({
       configured: true, balance: 466.8, accountId: 12571, updatedAt: '2026-10-05T12:00:00.000Z'
+    });
+    http.expectOne(request => request.url.endsWith('/api/admin/online-players/summary')).flush({
+      onlineUsers: 0, connectedPlayers: 0, topPlayers: [], version: 0, updatedAt: '2026-10-05T12:00:00Z'
     });
   });
 
@@ -389,5 +392,93 @@ describe('Admin dashboard live account management', () => {
       .flush({}, { status: 503, statusText: 'Unavailable' });
     expect(component.isLoadingActiveUsers).toBe(false);
     expect(component.activeUsersError).toContain('Could not load player activity');
+  });
+
+  const onlinePlayer = (id: number) => ({
+    ...user({ id, username: `player_${id}` }), phone_number: '07' + String(id).padStart(8, '0'), is_online: true
+  });
+  const onlineSummary = (version: number, count = 3) => ({
+    onlineUsers: count, connectedPlayers: count * 2, topPlayers: count ? [onlinePlayer(1)] : [],
+    version, updatedAt: '2026-10-05T12:00:00Z'
+  });
+  const onlineResult = (version = 1, players = [onlinePlayer(1)]) => ({
+    ...onlineSummary(version, players.length), players, total: players.length, page: 1, totalPages: 1
+  });
+
+  it('opens only the bounded online-player endpoint without loading withdrawals or wager settings', () => {
+    component.openOnlinePlayers();
+    expect(component.activeTab).toBe('online-users');
+    http.expectNone(request => request.url.endsWith('/api/admin/active-users'));
+    http.expectNone(request => request.url.endsWith('/api/admin/withdrawal-settings'));
+    const request = http.expectOne(request => request.url.includes('/api/admin/online-players?'));
+    expect(request.request.url).toContain('pageSize=25');
+    request.flush(onlineResult());
+    expect(component.visibleOnlinePlayers.map(player => player.id)).toEqual([1]);
+  });
+
+  it('keeps the distinct-player count authoritative across room ticks, stale summaries and statistics responses', () => {
+    socket.onlinePlayers$.next(onlineSummary(5, 3));
+    socket.currentRound$.next({ onlineUsers: 1, connectedPlayers: 8 });
+    socket.onlinePlayers$.next(onlineSummary(4, 9));
+    component.fetchOverviewStats();
+    http.expectOne(request => request.url.endsWith('/api/admin/stats')).flush({ onlineUsers: 99, connectedPlayers: 101 });
+    expect(component.onlinePlayersSummary?.onlineUsers).toBe(3);
+    expect(component.stats.onlineUsers).toBe(3);
+    expect(component.onlinePlayersSummary?.topPlayers[0].phone_number).toBe('0700000001');
+    for (let i = 0; i < 100; i++) socket.currentRound$.next({ onlineUsers: i, connectedPlayers: i });
+    expect(component.stats.onlineUsers).toBe(3);
+    http.expectNone(request => request.url.includes('/api/admin/online-players?'));
+  });
+
+  it('debounces online phone searches, cancels stale requests and filters cached rows immediately', () => {
+    component.openOnlinePlayers();
+    const first = http.expectOne(request => request.url.includes('/api/admin/online-players?'));
+    component.onlinePlayerRows = [onlinePlayer(1), onlinePlayer(2)];
+    component.onlineSearchQuery = '+254 700 000 002';
+    component.searchOnlinePlayers();
+    expect(first.cancelled).toBe(true);
+    expect(component.visibleOnlinePlayers.map(player => player.id)).toEqual([2]);
+    vi.advanceTimersByTime(150);
+    http.expectOne(request => request.url.includes('search=%2B254%20700%20000%20002'))
+      .flush(onlineResult(2, [onlinePlayer(2)]));
+    expect(component.isSearchingOnlinePlayers).toBe(false);
+  });
+
+  it('removes an offline player immediately and refreshes presence without financial aggregation', () => {
+    component.activeTab = 'online-users';
+    component.onlinePlayerRows = [onlinePlayer(1)];
+    socket.userUpdated$.next({ action: 'user_offline', userId: 1, is_online: false });
+    socket.dashboardStatsUpdated$.next({ action: 'user_offline', userId: 1 });
+    socket.onlinePlayers$.next(onlineSummary(2, 0));
+    expect(component.visibleOnlinePlayers).toEqual([]);
+    expect(component.stats.onlineUsers).toBe(0);
+    vi.advanceTimersByTime(250);
+    http.expectNone(request => request.url.endsWith('/api/admin/stats'));
+    http.expectNone(request => request.url.endsWith('/api/admin/active-users'));
+    http.expectOne(request => request.url.includes('/api/admin/online-players?')).flush(onlineResult(2, []));
+  });
+
+  it('serializes presence event bursts and cancels the follow-up online request on destruction', () => {
+    component.openOnlinePlayers();
+    const first = http.expectOne(request => request.url.includes('/api/admin/online-players?'));
+    socket.onlinePlayers$.next(onlineSummary(2));
+    socket.onlinePlayers$.next(onlineSummary(3));
+    vi.advanceTimersByTime(250);
+    http.expectNone(request => request.url.includes('/api/admin/online-players?'));
+    first.flush(onlineResult(1));
+    const followUp = http.expectOne(request => request.url.includes('/api/admin/online-players?'));
+    fixture.destroy();
+    expect(followUp.cancelled).toBe(true);
+  });
+
+  it('reports malformed or failed online responses inline without inventing a player list', () => {
+    component.openOnlinePlayers();
+    http.expectOne(request => request.url.includes('/api/admin/online-players?')).flush({});
+    expect(component.onlinePlayersError).toContain('verified online-player list');
+    expect(component.isLoadingOnlinePlayers).toBe(false);
+    component.fetchOnlinePlayers();
+    http.expectOne(request => request.url.includes('/api/admin/online-players?'))
+      .flush({}, { status: 503, statusText: 'Unavailable' });
+    expect(component.onlinePlayersError).toContain('could not be checked');
   });
 });

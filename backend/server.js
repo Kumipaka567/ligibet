@@ -17,6 +17,7 @@ const axios = require('axios');
 const { createRealtimeEmitter, adminSocketAccessError, revokeAdminSockets } = require('./realtime');
 const { userSearchConditions } = require('./user-search');
 const { createPayHeroBalanceFetcher } = require('./payhero-balance');
+const { createOnlinePlayers } = require('./online-players');
 
 function escapeRegExp(string) {
   return String(string || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -292,7 +293,24 @@ function realtimeLog(message, details = null) {
   console.log(`[${new Date().toISOString()}] [REALTIME] ${message}${suffix}`);
 }
 
-const emitRealtimeMutation = createRealtimeEmitter(io, adminNamespace);
+const onlinePlayers = createOnlinePlayers({
+  onChange: summary => adminNamespace.emit('admin_online_players', summary)
+});
+const fanOutRealtimeMutation = createRealtimeEmitter(io, adminNamespace);
+function emitRealtimeMutation(event) {
+  if (event.action === 'user_deleted') onlinePlayers.removeUser(event.userId);
+  else {
+    const patch = {};
+    if (event.user && typeof event.user === 'object') {
+      for (const field of ['username', 'phone_number', 'balance', 'role', 'is_suspended', 'created_at']) {
+        if (event.user[field] !== undefined) patch[field] = event.user[field];
+      }
+    }
+    if (event.balance !== undefined) patch.balance = event.balance;
+    onlinePlayers.updateUser(event.userId, patch);
+  }
+  fanOutRealtimeMutation(event);
+}
 
 // ---------- SETTINGS HELPERS ----------
 const DEFAULT_MINIMUM_TOTAL_WAGER = 2500.00;
@@ -2344,8 +2362,8 @@ app.get('/api/admin/stats', authenticateAdminToken, async (req, res) => {
       totalPayout: roundToMoney(betTotals.totalPayout || 0),
       totalDeposits: roundToMoney(depAgg[0]?.total || 0),
       totalWithdrawals: roundToMoney(wdAgg[0]?.total || 0),
-      connectedPlayers: connectedPlayerSockets,
-      onlineUsers: connectedUserCounts.size
+      connectedPlayers: onlinePlayers.summary().connectedPlayers,
+      onlineUsers: onlinePlayers.summary().onlineUsers
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to load admin stats' });
@@ -2359,6 +2377,16 @@ const fetchPayHeroBalance = createPayHeroBalanceFetcher();
 app.get('/api/admin/payhero/balance', authenticateAdminToken, async (req, res) => {
   res.set('Cache-Control', 'no-store');
   return res.json(await fetchPayHeroBalance());
+});
+
+// Lightweight presence endpoints: no withdrawal queries or transaction aggregation.
+app.get('/api/admin/online-players/summary', authenticateAdminToken, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.json(onlinePlayers.summary());
+});
+app.get('/api/admin/online-players', authenticateAdminToken, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.json(onlinePlayers.list(req.query));
 });
 
 // Admin Users List
@@ -2401,8 +2429,8 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
         totalPayout: roundToMoney(betTotals.totalPayout || 0),
         totalDeposits: roundToMoney(depAgg[0]?.total || 0),
         totalWithdrawals: roundToMoney(wdAgg[0]?.total || 0),
-        connectedPlayers: connectedPlayerSockets,
-        onlineUsers: connectedUserCounts.size
+        connectedPlayers: onlinePlayers.summary().connectedPlayers,
+        onlineUsers: onlinePlayers.summary().onlineUsers
       },
       users: users.map(u => ({ ...u, balance: parseFloat(u.balance || 0), is_online: (connectedUserCounts.get(Number(u.id)) || 0) > 0 })),
       transactions: transactions.map(t => {
@@ -3002,12 +3030,6 @@ app.get('/api/admin/active-users', authenticateAdminToken, async (req, res) => {
       const num = Number(id);
       if (!isNaN(num) && count > 0) onlineSet.add(num);
     }
-    for (const bet of activeBets.values()) {
-      if (bet?.userId) {
-        const num = Number(bet.userId);
-        if (!isNaN(num)) onlineSet.add(num);
-      }
-    }
 
     // Retrieve all registered accounts (including admin accounts so admin can test popups)
     const search = req.query.search ? String(req.query.search).trim() : '';
@@ -3564,17 +3586,8 @@ function adminStatusFromRoundStatus(status) {
 }
 
 function getConnectedPlayerStats() {
-  const roomOneSockets = io.sockets.adapter.rooms.get(playerRoomName(1));
-  const roomOneUsers = new Set(
-    Array.from(io.sockets.sockets.values())
-      .filter((socket) => socket.data?.gameRoom === 1)
-      .map((socket) => socket.user?.id)
-      .filter(Boolean)
-  );
-  return {
-    connectedPlayers: roomOneSockets?.size || 0,
-    onlineUsers: roomOneUsers.size
-  };
+  const { onlineUsers, connectedPlayers } = onlinePlayers.summary();
+  return { onlineUsers, connectedPlayers };
 }
 
 /**
@@ -4067,23 +4080,26 @@ async function handleSecondaryCrash(room) {
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token || socket.handshake.query?.token;
   if (!token) return next();
-
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (!err && decoded) {
-      // Refuse the connection outright rather than letting a suspended player
-      // reconnect straight after being disconnected.
-      if (isSuspendedUser(decoded.id)) {
-        return next(new Error('ACCOUNT_SUSPENDED'));
-      }
-      socket.user = decoded;
+  jwt.verify(token, JWT_SECRET, async (err, decoded) => {
+    if (err || !decoded) return next(new Error('Invalid token'));
+    try {
+      const user = await User.findOne({ id: decoded.id })
+        .select('id username phone_number role balance is_suspended created_at').lean();
+      if (!user) return next(new Error('Invalid account'));
+      if (user.is_suspended || isSuspendedUser(user.id)) return next(new Error('ACCOUNT_SUSPENDED'));
+      socket.user = buildPublicUser(user);
+      socket.presenceUser = user;
+      next();
+    } catch (error) {
+      next(new Error('Account verification temporarily unavailable'));
     }
-    next();
   });
 });
 
 io.on('connection', (socket) => {
   connectedPlayerSockets++;
   const user = socket.user;
+  if (socket.presenceUser) onlinePlayers.connect(socket.id, socket.presenceUser);
   if (user?.id) {
     const numericUserId = Number(user.id);
     if (!isNaN(numericUserId) && numericUserId > 0) {
@@ -4094,16 +4110,12 @@ io.on('connection', (socket) => {
     socket.join(`user_${user.id}`);
     socket.join(`user_${String(user.id)}`);
 
-    // Immediately push latest authoritative DB balance to the connected socket
-    User.findOne({ id: user.id }).lean().then(dbUser => {
-      if (dbUser) {
-        const bal = parseFloat(dbUser.balance || 0) || 0.00;
-        socket.emit('balance_update', { balance: bal });
-        socket.emit('balance_updated', { balance: bal });
-        socket.emit('balance', { balance: bal });
-        socket.emit('wallet_updated', { balance: bal });
-      }
-    }).catch(err => console.warn('Sync balance on connection error:', err?.message));
+    // Reuse the verified database snapshot from socket authentication.
+    const bal = Number(user.balance) || 0;
+    socket.emit('balance_update', { balance: bal });
+    socket.emit('balance_updated', { balance: bal });
+    socket.emit('balance', { balance: bal });
+    socket.emit('wallet_updated', { balance: bal });
   }
 
   socket.data = { gameRoom: 1 };
@@ -4438,6 +4450,7 @@ io.on('connection', (socket) => {
 
   // Disconnect
   socket.on('disconnect', () => {
+    onlinePlayers.disconnect(socket.id);
     connectedPlayerSockets = Math.max(0, connectedPlayerSockets - 1);
     if (user?.id) {
       const numericUserId = Number(user.id);
@@ -4475,6 +4488,7 @@ adminNamespace.use((socket, next) => {
 });
 
 adminNamespace.on('connection', (socket) => {
+  socket.emit('admin_online_players', onlinePlayers.summary());
   socket.emit('admin_snapshot', getAdminSnapshot());
   socket.emit('admin_current_round', getCurrentRoundAdminStats());
   socket.emit('admin_next_round', getAdminNextRoundPayload());
