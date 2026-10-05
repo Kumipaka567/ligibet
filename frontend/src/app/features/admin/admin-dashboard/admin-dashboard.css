@@ -1558,6 +1558,11 @@
 .payhero-account,.payhero-error { margin:7px 0 0; font-size:10px; line-height:1.5; overflow-wrap:anywhere; }
 .payhero-account { color:#99aabd; }
 .payhero-error { color:#efb6a2; }
+.table-pagination { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding-top:16px; margin-top:16px; border-top:1px solid #283441; color:#a9b8c9; font-size:11px; }
+.pagination-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.pagination-actions .action-btn { min-height:36px; }
+.pagination-actions .action-btn:disabled { opacity:.45; cursor:default; }
+@media (max-width:680px) { .table-pagination>span,.pagination-actions { width:100%; } .pagination-actions { justify-content:space-between; gap:6px; } }
 .micro-refresh-btn { background:transparent; border:none; cursor:pointer; color:#8c9daf; padding:4px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:all .18s ease; }
 .micro-refresh-btn:hover:not(:disabled) { color:#f0f5fa; background:rgba(255,255,255,0.08); }
 .micro-refresh-btn:disabled { opacity:0.6; cursor:not-allowed; }

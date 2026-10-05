@@ -827,8 +827,10 @@
           <h2>Pending Withdrawals & Wager Verification</h2>
           <p class="panel-desc">Review pending customer withdrawal requests against wager requirements.</p>
         </div>
-        <button class="action-btn outline-sm" (click)="fetchActiveUsers()">Refresh Queue</button>
+        <button type="button" class="action-btn outline-sm" (click)="fetchActiveUsers()" [disabled]="isLoadingActiveUsers">{{ isLoadingActiveUsers ? 'Refreshing...' : 'Refresh Queue' }}</button>
       </div>
+
+      <p class="text-red" role="alert" *ngIf="activeUsersError">{{ activeUsersError }}</p>
 
       <div class="table-responsive margin-top" tabindex="0" aria-label="Scrollable account data">
         <table class="admin-table">
@@ -846,7 +848,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let wd of pendingWithdrawalsList">
+            <tr *ngFor="let wd of visiblePendingWithdrawals; trackBy: trackById">
               <td class="mono text-muted" data-label="ID">#{{ wd.id }}</td>
               <td data-label="Player">
                 <strong>{{ wd.username }}</strong>
@@ -888,6 +890,14 @@
           </tbody>
         </table>
       </div>
+      <nav class="table-pagination" aria-label="Pending withdrawal pages" *ngIf="pendingWithdrawalsList.length">
+        <span>{{ pendingWithdrawalsList.length | number }} pending requests</span>
+        <div class="pagination-actions">
+          <button type="button" class="action-btn outline-sm" (click)="changeWithdrawalPage(-1)" [disabled]="withdrawalPage === 1" aria-label="Previous withdrawal page">Previous</button>
+          <span>Page {{ withdrawalPage }} of {{ withdrawalTotalPages }}</span>
+          <button type="button" class="action-btn outline-sm" (click)="changeWithdrawalPage(1)" [disabled]="withdrawalPage === withdrawalTotalPages" aria-label="Next withdrawal page">Next</button>
+        </div>
+      </nav>
     </section>
 
     <!-- SECTION 2: ACTIVE & ONLINE PLAYERS LIST WITH PER-PLAYER WITHDRAWAL POPUP -->
@@ -897,7 +907,7 @@
           <h2>Player presence & balances</h2>
           <p class="panel-desc">See who is online, their phone number, balance, and exact registration time.</p>
         </div>
-        <div class="filter-controls"><div class="user-search-wrap"><svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><input type="search" class="styled-input" [(ngModel)]="activeUserSearchQuery" placeholder="Search phone or username..." aria-label="Search player phone number or username" autocomplete="off" /></div><select class="styled-select" [(ngModel)]="activeUserPresenceFilter" aria-label="Filter player presence"><option value="all">All players</option><option value="online">Online now</option><option value="offline">Offline</option></select></div>
+        <div class="filter-controls"><div class="user-search-wrap"><svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><input type="search" class="styled-input" [(ngModel)]="activeUserSearchQuery" (ngModelChange)="resetActiveUserPage()" placeholder="Search phone or username..." aria-label="Search player phone number or username" autocomplete="off" /></div><select class="styled-select" [(ngModel)]="activeUserPresenceFilter" (ngModelChange)="resetActiveUserPage()" aria-label="Filter player presence"><option value="all">All players</option><option value="online">Online now</option><option value="offline">Offline</option></select></div>
       </div>
 
       <div class="table-responsive margin-top" tabindex="0" aria-label="Scrollable account data">
@@ -914,7 +924,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let usr of filteredActiveUsers">
+            <tr *ngFor="let usr of visibleActiveUsers; trackBy: trackById">
               <td class="mono text-muted" data-label="ID">#{{ usr.id }}</td>
               <td data-label="Player Username"><strong>{{ usr.username }}</strong></td>
               <td class="mono font-semibold" data-label="Phone Number">{{ usr.phone_number || '--' }}</td>
@@ -936,6 +946,14 @@
           </tbody>
         </table>
       </div>
+      <nav class="table-pagination" aria-label="Player pages" *ngIf="filteredActiveUsers.length">
+        <span>{{ filteredActiveUsers.length | number }} matching players</span>
+        <div class="pagination-actions">
+          <button type="button" class="action-btn outline-sm" (click)="changeActiveUserPage(-1)" [disabled]="activeUserPage === 1" aria-label="Previous player page">Previous</button>
+          <span>Page {{ activeUserPage }} of {{ activeUserTotalPages }}</span>
+          <button type="button" class="action-btn outline-sm" (click)="changeActiveUserPage(1)" [disabled]="activeUserPage === activeUserTotalPages" aria-label="Next player page">Next</button>
+        </div>
+      </nav>
     </section>
 
   </ng-container>

@@ -308,4 +308,86 @@ describe('Admin dashboard live account management', () => {
     vi.advanceTimersByTime(60000);
     http.expectNone(request => request.url.includes('/api/admin/payhero/balance'));
   });
+
+  it('bounds player and withdrawal rendering with large lists while preserving all records', () => {
+    component.activeUsersList = Array.from({ length: 2000 }, (_, i) => ({
+      ...user({ id: i + 1, username: `player_${i + 1}` }),
+      total_deposits: 500, total_wagers: 200, is_online: i < 3
+    }));
+    component.pendingWithdrawalsList = Array.from({ length: 1142 }, (_, i) => ({
+      id: i + 1, user_id: i + 1, username: `player_${i + 1}`, amount: 50,
+      user_current_balance: 100, user_total_deposits: 500, user_total_wagers: 200,
+      status: 'pending', is_online: false, created_at: '2026-10-05T07:40:25.000Z'
+    } as PendingWithdrawal));
+    expect(component.visibleActiveUsers).toHaveLength(25);
+    expect(component.visiblePendingWithdrawals).toHaveLength(25);
+    expect(component.activeUserTotalPages).toBe(80);
+    expect(component.withdrawalTotalPages).toBe(46);
+    const visible = component.visibleActiveUsers;
+    expect(component.visibleActiveUsers).toBe(visible);
+    component.changeActiveUserPage(1);
+    component.changeWithdrawalPage(1);
+    expect(component.visibleActiveUsers[0].id).toBe(26);
+    expect(component.visiblePendingWithdrawals[0].id).toBe(26);
+    component.changeWithdrawalPage(100);
+    expect(component.visiblePendingWithdrawals).toHaveLength(17);
+    expect(component.visiblePendingWithdrawals.at(-1)?.id).toBe(1142);
+  });
+
+  it('searches the entire player list and resets the page when phone or presence filters change', () => {
+    component.activeUsersList = Array.from({ length: 2000 }, (_, i) => ({
+      ...user({ id: i + 1, username: `player_${i + 1}`, phone_number: '07' + String(i + 1).padStart(8, '0') }),
+      total_deposits: 500, total_wagers: 200, is_online: i < 3
+    }));
+    component.changeActiveUserPage(20);
+    component.activeUserSearchQuery = '+254 700 002 000';
+    component.resetActiveUserPage();
+    expect(component.visibleActiveUsers.map(row => row.id)).toEqual([2000]);
+    expect(component.activeUserPage).toBe(1);
+    component.activeUserSearchQuery = '';
+    component.activeUserPresenceFilter = 'online';
+    component.resetActiveUserPage();
+    expect(component.visibleActiveUsers.map(row => row.id)).toEqual([1, 2, 3]);
+  });
+
+  it('preserves the current page during live wallet changes and clamps pages as the queue shrinks', () => {
+    component.activeUsersList = Array.from({ length: 30 }, (_, i) => ({
+      ...user({ id: i + 1 }), total_deposits: 500, total_wagers: 200, is_online: false
+    }));
+    component.changeActiveUserPage(1);
+    const originalRow = component.visibleActiveUsers[0];
+    socket.walletUpdated$.next({ action: 'balance_adjusted', userId: 26, balance: 900, occurredAt: 'now' });
+    expect(component.activeUserPage).toBe(2);
+    expect(component.visibleActiveUsers[0].balance).toBe(900);
+    expect(component.trackById(0, component.visibleActiveUsers[0])).toBe(component.trackById(0, originalRow));
+    component.activeUsersList = component.activeUsersList.slice(0, 10);
+    expect(component.activeUserPage).toBe(1);
+    expect(component.visibleActiveUsers).toHaveLength(10);
+  });
+
+  it('coalesces overlapping activity refreshes and cancels requests when leaving the component', () => {
+    component.activeTab = 'active-users';
+    component.fetchActiveUsers();
+    const first = http.expectOne(request => request.url.endsWith('/api/admin/active-users'));
+    component.fetchActiveUsers();
+    component.fetchActiveUsers();
+    http.expectNone(request => request.url.endsWith('/api/admin/active-users'));
+    first.flush({ activeUsers: [], pendingWithdrawals: [] });
+    const followUp = http.expectOne(request => request.url.endsWith('/api/admin/active-users'));
+    fixture.destroy();
+    expect(followUp.cancelled).toBe(true);
+  });
+
+  it('reuses fresh activity data on tab switches and reports failed refreshes', () => {
+    component.fetchActiveUsers();
+    http.expectOne(request => request.url.endsWith('/api/admin/active-users')).flush({ activeUsers: [], pendingWithdrawals: [] });
+    component.setTab('active-users');
+    http.expectNone(request => request.url.endsWith('/api/admin/active-users'));
+    http.expectOne(request => request.url.endsWith('/api/admin/withdrawal-settings')).flush({ minimum_total_wager: 2500 });
+    component.fetchActiveUsers();
+    http.expectOne(request => request.url.endsWith('/api/admin/active-users'))
+      .flush({}, { status: 503, statusText: 'Unavailable' });
+    expect(component.isLoadingActiveUsers).toBe(false);
+    expect(component.activeUsersError).toContain('Could not load player activity');
+  });
 });

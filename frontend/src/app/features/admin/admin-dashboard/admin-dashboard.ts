@@ -262,7 +262,14 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   // Active Users & Withdrawal Wager State
   public activeUsersList: ActiveUser[] = [];
   public pendingWithdrawalsList: PendingWithdrawal[] = [];
+  public readonly activityPageSize = 25;
+  private requestedActiveUserPage = 1;
+  private requestedWithdrawalPage = 1;
+  private activeUserPageCache?: { rows: ActiveUser[]; page: number; visible: ActiveUser[] };
+  private withdrawalPageCache?: { rows: PendingWithdrawal[]; page: number; visible: PendingWithdrawal[] };
+  private activeUserRequest?: Subscription;
   public isLoadingActiveUsers: boolean = false;
+  public activeUsersError: string | null = null;
   public withdrawalWagerRequirement: number = 2500;
   public withdrawalInitiationTitle: string = 'Withdrawal Notice';
   public withdrawalInitiationMessage: string = 'Your withdrawal request has been received and is awaiting review.';
@@ -478,6 +485,58 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     return this._cachedFilteredActiveUsers;
   }
 
+  public get activeUserTotalPages(): number {
+    return Math.max(1, Math.ceil(this.filteredActiveUsers.length / this.activityPageSize));
+  }
+
+  public get activeUserPage(): number {
+    return Math.min(this.requestedActiveUserPage, this.activeUserTotalPages);
+  }
+
+  public get visibleActiveUsers(): ActiveUser[] {
+    const rows = this.filteredActiveUsers;
+    const page = this.activeUserPage;
+    if (this.activeUserPageCache?.rows !== rows || this.activeUserPageCache.page !== page) {
+      const start = (page - 1) * this.activityPageSize;
+      this.activeUserPageCache = { rows, page, visible: rows.slice(start, start + this.activityPageSize) };
+    }
+    return this.activeUserPageCache.visible;
+  }
+
+  public get withdrawalTotalPages(): number {
+    return Math.max(1, Math.ceil(this.pendingWithdrawalsList.length / this.activityPageSize));
+  }
+
+  public get withdrawalPage(): number {
+    return Math.min(this.requestedWithdrawalPage, this.withdrawalTotalPages);
+  }
+
+  public get visiblePendingWithdrawals(): PendingWithdrawal[] {
+    const rows = this.pendingWithdrawalsList;
+    const page = this.withdrawalPage;
+    if (this.withdrawalPageCache?.rows !== rows || this.withdrawalPageCache.page !== page) {
+      const start = (page - 1) * this.activityPageSize;
+      this.withdrawalPageCache = { rows, page, visible: rows.slice(start, start + this.activityPageSize) };
+    }
+    return this.withdrawalPageCache.visible;
+  }
+
+  public changeActiveUserPage(direction: number): void {
+    this.requestedActiveUserPage = Math.max(1, Math.min(this.activeUserPage + direction, this.activeUserTotalPages));
+  }
+
+  public resetActiveUserPage(): void {
+    this.requestedActiveUserPage = 1;
+  }
+
+  public changeWithdrawalPage(direction: number): void {
+    this.requestedWithdrawalPage = Math.max(1, Math.min(this.withdrawalPage + direction, this.withdrawalTotalPages));
+  }
+
+  public trackById(_index: number, row: { id: number }): number {
+    return row.id;
+  }
+
   private matchesUserSearch(user: { id: number; username: string; phone_number?: string }, query: string): boolean {
     const text = query.trim().toLowerCase();
     if (!text) return true;
@@ -584,6 +643,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (this.userSearchTimer !== null) clearTimeout(this.userSearchTimer);
     if (this.toastTimeout !== null) clearTimeout(this.toastTimeout);
     this.userRequest?.unsubscribe();
+    this.activeUserRequest?.unsubscribe();
     this.adminSocket.disconnect();
   }
 
@@ -607,6 +667,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.router.navigate(['/play']);
       }),
       this.adminSocket.currentRound$.subscribe(round => {
+        if (this.stats.onlineUsers === round.onlineUsers && this.stats.connectedPlayers === round.connectedPlayers) return;
         this.stats = { ...this.stats, onlineUsers: round.onlineUsers, connectedPlayers: round.connectedPlayers };
         this.cdr.markForCheck();
       }),
@@ -812,7 +873,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (tab === 'withdrawal-settings') this.fetchWithdrawalSettings();
     if (tab === 'withdrawal-settings') this.fetchDepositSettings();
     if (tab === 'active-users') {
-      this.fetchActiveUsers();
+      if (this.isStale('activeUsers')) this.fetchActiveUsers();
       this.fetchWithdrawalSettings();
     }
     if (tab === 'transactions' && this.isStale('transactions')) this.fetchTransactions();
@@ -827,12 +888,17 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   public fetchActiveUsers(): void {
     const token = this.authService.getToken();
-    if (!token) return;
+    if (!token || this.destroyed) return;
+    if (this.isLoadingActiveUsers) {
+      this.queuedRealtimeLists.activeUsers = true;
+      return;
+    }
     this.queuedRealtimeLists.activeUsers = false;
     const requestVersion = ++this.activeUserRequestVersion;
     const realtimeVersion = this.realtimeVersion;
     this.isLoadingActiveUsers = true;
-    this.http.get<{ activeUsers: ActiveUser[]; pendingWithdrawals: PendingWithdrawal[] }>(
+    this.activeUsersError = null;
+    this.activeUserRequest = this.http.get<{ activeUsers: ActiveUser[]; pendingWithdrawals: PendingWithdrawal[] }>(
       this.baseUrl + '/api/admin/active-users',
       { headers: { Authorization: 'Bearer ' + token } }
     ).pipe(
@@ -859,10 +925,15 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
             is_online: update.patch.is_online ?? withdrawal.is_online
           };
         });
+        this.requestedActiveUserPage = this.activeUserPage;
+        this.requestedWithdrawalPage = this.withdrawalPage;
         this.markLoaded('activeUsers');
         this.cdr.markForCheck();
       },
-      error: () => {}
+      error: () => {
+        this.activeUsersError = 'Could not load player activity. Please try refreshing the queue.';
+        this.cdr.markForCheck();
+      }
     });
   }
 
