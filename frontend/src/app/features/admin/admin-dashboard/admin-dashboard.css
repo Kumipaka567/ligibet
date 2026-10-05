@@ -1517,7 +1517,7 @@
 .sidebar-player-link svg { width:16px; height:16px; }
 .sidebar-backdrop,.menu-toggle { display:none; }
 .admin-main { min-width:0; margin-left:232px; }
-.admin-topbar { position:sticky; top:0; z-index:900; display:flex; align-items:center; justify-content:space-between; min-height:74px; padding:15px 32px; border-bottom:1px solid var(--line); background:rgba(11,17,24,.92); backdrop-filter:blur(18px); gap:16px; }
+.admin-topbar { position:sticky; top:0; z-index:900; display:flex; align-items:center; justify-content:space-between; min-height:74px; padding:15px 32px; border-bottom:1px solid var(--line); background:#0b1118; gap:16px; }
 .topbar-left,.topbar-actions,.topbar-breadcrumb { display:flex; align-items:center; }
 .topbar-left { gap:12px; min-width:0; }
 .topbar-actions { gap:12px; flex-shrink:0; }
@@ -1550,11 +1550,23 @@
 .stat-icon-wrapper svg { width:16px; height:16px; }
 .stat-card.green .stat-icon-wrapper { background:#223a2f; color:#a4edc9; }
 .stat-card.gold .stat-icon-wrapper { background:#3c3021; color:#eac17d; }
-.stat-card.purple .stat-icon-wrapper { background:#302944; color:#bfabe7; }
-.stat-card.payhero-card { position:relative; background:linear-gradient(130deg,#17222e,#111a24); border:1px solid #2a3c4f; }
+.stat-card.payhero-card { position:relative; background:linear-gradient(130deg,#17222e,#111a24); border:1px solid #2a3c4f; transition:border-color .18s,box-shadow .18s; }
+.stat-card.payhero-card.balance-safe { border-color:rgba(16,185,129,0.5); box-shadow:0 4px 20px rgba(16,185,129,0.1); }
+.stat-card.payhero-card.balance-warning { border-color:rgba(245,158,11,0.55); box-shadow:0 4px 20px rgba(245,158,11,0.12); }
+.stat-card.payhero-card.balance-danger { border-color:rgba(239,68,68,0.65); box-shadow:0 4px 20px rgba(239,68,68,0.15); }
 .stat-card.payhero-card.balance-unavailable { border-color:#77564b; }
-.payhero-balance-val { font-size:clamp(23px,2.2vw,32px)!important; font-weight:750!important; letter-spacing:-0.8px; }
+.payhero-balance-val { font-size:clamp(26px,2.5vw,36px)!important; font-weight:800!important; letter-spacing:-0.8px; line-height:1.1; }
+.payhero-balance-val.text-green { color:#10b981!important; }
+.payhero-balance-val.text-yellow { color:#f59e0b!important; }
+.payhero-balance-val.text-red { color:#ef4444!important; }
+.stat-icon-wrapper.icon-safe { background:#163b2f; color:#34d399; }
+.stat-icon-wrapper.icon-warning { background:#3a2d17; color:#fbbf24; }
+.stat-icon-wrapper.icon-danger { background:#3f1a1a; color:#f87171; }
 .payhero-status { flex-wrap:wrap; row-gap:6px; }
+.payhero-status-pill { font-size:11px; font-weight:600; display:inline-flex; align-items:center; }
+.payhero-status-pill.pill-green { color:#10b981; }
+.payhero-status-pill.pill-yellow { color:#f59e0b; }
+.payhero-status-pill.pill-red { color:#ef4444; }
 .payhero-account,.payhero-error { margin:7px 0 0; font-size:10px; line-height:1.5; overflow-wrap:anywhere; }
 .payhero-account { color:#99aabd; }
 .payhero-error { color:#efb6a2; }
@@ -1666,9 +1678,9 @@
 .promote-btn { order:-1; }
 .transaction-type-tabs { display:flex; flex-wrap:wrap; padding:5px; gap:5px; background:#0e1721; border:1px solid #283846; border-radius:10px; width:fit-content; margin-top:18px; }
 .transaction-type-tabs button { min-height:36px; padding:8px 14px; border-radius:7px; color:#96a9bf; font-size:11px; }
-.transaction-type-tabs button.active { background:#294637; color:#b4f6d1; }
-.table-responsive { width:100%; max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:thin; scrollbar-color:#3a4f62 transparent; border-radius:10px; }
+.table-responsive { width:100%; max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:thin; scrollbar-color:#3a4f62 transparent; border-radius:10px; -webkit-overflow-scrolling:touch; contain:paint; }
 .admin-table { width:100%; border-collapse:collapse; font-size:11px; text-align:left; }
+.admin-table tr { contain:layout style; }
 .admin-table th { padding:13px 12px; background:#172330; color:#93a7bb; font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; white-space:nowrap; border-bottom:1px solid #304354; }
 .admin-table td { padding:15px 12px; vertical-align:middle; color:#b9c9db; font-size:11px; border-bottom:1px solid #253442; }
 .admin-table td strong { color:#e0ebf5; font-weight:550; }

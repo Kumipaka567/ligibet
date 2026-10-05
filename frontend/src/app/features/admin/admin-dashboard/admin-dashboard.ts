@@ -420,6 +420,34 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public txSearchQuery: string = '';
   public txStatusFilter: string = 'all';
   public isLoadingTransactions: boolean = false;
+  public txPage: number = 1;
+  public txPageSize: number = 25;
+
+  public get totalTxPages(): number {
+    return Math.max(1, Math.ceil(this.transactionsList.length / this.txPageSize));
+  }
+
+  public get pagedTransactions(): AdminTransaction[] {
+    const start = (this.txPage - 1) * this.txPageSize;
+    return this.transactionsList.slice(start, start + this.txPageSize);
+  }
+
+  public get txPageStart(): number {
+    return this.transactionsList.length === 0 ? 0 : (this.txPage - 1) * this.txPageSize + 1;
+  }
+
+  public get txPageEnd(): number {
+    return Math.min(this.txPage * this.txPageSize, this.transactionsList.length);
+  }
+
+  public changeTxPage(delta: number): void {
+    const next = this.txPage + delta;
+    if (next >= 1 && next <= this.totalTxPages) {
+      this.txPage = next;
+      this.cdr.markForCheck();
+    }
+  }
+
   private transactionRequestVersion = 0;
   private userRequestVersion = 0;
   private activeUserRequestVersion = 0;
@@ -481,6 +509,34 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       (Date.parse(b.created_at) || 0) - (Date.parse(a.created_at) || 0) || b.id - a.id
     );
     return this._cachedDisplayedUsers;
+  }
+
+  public userPage: number = 1;
+  public userPageSize: number = 25;
+
+  public get totalUserPages(): number {
+    return Math.max(1, Math.ceil(this.displayedUsers.length / this.userPageSize));
+  }
+
+  public get pagedUsers(): AdminUser[] {
+    const start = (this.userPage - 1) * this.userPageSize;
+    return this.displayedUsers.slice(start, start + this.userPageSize);
+  }
+
+  public get userPageStart(): number {
+    return this.displayedUsers.length === 0 ? 0 : (this.userPage - 1) * this.userPageSize + 1;
+  }
+
+  public get userPageEnd(): number {
+    return Math.min(this.userPage * this.userPageSize, this.displayedUsers.length);
+  }
+
+  public changeUserPage(delta: number): void {
+    const next = this.userPage + delta;
+    if (next >= 1 && next <= this.totalUserPages) {
+      this.userPage = next;
+      this.cdr.markForCheck();
+    }
   }
 
   private _lastActiveUsersListRef: ActiveUser[] | null = null;
@@ -573,6 +629,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
   public searchUsers(): void {
+    this.userPage = 1;
     this.queuedRealtimeLists.users = false;
     if (this.userSearchTimer !== null) clearTimeout(this.userSearchTimer);
     ++this.userRequestVersion;
@@ -623,6 +680,115 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   private payHeroRefreshQueued = false;
   private payHeroPollTimer: ReturnType<typeof setInterval> | null = null;
 
+  public get payHeroTier(): 'safe' | 'warning' | 'danger' | 'unknown' {
+    if (this.payHeroBalance === null) return 'unknown';
+    if (this.payHeroBalance >= 200) return 'safe';
+    if (this.payHeroBalance >= 100) return 'warning';
+    return 'danger';
+  }
+
+  // Audio notification synthesis (Admin only)
+  private audioCtx: AudioContext | null = null;
+  private lastDepositInitiatedSoundTime = 0;
+  private lastDepositCompletedSoundTime = 0;
+
+  private getAudioContext(): AudioContext | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return null;
+      if (!this.audioCtx || this.audioCtx.state === 'closed') {
+        this.audioCtx = new AudioCtx();
+      }
+      if (this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume().catch(() => {});
+      }
+      return this.audioCtx;
+    } catch {
+      return null;
+    }
+  }
+
+  public playDepositInitiatedSound(): void {
+    const nowMs = Date.now();
+    if (nowMs - this.lastDepositInitiatedSoundTime < 600) return;
+    this.lastDepositInitiatedSoundTime = nowMs;
+    try {
+      const ctx = this.getAudioContext();
+      if (!ctx) return;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      const now = ctx.currentTime;
+
+      // Note 1: Clean prompt ping (D5: 587.33 Hz)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(587.33, now);
+      gain1.gain.setValueAtTime(0, now);
+      gain1.gain.linearRampToValueAtTime(0.2, now + 0.02);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.16);
+
+      // Note 2: Higher prompt chime (A5: 880.00 Hz)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(880.00, now + 0.12);
+      gain2.gain.setValueAtTime(0, now + 0.12);
+      gain2.gain.linearRampToValueAtTime(0.25, now + 0.14);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.12);
+      osc2.stop(now + 0.4);
+    } catch {
+      // Audio autoplay policy
+    }
+  }
+
+  public playDepositCompletedSound(): void {
+    const nowMs = Date.now();
+    if (nowMs - this.lastDepositCompletedSoundTime < 600) return;
+    this.lastDepositCompletedSoundTime = nowMs;
+    try {
+      const ctx = this.getAudioContext();
+      if (!ctx) return;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      const now = ctx.currentTime;
+
+      // Ascending celebratory payment chord: C5 -> E5 -> G5 -> C6
+      const notes = [
+        { freq: 523.25, start: 0, dur: 0.12, vol: 0.18 },
+        { freq: 659.25, start: 0.08, dur: 0.12, vol: 0.2 },
+        { freq: 783.99, start: 0.16, dur: 0.14, vol: 0.22 },
+        { freq: 1046.50, start: 0.24, dur: 0.35, vol: 0.25 }
+      ];
+
+      for (const n of notes) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(n.freq, now + n.start);
+        gain.gain.setValueAtTime(0, now + n.start);
+        gain.gain.linearRampToValueAtTime(n.vol, now + n.start + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + n.start + n.dur);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + n.start);
+        osc.stop(now + n.start + n.dur + 0.02);
+      }
+    } catch {
+      // Audio autoplay policy
+    }
+  }
+
   public ngOnInit(): void {
     const token = this.authService.getToken();
     if (!token) {
@@ -670,6 +836,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.onlineSummaryRequest?.unsubscribe();
     if (this.onlineSearchTimer !== null) clearTimeout(this.onlineSearchTimer);
     if (this.onlineRefreshTimer !== null) clearTimeout(this.onlineRefreshTimer);
+    if (this.audioCtx && this.audioCtx.state !== 'closed') {
+      this.audioCtx.close().catch(() => {});
+    }
     this.adminSocket.disconnect();
   }
 
@@ -705,12 +874,18 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         const username = event.username || `Player #${event.userId}`;
         const amountFormatted = Number(event.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         this.showAdminToast(`User ${username} has initiated a deposit of KES ${amountFormatted}.`, 'info', 'Deposit Initiated');
+        this.playDepositInitiatedSound();
         this.queueRealtimeRefresh({ transactions: true, activeUsers: true, dashboard: true });
         this.fetchPayHeroBalance(true);
       }),
       this.adminSocket.transactionUpdate$.subscribe(event => {
         if (!event) return;
-        if (event.type === 'deposit') this.fetchPayHeroBalance(true);
+        if (event.type === 'deposit') {
+          this.fetchPayHeroBalance(true);
+          if (event.status === 'completed') {
+            this.playDepositCompletedSound();
+          }
+        }
         this.applyTransactionUpdate(event);
         this.queueRealtimeRefresh({ transactions: true, dashboard: true, users: true, activeUsers: true, logs: true });
       }),
@@ -734,6 +909,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         if (event) this.queueRealtimeRefresh({ transactions: true, dashboard: true, users: true, activeUsers: true });
       }),
       this.adminSocket.depositsUpdated$.subscribe(event => {
+        if (event?.action === 'mpesa_deposit_completed') {
+          this.playDepositCompletedSound();
+        }
         if (event) this.queueRealtimeRefresh({ transactions: true, dashboard: true, users: true, activeUsers: true });
       }),
       this.adminSocket.withdrawalsUpdated$.subscribe(event => {
@@ -855,7 +1033,6 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     for (const key of Object.keys(refresh) as (keyof typeof this.pendingRealtimeRefresh)[]) {
       if (refresh[key]) {
         this.pendingRealtimeRefresh[key] = true;
-        this.lastLoadedAt[key] = 0;
       }
     }
     if (this.realtimeRefreshTimer !== null) return;
@@ -899,6 +1076,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public setTab(tab: AdminDashboardComponent['activeTab']): void {
     // Admins tab is superadmin-only
     if (tab === 'admins' && !this.isSuperAdmin) return;
+    if (this.activeTab === tab) return;
     this.activeTab = tab;
     this.mobileMenuOpen = false;
     if (tab === 'predator') {
@@ -906,18 +1084,39 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     }
     // Rows already held render immediately and a refresh only goes out once the
     // data has aged, so switching tabs no longer waits on a network round trip.
-    if (tab === 'monitor' && this.isStale('dashboard')) this.fetchOverviewStats();
-    if (tab === 'withdrawal-settings') this.fetchWithdrawalSettings();
-    if (tab === 'withdrawal-settings') this.fetchDepositSettings();
+    if (tab === 'monitor' && (this.isStale('dashboard') || this.pendingRealtimeRefresh.dashboard)) {
+      this.pendingRealtimeRefresh.dashboard = false;
+      this.fetchOverviewStats();
+    }
+    if (tab === 'withdrawal-settings') {
+      this.fetchWithdrawalSettings();
+      this.fetchDepositSettings();
+    }
     if (tab === 'active-users') {
-      if (this.isStale('activeUsers')) this.fetchActiveUsers();
+      if (this.isStale('activeUsers') || this.pendingRealtimeRefresh.activeUsers) {
+        this.pendingRealtimeRefresh.activeUsers = false;
+        this.fetchActiveUsers();
+      }
       this.fetchWithdrawalSettings();
     }
     if (tab === 'online-users') this.fetchOnlinePlayers();
-    if (tab === 'transactions' && this.isStale('transactions')) this.fetchTransactions();
-    if (tab === 'users' && this.isStale('users')) this.fetchUsers();
-    if (tab === 'admins' && this.isStale('admins')) this.fetchAdmins();
-    if (tab === 'logs' && this.isStale('logs')) this.fetchLogs();
+    if (tab === 'transactions' && (this.isStale('transactions') || this.pendingRealtimeRefresh.transactions)) {
+      this.pendingRealtimeRefresh.transactions = false;
+      this.fetchTransactions();
+    }
+    if (tab === 'users' && (this.isStale('users') || this.pendingRealtimeRefresh.users)) {
+      this.pendingRealtimeRefresh.users = false;
+      this.fetchUsers();
+    }
+    if (tab === 'admins' && (this.isStale('admins') || this.pendingRealtimeRefresh.admins)) {
+      this.pendingRealtimeRefresh.admins = false;
+      this.fetchAdmins();
+    }
+    if (tab === 'logs' && (this.isStale('logs') || this.pendingRealtimeRefresh.logs)) {
+      this.pendingRealtimeRefresh.logs = false;
+      this.fetchLogs();
+    }
+    this.cdr.markForCheck();
   }
 
   private get baseUrl(): string {
@@ -1623,6 +1822,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public setTransactionType(type: 'deposit' | 'withdrawal'): void {
     if (this.txTypeFilter === type) return;
     this.txTypeFilter = type;
+    this.txPage = 1;
     this.fetchTransactions();
   }
 

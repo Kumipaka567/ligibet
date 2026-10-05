@@ -481,4 +481,83 @@ describe('Admin dashboard live account management', () => {
       .flush({}, { status: 503, statusText: 'Unavailable' });
     expect(component.onlinePlayersError).toContain('could not be checked');
   });
+
+  it('evaluates PayHero 3-tier indicator colors correctly for all threshold values', () => {
+    component.payHeroBalance = 250;
+    expect(component.payHeroTier).toBe('safe');
+    component.payHeroBalance = 200;
+    expect(component.payHeroTier).toBe('safe');
+    component.payHeroBalance = 199.99;
+    expect(component.payHeroTier).toBe('warning');
+    component.payHeroBalance = 100;
+    expect(component.payHeroTier).toBe('warning');
+    component.payHeroBalance = 99.5;
+    expect(component.payHeroTier).toBe('danger');
+    component.payHeroBalance = 0;
+    expect(component.payHeroTier).toBe('danger');
+    component.payHeroBalance = null;
+    expect(component.payHeroTier).toBe('unknown');
+  });
+
+  it('triggers admin notification sound on deposit initiation and completion', () => {
+    const playInitiatedSpy = vi.spyOn(component, 'playDepositInitiatedSound');
+    const playCompletedSpy = vi.spyOn(component, 'playDepositCompletedSound');
+
+    socket.depositInitiated$.next({
+      userId: 7,
+      username: 'test_player',
+      phone: '0712345678',
+      amount: 1500,
+      timestamp: new Date().toISOString()
+    });
+    expect(playInitiatedSpy).toHaveBeenCalled();
+
+    socket.transactionUpdate$.next({
+      id: 99,
+      user_id: 7,
+      username: 'test_player',
+      type: 'deposit',
+      amount: 1500,
+      status: 'completed',
+      created_at: new Date().toISOString()
+    });
+    expect(playCompletedSpy).toHaveBeenCalled();
+  });
+
+  it('pages user accounts and transactions smoothly to prevent dashboard hanging', () => {
+    component.userList = Array.from({ length: 70 }, (_, i) => ({
+      ...user({ id: i + 1, username: `user_${i + 1}` })
+    }));
+    expect(component.totalUserPages).toBe(3);
+    expect(component.pagedUsers.length).toBe(25);
+    expect(component.userPageStart).toBe(1);
+    expect(component.userPageEnd).toBe(25);
+
+    component.changeUserPage(1);
+    expect(component.userPage).toBe(2);
+    expect(component.pagedUsers.length).toBe(25);
+    expect(component.userPageStart).toBe(26);
+    expect(component.userPageEnd).toBe(50);
+
+    component.transactionsList = Array.from({ length: 60 }, (_, i) => ({
+      id: i + 1,
+      user_id: 7,
+      username: 'player',
+      type: 'deposit' as const,
+      amount: 100,
+      status: 'completed',
+      created_at: new Date().toISOString()
+    }));
+    expect(component.totalTxPages).toBe(3);
+    expect(component.pagedTransactions.length).toBe(25);
+
+    component.changeTxPage(1);
+    expect(component.txPage).toBe(2);
+    expect(component.pagedTransactions.length).toBe(25);
+
+    component.setTab('users');
+    expect(component.activeTab).toBe('users');
+    component.setTab('transactions');
+    expect(component.activeTab).toBe('transactions');
+  });
 });

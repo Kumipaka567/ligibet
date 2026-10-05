@@ -30,10 +30,40 @@
   <span class="online-card-empty" *ngIf="onlinePlayersSummary && !onlinePlayersSummary.onlineUsers">No players online</span>
   <span class="stat-card-footer"><span><span class="small-live-dot"></span>{{ onlinePlayersSummary ? ((isConnected$ | async) ? 'Live unique players' : 'Last known presence') : 'Checking presence...' }}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3h7v7m0-7L10 14M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"/></svg></span>
 </button>
-<article class="stat-card payhero-card" [class.balance-unavailable]="!!payHeroError" aria-label="PayHero service-token balance">
-  <div class="stat-card-top"><span class="stat-label">PayHero service tokens</span><span class="stat-icon-wrapper"><button type="button" class="micro-refresh-btn" (click)="fetchPayHeroBalance(true)" title="Refresh PayHero service tokens" [disabled]="isLoadingPayHeroBalance" aria-label="Refresh PayHero service tokens"><svg class="refresh-icon" [class.spinning]="isLoadingPayHeroBalance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg></button></span></div>
-  <strong class="stat-val payhero-balance-val"><span class="stat-currency">Tokens</span>{{ payHeroBalance !== null ? (payHeroBalance | number:'1.2-2') : 'Unavailable' }}</strong>
-  <div class="stat-card-footer payhero-status" role="status"><span>{{ isLoadingPayHeroBalance ? 'Checking PayHero...' : (payHeroError ? 'Balance unavailable' : 'Available service tokens') }}</span><span class="stat-footnote" *ngIf="payHeroLastUpdated" [title]="payHeroLastUpdated">Checked {{ payHeroLastUpdated | date:'HH:mm:ss':'+0300' }} EAT</span></div>
+<article class="stat-card payhero-card"
+  [class.balance-safe]="payHeroBalance !== null && payHeroBalance >= 200"
+  [class.balance-warning]="payHeroBalance !== null && payHeroBalance >= 100 && payHeroBalance < 200"
+  [class.balance-danger]="payHeroBalance !== null && payHeroBalance < 100"
+  [class.balance-unavailable]="!!payHeroError"
+  aria-label="PayHero service-token balance">
+  <div class="stat-card-top">
+    <span class="stat-label">PayHero service tokens</span>
+    <span class="stat-icon-wrapper"
+      [class.icon-safe]="payHeroBalance !== null && payHeroBalance >= 200"
+      [class.icon-warning]="payHeroBalance !== null && payHeroBalance >= 100 && payHeroBalance < 200"
+      [class.icon-danger]="payHeroBalance !== null && payHeroBalance < 100">
+      <button type="button" class="micro-refresh-btn" (click)="fetchPayHeroBalance(true)" title="Refresh PayHero service tokens" [disabled]="isLoadingPayHeroBalance" aria-label="Refresh PayHero service tokens">
+        <svg class="refresh-icon" [class.spinning]="isLoadingPayHeroBalance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+        </svg>
+      </button>
+    </span>
+  </div>
+  <strong class="stat-val payhero-balance-val"
+    [class.text-green]="payHeroBalance !== null && payHeroBalance >= 200"
+    [class.text-yellow]="payHeroBalance !== null && payHeroBalance >= 100 && payHeroBalance < 200"
+    [class.text-red]="payHeroBalance !== null && payHeroBalance < 100">
+    <span class="stat-currency">Tokens</span>{{ payHeroBalance !== null ? (payHeroBalance | number:'1.2-2') : 'Unavailable' }}
+  </strong>
+  <div class="stat-card-footer payhero-status" role="status">
+    <span class="payhero-status-pill"
+      [class.pill-green]="payHeroBalance !== null && payHeroBalance >= 200"
+      [class.pill-yellow]="payHeroBalance !== null && payHeroBalance >= 100 && payHeroBalance < 200"
+      [class.pill-red]="payHeroBalance !== null && payHeroBalance < 100">
+      {{ isLoadingPayHeroBalance ? 'Checking PayHero...' : (payHeroError ? 'Balance unavailable' : (payHeroBalance !== null && payHeroBalance >= 200 ? 'Sufficient Tokens (>= 200)' : (payHeroBalance !== null && payHeroBalance >= 100 ? 'Low Tokens (< 200) - Consider Top Up' : (payHeroBalance !== null ? 'CRITICAL: Tokens Below 100! Top Up Now' : 'Available service tokens')))) }}
+    </span>
+    <span class="stat-footnote" *ngIf="payHeroLastUpdated" [title]="payHeroLastUpdated">Checked {{ payHeroLastUpdated | date:'HH:mm:ss':'+0300' }} EAT</span>
+  </div>
   <p class="payhero-account" *ngIf="payHeroAccountId !== null">PayHero account {{ payHeroAccountId }}</p>
   <p class="payhero-error" *ngIf="payHeroError">{{ payHeroError }}</p>
 </article>
@@ -647,7 +677,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let tx of transactionsList">
+            <tr *ngFor="let tx of pagedTransactions; trackBy: trackById">
               <td class="mono text-muted" data-label="ID">#{{ tx.id }}</td>
               <td data-label="Account"><strong>{{ tx.username }}</strong></td>
               <td class="mono" data-label="Phone">{{ tx.phone_number || '--' }}</td>
@@ -666,6 +696,14 @@
           </tbody>
         </table>
       </div>
+      <nav class="table-pagination" aria-label="Transaction pages" *ngIf="transactionsList.length > txPageSize">
+        <span>Showing {{ txPageStart }}-{{ txPageEnd }} of {{ transactionsList.length | number }} records</span>
+        <div class="pagination-actions">
+          <button type="button" class="action-btn outline-sm" (click)="changeTxPage(-1)" [disabled]="txPage === 1" aria-label="Previous transaction page">Previous</button>
+          <span>Page {{ txPage }} of {{ totalTxPages }}</span>
+          <button type="button" class="action-btn outline-sm" (click)="changeTxPage(1)" [disabled]="txPage === totalTxPages" aria-label="Next transaction page">Next</button>
+        </div>
+      </nav>
     </section>
   </ng-container>
 
@@ -706,7 +744,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let u of displayedUsers">
+            <tr *ngFor="let u of pagedUsers; trackBy: trackById">
               <td class="mono text-muted" data-label="ID">#{{ u.id }}</td>
               <td data-label="Username"><strong>{{ u.username }}</strong></td>
               <td class="mono" data-label="Phone">{{ u.phone_number || '--' }}</td><td data-label="Presence"><span class="online-indicator" [class.online]="u.is_online"><span class="indicator-dot"></span>{{ u.is_online ? 'Online' : 'Offline' }}</span></td><td class="registration-cell" data-label="Registered (EAT)"><strong>{{ u.created_at | date:'dd MMM yyyy':'+0300' }}</strong><span>{{ u.created_at | date:'HH:mm:ss':'+0300' }} EAT</span></td>
@@ -743,10 +781,18 @@
                 </div>
               </td>
             </tr>
-<tr *ngIf="displayedUsers.length === 0"><td colspan="10" class="text-center padding-lg text-muted">{{ isLoadingUsers ? 'Loading users...' : 'No users match your search.' }}</td></tr>
+            <tr *ngIf="displayedUsers.length === 0"><td colspan="10" class="text-center padding-lg text-muted">{{ isLoadingUsers ? 'Loading users...' : 'No users match your search.' }}</td></tr>
           </tbody>
         </table>
       </div>
+      <nav class="table-pagination" aria-label="User directory pages" *ngIf="displayedUsers.length > userPageSize">
+        <span>Showing {{ userPageStart }}-{{ userPageEnd }} of {{ displayedUsers.length | number }} users</span>
+        <div class="pagination-actions">
+          <button type="button" class="action-btn outline-sm" (click)="changeUserPage(-1)" [disabled]="userPage === 1" aria-label="Previous user page">Previous</button>
+          <span>Page {{ userPage }} of {{ totalUserPages }}</span>
+          <button type="button" class="action-btn outline-sm" (click)="changeUserPage(1)" [disabled]="userPage === totalUserPages" aria-label="Next user page">Next</button>
+        </div>
+      </nav>
     </section>
   </ng-container>
 
@@ -775,7 +821,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let adm of adminsList">
+            <tr *ngFor="let adm of adminsList; trackBy: trackById">
               <td class="mono text-muted" data-label="ID">#{{ adm.id }}</td>
               <td data-label="Username"><strong>{{ adm.username }}</strong></td>
               <td class="mono" data-label="Phone">{{ adm.phone_number || '--' }}</td>
@@ -1110,7 +1156,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let l of adminLogs">
+            <tr *ngFor="let l of adminLogs; trackBy: trackById">
               <td class="mono text-muted" data-label="ID">#{{ l.id }}</td>
               <td data-label="Administrator"><strong>{{ l.admin_username }}</strong></td>
               <td data-label="Action Key"><span class="action-tag mono">{{ l.action }}</span></td>
