@@ -539,7 +539,12 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public payHeroBalance: number | null = null;
   public payHeroCurrency: string = 'KES';
   public payHeroLastUpdated: string | null = null;
+  public payHeroAccountId: string | number | null = null;
+  public payHeroError: string | null = null;
   public isLoadingPayHeroBalance: boolean = false;
+  private payHeroRequest?: Subscription;
+  private payHeroRefreshQueued = false;
+  private payHeroPollTimer: ReturnType<typeof setInterval> | null = null;
 
   public ngOnInit(): void {
     const token = this.authService.getToken();
@@ -560,6 +565,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.adminSocket.connect(token);
     this.fetchOverview();
     this.fetchPayHeroBalance();
+    this.payHeroPollTimer = setInterval(() => this.fetchPayHeroBalance(), 30000);
     this.sanitizedMode.fetchStatus();
     this.predatorInputText = this.sanitizedMode.predatorCustomText();
     // Load expensive lists only when their tab is opened. Previously every
@@ -571,6 +577,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public ngOnDestroy(): void {
     this.destroyed = true;
     this.statsRequest?.unsubscribe();
+    this.payHeroRequest?.unsubscribe();
+    if (this.payHeroPollTimer !== null) clearInterval(this.payHeroPollTimer);
     this.realtimeSubscriptions.forEach(subscription => subscription.unsubscribe());
     if (this.realtimeRefreshTimer !== null) clearTimeout(this.realtimeRefreshTimer);
     if (this.userSearchTimer !== null) clearTimeout(this.userSearchTimer);
@@ -583,6 +591,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.realtimeSubscriptions.push(
       this.adminSocket.isConnected$.subscribe(connected => {
         if (!connected) return;
+        this.fetchPayHeroBalance(true);
         // Events sent while this browser was offline are recovered from the API.
         this.latestUserUpdates.clear();
         this.latestTransactionUpdates.clear();
@@ -611,10 +620,15 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       }),
       this.adminSocket.transactionUpdate$.subscribe(event => {
         if (!event) return;
+        if (event.type === 'deposit') this.fetchPayHeroBalance(true);
         this.applyTransactionUpdate(event);
         this.queueRealtimeRefresh({ transactions: true, dashboard: true, users: true, activeUsers: true, logs: true });
       }),
       this.adminSocket.dashboardStatsUpdated$.subscribe(event => {
+        if (event?.action === 'payhero_service_wallet_changed') {
+          this.fetchPayHeroBalance(true);
+          return;
+        }
         if (event) this.queueRealtimeRefresh({ dashboard: true });
       }),
       this.adminSocket.walletUpdated$.subscribe(event => {
@@ -1333,7 +1347,6 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           this.stats = { ...this.stats, ...res };
           this.lastSyncedAt = new Date();
           this.markLoaded('dashboard');
-          this.fetchPayHeroBalance();
           this.cdr.markForCheck();
         },
         error: () => {}
@@ -1642,35 +1655,52 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   public fetchPayHeroBalance(force: boolean = false): void {
     const token = this.authService.getToken();
-    if (!token) return;
+    if (!token || this.destroyed) return;
+    if (this.isLoadingPayHeroBalance) {
+      if (force) this.payHeroRefreshQueued = true;
+      return;
+    }
+    this.payHeroRefreshQueued = false;
     this.isLoadingPayHeroBalance = true;
     this.cdr.markForCheck();
 
     const url = `${this.baseUrl}/api/admin/payhero/balance${force ? '?force=true' : ''}`;
-    this.http.get<{ configured: boolean; balance: number | null; currency?: string; updatedAt?: string; error?: string }>(
+    this.payHeroRequest = this.http.get<{ configured: boolean; balance: number | null; currency?: string; accountId?: string | number | null; updatedAt?: string; error?: string }>(
       url,
       { headers: { Authorization: `Bearer ${token}` } }
     ).pipe(
       timeout(8000),
       finalize(() => {
         this.isLoadingPayHeroBalance = false;
+        if (this.destroyed) return;
+        if (this.payHeroRefreshQueued) this.fetchPayHeroBalance(true);
         this.cdr.markForCheck();
       })
     ).subscribe({
       next: (res) => {
-        if (res && res.balance !== null && typeof res.balance === 'number') {
+        if (res?.configured && typeof res.balance === 'number' && Number.isFinite(res.balance) && res.updatedAt && !res.error) {
           this.payHeroBalance = res.balance;
           this.payHeroCurrency = res.currency || 'KES';
-          this.payHeroLastUpdated = res.updatedAt || new Date().toISOString();
-        } else if (res && res.balance === null && !res.configured) {
-          this.payHeroBalance = null;
+          this.payHeroLastUpdated = res.updatedAt;
+          this.payHeroAccountId = res.accountId ?? null;
+          this.payHeroError = null;
+        } else {
+          this.clearPayHeroBalance(res?.error || 'The service-token balance could not be verified. Try refreshing.');
         }
         this.cdr.markForCheck();
       },
-      error: (err) => {
-        console.warn('Could not fetch PayHero balance:', err?.message || err);
+      error: () => {
+        this.clearPayHeroBalance('Could not reach the server to check PayHero. Try refreshing.');
       }
     });
+  }
+
+  private clearPayHeroBalance(message: string): void {
+    this.payHeroBalance = null;
+    this.payHeroLastUpdated = null;
+    this.payHeroAccountId = null;
+    this.payHeroError = message;
+    this.cdr.markForCheck();
   }
 
   /** Superadmin only — remove an admin account */

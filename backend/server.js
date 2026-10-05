@@ -16,6 +16,7 @@ const mongoose = require('mongoose');
 const axios = require('axios');
 const { createRealtimeEmitter, adminSocketAccessError, revokeAdminSockets } = require('./realtime');
 const { userSearchConditions } = require('./user-search');
+const { createPayHeroBalanceFetcher } = require('./payhero-balance');
 
 function escapeRegExp(string) {
   return String(string || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1595,6 +1596,14 @@ app.post([
         });
       } catch (apiErr) {
         console.warn('PayHero API call response:', apiErr.response?.data || apiErr.message);
+      } finally {
+        // The provider may deduct service tokens while processing an STK request.
+        // Notify admins after the call finishes, rather than only before it starts.
+        adminNamespace.emit('dashboard_stats_updated', {
+          action: 'payhero_service_wallet_changed',
+          userId: null,
+          occurredAt: new Date().toISOString()
+        });
       }
     }
 
@@ -2344,84 +2353,12 @@ app.get('/api/admin/stats', authenticateAdminToken, async (req, res) => {
 });
 
 // ---------- PAYHERO SERVICE WALLET BALANCE ----------
-let cachedPayHeroBalance = null;
-let lastPayHeroBalanceFetch = 0;
-const PAYHERO_CACHE_TTL_MS = 30000;
-
-async function fetchPayHeroBalance(force = false) {
-  const now = Date.now();
-  if (!force && cachedPayHeroBalance !== null && (now - lastPayHeroBalanceFetch < PAYHERO_CACHE_TTL_MS)) {
-    return cachedPayHeroBalance;
-  }
-
-  const authToken = process.env.PAYHERO_AUTH_TOKEN || PAYHERO_AUTH_TOKEN;
-  const apiUser = process.env.PAYHERO_API_USERNAME || PAYHERO_API_USERNAME;
-  const apiPass = process.env.PAYHERO_API_PASSWORD || PAYHERO_API_PASSWORD;
-
-  let authHeader = null;
-  if (authToken && authToken.trim()) {
-    const cleanToken = authToken.trim();
-    authHeader = (cleanToken.startsWith('Basic ') || cleanToken.startsWith('Bearer ')) ? cleanToken : `Basic ${cleanToken}`;
-  } else if (apiUser && apiPass) {
-    authHeader = `Basic ${Buffer.from(`${apiUser.trim()}:${apiPass.trim()}`).toString('base64')}`;
-  }
-
-  if (!authHeader) {
-    return { configured: false, balance: null, currency: 'KES', error: 'PayHero credentials not configured' };
-  }
-
-  try {
-    const res = await axios.get(`${PAYHERO_BASE_URL}/wallets?wallet_type=service_wallet`, {
-      headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
-      timeout: 6000
-    });
-
-    let balance = null;
-    let currency = 'KES';
-    const data = res.data;
-
-    if (Array.isArray(data)) {
-      const sw = data.find(w => w.wallet_type === 'service_wallet') || data[0];
-      if (sw) {
-        balance = parseFloat(sw.available_balance ?? sw.balance ?? 0);
-        currency = sw.currency || 'KES';
-      }
-    } else if (data && typeof data === 'object') {
-      const list = data.response || data.data || data.wallets;
-      if (Array.isArray(list)) {
-        const sw = list.find(w => w.wallet_type === 'service_wallet') || list[0];
-        if (sw) {
-          balance = parseFloat(sw.available_balance ?? sw.balance ?? 0);
-          currency = sw.currency || 'KES';
-        }
-      } else if (data.available_balance !== undefined || data.balance !== undefined) {
-        balance = parseFloat(data.available_balance ?? data.balance ?? 0);
-        currency = data.currency || 'KES';
-      }
-    }
-
-    if (balance !== null && !isNaN(balance)) {
-      cachedPayHeroBalance = { configured: true, balance, currency, updatedAt: new Date().toISOString() };
-      lastPayHeroBalanceFetch = now;
-      return cachedPayHeroBalance;
-    }
-
-    if (cachedPayHeroBalance) return cachedPayHeroBalance;
-    return { configured: true, balance: 0, currency, updatedAt: new Date().toISOString() };
-  } catch (err) {
-    if (cachedPayHeroBalance) return cachedPayHeroBalance;
-    return { configured: true, balance: null, currency: 'KES', error: err.message };
-  }
-}
+// Every request reads the provider; failed reads never masquerade as a current balance.
+const fetchPayHeroBalance = createPayHeroBalanceFetcher();
 
 app.get('/api/admin/payhero/balance', authenticateAdminToken, async (req, res) => {
-  try {
-    const force = req.query.force === 'true';
-    const result = await fetchPayHeroBalance(force);
-    return res.json(result);
-  } catch (err) {
-    return res.status(500).json({ error: 'Failed to fetch PayHero balance' });
-  }
+  res.set('Cache-Control', 'no-store');
+  return res.json(await fetchPayHeroBalance());
 });
 
 // Admin Users List

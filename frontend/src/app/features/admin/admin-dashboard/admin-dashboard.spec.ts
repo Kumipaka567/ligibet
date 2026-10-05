@@ -33,7 +33,7 @@ describe('Admin dashboard live account management', () => {
       ...Object.fromEntries([
         'transactionUpdate$', 'dashboardStatsUpdated$', 'walletUpdated$',
         'transactionsUpdated$', 'depositsUpdated$', 'withdrawalsUpdated$',
-        'userUpdated$', 'activityUpdated$', 'predatorTextUpdate$', 'accessRevoked$'
+        'userUpdated$', 'activityUpdated$', 'predatorTextUpdate$', 'accessRevoked$', 'depositInitiated$'
       ].map(key => [key, new BehaviorSubject(null)]))
     };
     auth = {
@@ -59,9 +59,12 @@ describe('Admin dashboard live account management', () => {
     fixture = TestBed.createComponent(AdminDashboardComponent);
     component = fixture.componentInstance;
     http = TestBed.inject(HttpTestingController);
+    vi.useFakeTimers();
     fixture.detectChanges();
     http.expectOne(request => request.url.endsWith('/api/admin/overview')).flush({ users: [], stats: {}, logs: [] });
-    vi.useFakeTimers();
+    http.expectOne(request => request.url.endsWith('/api/admin/payhero/balance')).flush({
+      configured: true, balance: 466.8, accountId: 12571, updatedAt: '2026-10-05T12:00:00.000Z'
+    });
   });
 
   afterEach(() => {
@@ -149,6 +152,8 @@ describe('Admin dashboard live account management', () => {
     expect(component.transactionsList[0].reference).toBe('LIVE20');
     socket.transactionUpdate$.next({ ...transaction, status: 'completed' });
     expect(component.transactionsList).toEqual([]);
+    http.expectOne(request => request.url.includes('/api/admin/payhero/balance')).flush({ configured: true, balance: 465.8, updatedAt: '2026-10-05T12:01:00.000Z' });
+    http.expectOne(request => request.url.includes('/api/admin/payhero/balance')).flush({ configured: true, balance: 465.8, updatedAt: '2026-10-05T12:01:01.000Z' });
   });
 
   it('promotes a user and synchronizes both account lists without a reload', () => {
@@ -179,8 +184,8 @@ describe('Admin dashboard live account management', () => {
     expect(component.adminToast?.message).toBe('Only the owner may promote users.');
   });
 
-  it('does not offer role changes to ordinary admins or for the superadmin', () => {
-    auth.currentUser$.next({ id: 1, username: 'admin', balance: 0, role: 'admin' });
+  it('does not offer role changes to ordinary users or for the superadmin', () => {
+    auth.currentUser$.next({ id: 1, username: 'player', balance: 0, role: 'user' });
     component.setUserRole(user(), 'admin');
     expect(component.confirmModal.isOpen).toBe(false);
     auth.currentUser$.next({ id: 1, username: 'owner', balance: 0, role: 'superadmin' });
@@ -192,6 +197,7 @@ describe('Admin dashboard live account management', () => {
     component.activeTab = 'transactions';
     socket.isConnected$.next(false);
     socket.isConnected$.next(true);
+    http.expectOne(request => request.url.includes('/api/admin/payhero/balance')).flush({ configured: true, balance: 465.8, updatedAt: '2026-10-05T12:01:00.000Z' });
     vi.advanceTimersByTime(150);
     http.expectOne(request => request.url.endsWith('/api/admin/stats')).flush({ totalDeposits: 800 });
     http.expectOne(request => request.url.includes('/api/admin/transactions?')).flush({ transactions: [] });
@@ -235,5 +241,71 @@ describe('Admin dashboard live account management', () => {
     expect(component.userList[0].balance).toBe(400);
     http.expectOne(request => request.url.includes('/api/admin/users?')).flush({ users: [user({ balance: 400 })] });
     expect(component.isLoadingUsers).toBe(false);
+  });
+
+  it('keeps the provider account, real zero and check time when service tokens are verified', () => {
+    component.fetchPayHeroBalance(true);
+    http.expectOne(request => request.url.includes('/api/admin/payhero/balance')).flush({
+      configured: true, balance: 0, accountId: 12571, updatedAt: '2026-10-05T12:01:00.000Z'
+    });
+    expect(component.payHeroBalance).toBe(0);
+    expect(component.payHeroAccountId).toBe(12571);
+    expect(component.payHeroLastUpdated).toBe('2026-10-05T12:01:00.000Z');
+    expect(component.payHeroError).toBeNull();
+  });
+
+  it('clears the old balance when PayHero cannot verify the wallet', () => {
+    component.fetchPayHeroBalance(true);
+    http.expectOne(request => request.url.includes('/api/admin/payhero/balance')).flush({
+      configured: true, balance: null, error: 'PayHero is unavailable.'
+    });
+    expect(component.payHeroBalance).toBeNull();
+    expect(component.payHeroAccountId).toBeNull();
+    expect(component.payHeroLastUpdated).toBeNull();
+    expect(component.payHeroError).toBe('PayHero is unavailable.');
+  });
+
+  it('shows an unavailable state for network failure and recovers on a successful refresh', () => {
+    component.fetchPayHeroBalance(true);
+    http.expectOne(request => request.url.includes('/api/admin/payhero/balance'))
+      .flush({}, { status: 503, statusText: 'Unavailable' });
+    expect(component.payHeroBalance).toBeNull();
+    expect(component.payHeroError).toContain('Could not reach the server');
+    component.fetchPayHeroBalance(true);
+    http.expectOne(request => request.url.includes('/api/admin/payhero/balance')).flush({
+      configured: true, balance: 465.8, accountId: 12571, updatedAt: '2026-10-05T12:01:00.000Z'
+    });
+    expect(component.payHeroBalance).toBe(465.8);
+    expect(component.payHeroError).toBeNull();
+  });
+
+  it('does not invent a verification time for an incomplete response', () => {
+    component.fetchPayHeroBalance(true);
+    http.expectOne(request => request.url.includes('/api/admin/payhero/balance')).flush({ configured: true, balance: 900 });
+    expect(component.payHeroBalance).toBeNull();
+    expect(component.payHeroLastUpdated).toBeNull();
+  });
+
+  it('queues a fresh check after the provider processes a deposit while an earlier check is running', () => {
+    component.fetchPayHeroBalance(true);
+    const earlier = http.expectOne(request => request.url.includes('/api/admin/payhero/balance'));
+    socket.dashboardStatsUpdated$.next({ action: 'payhero_service_wallet_changed', userId: null, occurredAt: 'now' });
+    socket.dashboardStatsUpdated$.next({ action: 'payhero_service_wallet_changed', userId: null, occurredAt: 'now' });
+    http.expectNone(request => request.url.includes('/api/admin/payhero/balance'));
+    earlier.flush({ configured: true, balance: 466.8, updatedAt: '2026-10-05T12:01:00.000Z' });
+    http.expectOne(request => request.url.includes('/api/admin/payhero/balance')).flush({
+      configured: true, balance: 465.8, updatedAt: '2026-10-05T12:01:01.000Z'
+    });
+    expect(component.payHeroBalance).toBe(465.8);
+    expect(component.isLoadingPayHeroBalance).toBe(false);
+  });
+
+  it('periodically checks service tokens and cancels pending checks on destruction', () => {
+    vi.advanceTimersByTime(30000);
+    const request = http.expectOne(request => request.url.includes('/api/admin/payhero/balance'));
+    fixture.destroy();
+    expect(request.cancelled).toBe(true);
+    vi.advanceTimersByTime(60000);
+    http.expectNone(request => request.url.includes('/api/admin/payhero/balance'));
   });
 });

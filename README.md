@@ -93,6 +93,21 @@ Note that Render's free plan idles a service after inactivity and takes
 roughly a minute to wake it. For a crash game that is a cold start in the
 middle of a round, so the paid plan is the one to use for real traffic.
 
+### PayHero service tokens
+
+The admin card reads `available_balance` from PayHero's `service_wallet` using
+the credentials configured on the API server. It shows the returned PayHero
+account ID and check time, refreshes every 30 seconds and after deposit activity,
+and shows an unavailable state when the provider cannot verify the balance.
+
+On Render, use `PAYHERO_AUTH_TOKEN` or the `PAYHERO_API_USERNAME` and
+`PAYHERO_API_PASSWORD` pair for the account whose service tokens you want to see.
+The token takes precedence if both are configured. When changing accounts using
+the username/password pair, remove any token belonging to the old account.
+Local `.env` files are ignored by Git and do not replace Render's configured
+environment variables. Deploy the same commit to Render and Vercel for both the
+API response and the updated admin card.
+
 ### Vercel — frontend
 
 Import the repository with the root directory left at the repository root;
