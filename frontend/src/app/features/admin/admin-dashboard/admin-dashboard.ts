@@ -433,31 +433,66 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public userPresenceFilter: 'all' | 'online' | 'offline' = 'all';
   public activeUserSearchQuery = '';
   public activeUserPresenceFilter: 'all' | 'online' | 'offline' = 'all';
+  public userListRev = 0;
+  public activeUsersListRev = 0;
+
+  private _lastUserListRef: AdminUser[] | null = null;
+  private _cachedDisplayedUsers: AdminUser[] | null = null;
+  private _cachedDisplayedUsersKey: string = '';
 
   public get displayedUsers(): AdminUser[] {
-    return this.userList.filter(user =>
-      this.matchesUserSearch(user, this.searchQuery) &&
-      (this.roleFilter === 'all' || user.role === this.roleFilter) &&
-      (this.userPresenceFilter === 'all' || Boolean(user.is_online) === (this.userPresenceFilter === 'online'))
+    const key = `${this.userListRev}_${this.searchQuery}_${this.roleFilter}_${this.userPresenceFilter}`;
+    if (this._cachedDisplayedUsers && this._lastUserListRef === this.userList && this._cachedDisplayedUsersKey === key) {
+      return this._cachedDisplayedUsers;
+    }
+    this._lastUserListRef = this.userList;
+    this._cachedDisplayedUsersKey = key;
+    const q = this.searchQuery;
+    const role = this.roleFilter;
+    const presence = this.userPresenceFilter;
+    this._cachedDisplayedUsers = this.userList.filter(user =>
+      (role === 'all' || user.role === role) &&
+      (presence === 'all' || Boolean(user.is_online) === (presence === 'online')) &&
+      this.matchesUserSearch(user, q)
     );
+    return this._cachedDisplayedUsers;
   }
 
+  private _lastActiveUsersListRef: ActiveUser[] | null = null;
+  private _cachedFilteredActiveUsers: ActiveUser[] | null = null;
+  private _cachedFilteredActiveUsersKey: string = '';
+
   public get filteredActiveUsers(): ActiveUser[] {
-    return this.activeUsersList.filter(user =>
-      this.matchesUserSearch(user, this.activeUserSearchQuery) &&
-      (this.activeUserPresenceFilter === 'all' || user.is_online === (this.activeUserPresenceFilter === 'online'))
+    const key = `${this.activeUsersListRev}_${this.activeUserSearchQuery}_${this.activeUserPresenceFilter}`;
+    if (this._cachedFilteredActiveUsers && this._lastActiveUsersListRef === this.activeUsersList && this._cachedFilteredActiveUsersKey === key) {
+      return this._cachedFilteredActiveUsers;
+    }
+    this._lastActiveUsersListRef = this.activeUsersList;
+    this._cachedFilteredActiveUsersKey = key;
+    const q = this.activeUserSearchQuery;
+    const presence = this.activeUserPresenceFilter;
+    this._cachedFilteredActiveUsers = this.activeUsersList.filter(user =>
+      (presence === 'all' || Boolean(user.is_online) === (presence === 'online')) &&
+      this.matchesUserSearch(user, q)
     );
+    return this._cachedFilteredActiveUsers;
   }
 
   private matchesUserSearch(user: { id: number; username: string; phone_number?: string }, query: string): boolean {
     const text = query.trim().toLowerCase();
     if (!text) return true;
-    if (user.username.toLowerCase().includes(text) || String(user.id) === text) return true;
+    if (user.username && user.username.toLowerCase().includes(text)) return true;
+    if (String(user.id) === text) return true;
     const digits = text.replace(/\D/g, '');
     if (!digits) return false;
-    const phone = (user.phone_number || '').replace(/\D/g, '');
+    const rawPhone = user.phone_number || '';
+    if (rawPhone.includes(digits)) return true;
+    const phone = rawPhone.replace(/\D/g, '');
+    if (phone.includes(digits)) return true;
     const normalize = (value: string) => value.replace(/^254/, '').replace(/^0/, '');
-    return phone.includes(digits) || (normalize(digits).length > 0 && normalize(phone).includes(normalize(digits)));
+    const normDigits = normalize(digits);
+    const normPhone = normalize(phone);
+    return normDigits.length > 0 && normPhone.includes(normDigits);
   }
 
   public searchUsers(): void {
@@ -494,6 +529,18 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     return role === 'superadmin';
   }
 
+  /** True for any administrator or superadmin to promote users to admin */
+  public get canPromoteUsers(): boolean {
+    const role = this.authService.currentUser$.getValue()?.role;
+    return role === 'superadmin' || role === 'admin';
+  }
+
+  // PayHero Service Wallet Balance State
+  public payHeroBalance: number | null = null;
+  public payHeroCurrency: string = 'KES';
+  public payHeroLastUpdated: string | null = null;
+  public isLoadingPayHeroBalance: boolean = false;
+
   public ngOnInit(): void {
     const token = this.authService.getToken();
     if (!token) {
@@ -512,6 +559,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.subscribeToRealtimeUpdates();
     this.adminSocket.connect(token);
     this.fetchOverview();
+    this.fetchPayHeroBalance();
     this.sanitizedMode.fetchStatus();
     this.predatorInputText = this.sanitizedMode.predatorCustomText();
     // Load expensive lists only when their tab is opened. Previously every
@@ -552,6 +600,14 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       this.adminSocket.currentRound$.subscribe(round => {
         this.stats = { ...this.stats, onlineUsers: round.onlineUsers, connectedPlayers: round.connectedPlayers };
         this.cdr.markForCheck();
+      }),
+      this.adminSocket.depositInitiated$.subscribe(event => {
+        if (!event) return;
+        const username = event.username || `Player #${event.userId}`;
+        const amountFormatted = Number(event.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        this.showAdminToast(`User ${username} has initiated a deposit of KES ${amountFormatted}.`, 'info', 'Deposit Initiated');
+        this.queueRealtimeRefresh({ transactions: true, activeUsers: true, dashboard: true });
+        this.fetchPayHeroBalance(true);
       }),
       this.adminSocket.transactionUpdate$.subscribe(event => {
         if (!event) return;
@@ -1277,6 +1333,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           this.stats = { ...this.stats, ...res };
           this.lastSyncedAt = new Date();
           this.markLoaded('dashboard');
+          this.fetchPayHeroBalance();
           this.cdr.markForCheck();
         },
         error: () => {}
@@ -1545,9 +1602,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Administrator access changes are authorized by the server for superadmins. */
+  /** Administrator access changes can be made by administrators and superadmins. */
   public setUserRole(user: AdminUser, role: 'user' | 'admin'): void {
-    if (!this.isSuperAdmin || user.role === 'superadmin' || user.role === role || this.isSettingRole !== null) return;
+    if (!this.canPromoteUsers || user.role === 'superadmin' || user.role === role || this.isSettingRole !== null) return;
     const promoting = role === 'admin';
     this.openConfirmDialog({
       title: promoting ? 'Promote to administrator' : 'Remove administrator access',
@@ -1558,7 +1615,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       type: promoting ? 'primary' : 'warning',
       onConfirm: () => {
         const token = this.authService.getToken();
-        if (!token || !this.isSuperAdmin || this.isSettingRole !== null) return;
+        if (!token || !this.canPromoteUsers || this.isSettingRole !== null) return;
         this.isSettingRole = user.id;
         this.http.post<{ message: string }>(
           this.baseUrl + '/api/admin/users/' + user.id + '/set-role',
@@ -1579,6 +1636,39 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           },
           error: err => this.showAdminToast(err?.error?.error || 'Failed to update role. Please try again.', 'error')
         });
+      }
+    });
+  }
+
+  public fetchPayHeroBalance(force: boolean = false): void {
+    const token = this.authService.getToken();
+    if (!token) return;
+    this.isLoadingPayHeroBalance = true;
+    this.cdr.markForCheck();
+
+    const url = `${this.baseUrl}/api/admin/payhero/balance${force ? '?force=true' : ''}`;
+    this.http.get<{ configured: boolean; balance: number | null; currency?: string; updatedAt?: string; error?: string }>(
+      url,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).pipe(
+      timeout(8000),
+      finalize(() => {
+        this.isLoadingPayHeroBalance = false;
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: (res) => {
+        if (res && res.balance !== null && typeof res.balance === 'number') {
+          this.payHeroBalance = res.balance;
+          this.payHeroCurrency = res.currency || 'KES';
+          this.payHeroLastUpdated = res.updatedAt || new Date().toISOString();
+        } else if (res && res.balance === null && !res.configured) {
+          this.payHeroBalance = null;
+        }
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.warn('Could not fetch PayHero balance:', err?.message || err);
       }
     });
   }

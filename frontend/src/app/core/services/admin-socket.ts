@@ -112,6 +112,15 @@ export interface AdminTransactionUpdate {
   created_at?: string;
 }
 
+export interface AdminDepositInitiatedEvent {
+  userId: number;
+  username: string;
+  phone: string;
+  amount: number;
+  depositId?: number;
+  timestamp: string;
+}
+
 const EMPTY_NEXT_ROUND: AdminNextRound = {
   roundId: null,
   nextRoundId: null,
@@ -168,6 +177,7 @@ export class AdminSocketService {
   public history$ = new BehaviorSubject<AdminHistoryRow[]>([]);
   public isConnected$ = new BehaviorSubject<boolean>(false);
   public error$ = new BehaviorSubject<string | null>(null);
+  public depositInitiated$ = new BehaviorSubject<AdminDepositInitiatedEvent | null>(null);
   public transactionUpdate$ = new BehaviorSubject<AdminTransactionUpdate | null>(null);
   public dashboardStatsUpdated$ = new BehaviorSubject<AdminRealtimeEvent | null>(null);
   public walletUpdated$ = new BehaviorSubject<AdminRealtimeEvent | null>(null);
@@ -269,6 +279,10 @@ export class AdminSocketService {
       this.transactionUpdate$.next(data);
     });
 
+    this.listen('admin_deposit_initiated', (data: AdminDepositInitiatedEvent) => {
+      this.depositInitiated$.next(data);
+    });
+
     this.listen('dashboard_stats_updated', (data: AdminRealtimeEvent) => {
       this.dashboardStatsUpdated$.next(data);
     });
@@ -345,6 +359,7 @@ export class AdminSocketService {
 
   private clearRealtimeEvents(): void {
     this.transactionUpdate$.next(null);
+    this.depositInitiated$.next(null);
     this.dashboardStatsUpdated$.next(null);
     this.walletUpdated$.next(null);
     this.transactionsUpdated$.next(null);

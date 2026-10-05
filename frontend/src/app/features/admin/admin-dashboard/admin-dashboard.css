@@ -1541,7 +1541,7 @@
 .workspace-heading h1 { margin:5px 0 6px; font-size:clamp(25px,2.3vw,36px); line-height:1.2; letter-spacing:-1.2px; font-weight:650; }
 .workspace-heading p { margin:0; color:#9aa9bc; font-size:12px; max-width:600px; }
 .heading-actions { display:flex; gap:10px; flex-shrink:0; }
-.stats-bar { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; margin-bottom:26px; }
+.stats-bar { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:16px; margin-bottom:26px; }
 .stat-card { display:flex; flex-direction:column; align-items:stretch; gap:0; min-width:0; padding:20px; background:linear-gradient(125deg,#18212b,#131c25); border:1px solid #2a3543; border-radius:15px; color:inherit; text-align:left; box-shadow:0 6px 20px #0000000c; transition:border-color .18s,transform .18s; }
 .stat-card::before { display:none; }
 .stat-card-top { display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:16px; }
@@ -1551,6 +1551,20 @@
 .stat-card.green .stat-icon-wrapper { background:#223a2f; color:#a4edc9; }
 .stat-card.gold .stat-icon-wrapper { background:#3c3021; color:#eac17d; }
 .stat-card.purple .stat-icon-wrapper { background:#302944; color:#bfabe7; }
+.stat-card.payhero-card { position:relative; background:linear-gradient(130deg,#17222e,#111a24); border:1px solid #2a3c4f; }
+.stat-card.payhero-card.balance-safe { border-color:rgba(16,185,129,0.5); box-shadow:0 4px 22px rgba(16,185,129,0.12); }
+.stat-card.payhero-card.balance-low { border-color:rgba(239,68,68,0.6); background:linear-gradient(130deg,#241417,#181014); box-shadow:0 4px 22px rgba(239,68,68,0.18); }
+.payhero-balance-val { font-size:clamp(23px,2.2vw,32px)!important; font-weight:750!important; letter-spacing:-0.8px; }
+.payhero-balance-val.text-green { color:#10b981!important; text-shadow:0 0 16px rgba(16,185,129,0.3); }
+.payhero-balance-val.text-red { color:#ef4444!important; text-shadow:0 0 16px rgba(239,68,68,0.35); }
+.badge-safe { color:#10b981; font-weight:600; display:inline-flex; align-items:center; }
+.badge-danger { color:#ef4444; font-weight:700; display:inline-flex; align-items:center; }
+.micro-refresh-btn { background:transparent; border:none; cursor:pointer; color:#8c9daf; padding:4px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:all .18s ease; }
+.micro-refresh-btn:hover:not(:disabled) { color:#f0f5fa; background:rgba(255,255,255,0.08); }
+.micro-refresh-btn:disabled { opacity:0.6; cursor:not-allowed; }
+.refresh-icon { width:15px; height:15px; }
+.refresh-icon.spinning { animation:adminSpin 0.75s linear infinite; }
+@keyframes adminSpin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
 .stat-val { font-family:inherit; font-size:clamp(19px,1.8vw,28px); line-height:1.2; font-weight:600; letter-spacing:-.8px; color:#f0f5fa; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
 .stat-currency { font-size:10px; font-weight:500; letter-spacing:0; color:#99aabd; margin-right:7px; }
 .stat-card-footer { display:flex; align-items:center; justify-content:space-between; gap:4px; margin-top:17px; color:#8d9eb1; font-size:10px; min-height:19px; }
@@ -1673,7 +1687,7 @@
 .predator-tab-layout { gap:20px; }
 .quick-word-pill,.preset-action-pill { background:#223446; border-color:#38536d; border-radius:7px; color:#bed0df; min-height:32px; }
 @media(min-width:1800px) { .mini-game-frame { height:340px; } }
-@media(max-width:1350px) { .stats-bar { gap:12px; } .stat-card { padding:16px; } .workspace-heading { align-items:flex-start; } .heading-actions { flex-direction:column; } .mini-console-grid { grid-template-columns:minmax(0,1fr); } .mini-game-frame { height:310px; } }
+@media(max-width:1350px) { .stats-bar { grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; } .stat-card { padding:16px; } .workspace-heading { align-items:flex-start; } .heading-actions { flex-direction:column; } .mini-console-grid { grid-template-columns:minmax(0,1fr); } .mini-game-frame { height:310px; } }
 @media(max-width:1100px) {
  .admin-sidebar { transform:translateX(-100%); transition:transform .24s cubic-bezier(.2,.8,.2,1); width:264px; z-index:1500; padding-top:24px; }
  .admin-sidebar.is-open { transform:translateX(0); box-shadow:24px 0 80px #00000066; }

@@ -1540,6 +1540,14 @@ app.post([
       provider: 'payhero'
     });
     emitRealtimeMutation({ action: 'mpesa_deposit_pending', userId: req.user.id, deposits: true });
+    adminNamespace.emit('admin_deposit_initiated', {
+      userId: req.user.id,
+      username: req.user.username || `Player_${req.user.id}`,
+      phone: formattedPhone,
+      amount: numAmount,
+      depositId: deposit.id,
+      timestamp: new Date().toISOString()
+    });
 
     const channelId = parseInt(process.env.PAYHERO_CHANNEL_ID || PAYHERO_CHANNEL_ID, 10);
     const authToken = process.env.PAYHERO_AUTH_TOKEN || PAYHERO_AUTH_TOKEN;
@@ -2335,6 +2343,87 @@ app.get('/api/admin/stats', authenticateAdminToken, async (req, res) => {
   }
 });
 
+// ---------- PAYHERO SERVICE WALLET BALANCE ----------
+let cachedPayHeroBalance = null;
+let lastPayHeroBalanceFetch = 0;
+const PAYHERO_CACHE_TTL_MS = 30000;
+
+async function fetchPayHeroBalance(force = false) {
+  const now = Date.now();
+  if (!force && cachedPayHeroBalance !== null && (now - lastPayHeroBalanceFetch < PAYHERO_CACHE_TTL_MS)) {
+    return cachedPayHeroBalance;
+  }
+
+  const authToken = process.env.PAYHERO_AUTH_TOKEN || PAYHERO_AUTH_TOKEN;
+  const apiUser = process.env.PAYHERO_API_USERNAME || PAYHERO_API_USERNAME;
+  const apiPass = process.env.PAYHERO_API_PASSWORD || PAYHERO_API_PASSWORD;
+
+  let authHeader = null;
+  if (authToken && authToken.trim()) {
+    const cleanToken = authToken.trim();
+    authHeader = (cleanToken.startsWith('Basic ') || cleanToken.startsWith('Bearer ')) ? cleanToken : `Basic ${cleanToken}`;
+  } else if (apiUser && apiPass) {
+    authHeader = `Basic ${Buffer.from(`${apiUser.trim()}:${apiPass.trim()}`).toString('base64')}`;
+  }
+
+  if (!authHeader) {
+    return { configured: false, balance: null, currency: 'KES', error: 'PayHero credentials not configured' };
+  }
+
+  try {
+    const res = await axios.get(`${PAYHERO_BASE_URL}/wallets?wallet_type=service_wallet`, {
+      headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+      timeout: 6000
+    });
+
+    let balance = null;
+    let currency = 'KES';
+    const data = res.data;
+
+    if (Array.isArray(data)) {
+      const sw = data.find(w => w.wallet_type === 'service_wallet') || data[0];
+      if (sw) {
+        balance = parseFloat(sw.available_balance ?? sw.balance ?? 0);
+        currency = sw.currency || 'KES';
+      }
+    } else if (data && typeof data === 'object') {
+      const list = data.response || data.data || data.wallets;
+      if (Array.isArray(list)) {
+        const sw = list.find(w => w.wallet_type === 'service_wallet') || list[0];
+        if (sw) {
+          balance = parseFloat(sw.available_balance ?? sw.balance ?? 0);
+          currency = sw.currency || 'KES';
+        }
+      } else if (data.available_balance !== undefined || data.balance !== undefined) {
+        balance = parseFloat(data.available_balance ?? data.balance ?? 0);
+        currency = data.currency || 'KES';
+      }
+    }
+
+    if (balance !== null && !isNaN(balance)) {
+      cachedPayHeroBalance = { configured: true, balance, currency, updatedAt: new Date().toISOString() };
+      lastPayHeroBalanceFetch = now;
+      return cachedPayHeroBalance;
+    }
+
+    if (cachedPayHeroBalance) return cachedPayHeroBalance;
+    return { configured: true, balance: 0, currency, updatedAt: new Date().toISOString() };
+  } catch (err) {
+    if (cachedPayHeroBalance) return cachedPayHeroBalance;
+    return { configured: true, balance: null, currency: 'KES', error: err.message };
+  }
+}
+
+app.get('/api/admin/payhero/balance', authenticateAdminToken, async (req, res) => {
+  try {
+    const force = req.query.force === 'true';
+    const result = await fetchPayHeroBalance(force);
+    return res.json(result);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch PayHero balance' });
+  }
+});
+
 // Admin Users List
 /**
  * One round trip that fills every admin tab at once.
@@ -2378,7 +2467,7 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
         connectedPlayers: connectedPlayerSockets,
         onlineUsers: connectedUserCounts.size
       },
-      users: users.map(u => ({ ...u, balance: parseFloat(u.balance || 0), is_online: (connectedUserCounts.get(u.id) || 0) > 0 })),
+      users: users.map(u => ({ ...u, balance: parseFloat(u.balance || 0), is_online: (connectedUserCounts.get(Number(u.id)) || 0) > 0 })),
       transactions: transactions.map(t => {
         const u = userMap.get(t.user_id) || {};
         return {
@@ -2420,7 +2509,7 @@ app.get('/api/admin/users', authenticateAdminToken, async (req, res) => {
       .limit(100)
       .lean();
 
-    return res.json({ users: users.map(u => ({ ...u, balance: parseFloat(u.balance || 0), is_online: (connectedUserCounts.get(u.id) || 0) > 0 })) });
+    return res.json({ users: users.map(u => ({ ...u, balance: parseFloat(u.balance || 0), is_online: (connectedUserCounts.get(Number(u.id)) || 0) > 0 })) });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch user list' });
   }
@@ -2703,7 +2792,7 @@ app.post('/api/admin/create-admin', authenticateSuperAdminToken, async (req, res
 });
 
 // Admin Set User Role
-app.post('/api/admin/users/:id/set-role', authenticateSuperAdminToken, async (req, res) => {
+app.post('/api/admin/users/:id/set-role', authenticateAdminToken, async (req, res) => {
   try {
     const targetUserId = Number(req.params.id);
     if (!Number.isSafeInteger(targetUserId) || targetUserId <= 0) {
@@ -2714,7 +2803,7 @@ app.post('/api/admin/users/:id/set-role', authenticateSuperAdminToken, async (re
       return res.status(400).json({ error: "Role must be 'user' or 'admin'" });
     }
     if (targetUserId === req.user.id) {
-      return res.status(400).json({ error: 'Cannot change your own superadmin role' });
+      return res.status(400).json({ error: 'Cannot change your own role' });
     }
 
     const targetUser = await User.findOne({ id: targetUserId });
@@ -2971,7 +3060,17 @@ app.post('/api/admin/predator-text', authenticateAdminToken, async (req, res) =>
 // Admin Active Users & Pending Withdrawals
 app.get('/api/admin/active-users', authenticateAdminToken, async (req, res) => {
   try {
-    const onlineUserIds = Array.from(connectedUserCounts.keys()).filter(id => (connectedUserCounts.get(id) || 0) > 0);
+    const onlineSet = new Set();
+    for (const [id, count] of connectedUserCounts.entries()) {
+      const num = Number(id);
+      if (!isNaN(num) && count > 0) onlineSet.add(num);
+    }
+    for (const bet of activeBets.values()) {
+      if (bet?.userId) {
+        const num = Number(bet.userId);
+        if (!isNaN(num)) onlineSet.add(num);
+      }
+    }
 
     // Retrieve all registered accounts (including admin accounts so admin can test popups)
     const search = req.query.search ? String(req.query.search).trim() : '';
@@ -3004,7 +3103,7 @@ app.get('/api/admin/active-users', authenticateAdminToken, async (req, res) => {
       has_custom_withdrawal_popup: Boolean(u.has_custom_withdrawal_popup),
       custom_withdrawal_title: u.custom_withdrawal_title || '',
       custom_withdrawal_message: u.custom_withdrawal_message || '',
-      is_online: onlineUserIds.includes(u.id)
+      is_online: onlineSet.has(Number(u.id))
     })).sort((a, b) => (b.is_online ? 1 : 0) - (a.is_online ? 1 : 0) || b.balance - a.balance);
 
     const pendingWds = await Withdrawal.find({ status: 'pending', ...(conditions.length ? { user_id: { $in: userIds } } : {}) })
@@ -3022,7 +3121,7 @@ app.get('/api/admin/active-users', authenticateAdminToken, async (req, res) => {
         user_current_balance: parseFloat(u.balance || 0),
         user_total_deposits: parseFloat(depMap.get(w.user_id) || 0),
         user_total_wagers: parseFloat(betMap.get(w.user_id) || 0),
-        is_online: onlineUserIds.includes(w.user_id)
+        is_online: onlineSet.has(Number(w.user_id))
       };
     });
 
@@ -3030,7 +3129,7 @@ app.get('/api/admin/active-users', authenticateAdminToken, async (req, res) => {
       activeUsers,
       pendingWithdrawals,
       withdrawalWagerRequirement: (await getWithdrawalSettings()).minimum_total_wager,
-      onlineCount: onlineUserIds.length
+      onlineCount: onlineSet.size
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch active users' });
@@ -3832,6 +3931,7 @@ async function launchFlight() {
   emitAdminCurrentRound();
 
   const startTime = Date.now();
+  let lastAdminTick = 0;
   flightInterval = setInterval(async () => {
     const elapsedSeconds = (Date.now() - startTime) / 1000;
     currentMultiplier = parseFloat(Math.max(1.00, Math.exp(0.06 * elapsedSeconds)).toFixed(2));
@@ -3844,7 +3944,12 @@ async function launchFlight() {
       io.to(playerRoomName(1)).emit('multiplier_tick', { multiplier: currentMultiplier, roundId: currentRound.id, room: 1 });
       io.to(playerRoomName(1)).emit('multiplier', { multiplier: currentMultiplier, room: 1 });
       io.to(playerRoomName(1)).emit('game_multiplier', { multiplier: currentMultiplier, room: 1 });
-      emitAdminCurrentRound();
+      
+      const now = Date.now();
+      if (now - lastAdminTick >= 500) {
+        lastAdminTick = now;
+        emitAdminCurrentRound();
+      }
     }
   }, TICK_MS);
 }
@@ -4043,9 +4148,12 @@ io.on('connection', (socket) => {
   connectedPlayerSockets++;
   const user = socket.user;
   if (user?.id) {
-    const prev = connectedUserCounts.get(user.id) || 0;
-    connectedUserCounts.set(user.id, prev + 1);
-    if (prev === 0) emitRealtimeMutation({ action: 'user_online', userId: user.id, user: true, isOnline: true, notifyPlayer: false });
+    const numericUserId = Number(user.id);
+    if (!isNaN(numericUserId) && numericUserId > 0) {
+      const prev = connectedUserCounts.get(numericUserId) || 0;
+      connectedUserCounts.set(numericUserId, prev + 1);
+      if (prev === 0) emitRealtimeMutation({ action: 'user_online', userId: numericUserId, user: true, isOnline: true, notifyPlayer: false });
+    }
     socket.join(`user_${user.id}`);
     socket.join(`user_${String(user.id)}`);
 
@@ -4395,11 +4503,16 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     connectedPlayerSockets = Math.max(0, connectedPlayerSockets - 1);
     if (user?.id) {
-      const count = (connectedUserCounts.get(user.id) || 1) - 1;
-      if (count <= 0) {
-        connectedUserCounts.delete(user.id);
-        emitRealtimeMutation({ action: 'user_offline', userId: user.id, user: true, isOnline: false, notifyPlayer: false });
-      } else connectedUserCounts.set(user.id, count);
+      const numericUserId = Number(user.id);
+      if (!isNaN(numericUserId) && numericUserId > 0) {
+        const count = (connectedUserCounts.get(numericUserId) || 1) - 1;
+        if (count <= 0) {
+          connectedUserCounts.delete(numericUserId);
+          emitRealtimeMutation({ action: 'user_offline', userId: numericUserId, user: true, isOnline: false, notifyPlayer: false });
+        } else {
+          connectedUserCounts.set(numericUserId, count);
+        }
+      }
     }
     emitAdminCurrentRound();
   });
