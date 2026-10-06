@@ -4,7 +4,8 @@
 <aside class="admin-sidebar" [class.is-open]="mobileMenuOpen" id="admin-navigation" aria-label="Admin navigation">
 <div class="sidebar-brand"><span class="brand-mark"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></svg></span><div><strong>LIGIBET<span class="brand-period">.</span></strong><span>Admin workspace</span></div><button type="button" class="sidebar-close" (click)="toggleMobileMenu()" aria-label="Close navigation">&times;</button></div>
 <div class="workspace-badge"><span class="workspace-avatar">{{ isSuperAdmin ? 'SA' : 'AD' }}</span><div><strong>{{ isSuperAdmin ? 'Super administrator' : 'Administrator' }}</strong><span>Platform management</span></div><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m8 12 3 3 5-6"/></svg></div>
-<nav class="sidebar-nav" aria-label="Dashboard sections"><span class="nav-section-label">Workspace</span><button type="button"  [class.active]="activeTab === 'monitor' || activeTab === 'game'" [attr.aria-current]="(activeTab === 'monitor' || activeTab === 'game') ? 'page' : null" (click)="setTab('monitor')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>Overview</span></button>
+<nav class="sidebar-nav" aria-label="Dashboard sections"><span class="nav-section-label">Workspace</span><button type="button" [class.active]="activeTab === 'game'" [attr.aria-current]="activeTab === 'game' ? 'page' : null" (click)="setTab('game')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/></svg><span>Game monitor</span></button>
+<button type="button"  [class.active]="activeTab === 'monitor'" [attr.aria-current]="activeTab === 'monitor' ? 'page' : null" (click)="setTab('monitor')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>Overview</span></button>
 <button type="button" [class.active]="activeTab === 'online-users'" [attr.aria-current]="activeTab === 'online-users' ? 'page' : null" (click)="openOnlinePlayers()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg><span>Online players</span></button>
 <button type="button"  [class.active]="activeTab === 'active-users'" [attr.aria-current]="(activeTab === 'active-users') ? 'page' : null" (click)="setTab('active-users')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Player activity</span><span *ngIf="pendingWithdrawalsList.length" class="badge-count">{{ pendingWithdrawalsList.length }}</span></button>
 <button type="button"  [class.active]="activeTab === 'transactions'" [attr.aria-current]="(activeTab === 'transactions') ? 'page' : null" (click)="setTab('transactions')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></svg><span>Transactions</span></button>
@@ -19,8 +20,8 @@
 <div class="topbar-left"><button type="button" class="menu-toggle" (click)="toggleMobileMenu()" [attr.aria-expanded]="mobileMenuOpen" aria-controls="admin-navigation" aria-label="Toggle navigation"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><div class="topbar-breadcrumb"><span>Workspace</span><span class="breadcrumb-divider">/</span><strong>{{ tabLabels[activeTab] }}</strong></div></div>
 <div class="topbar-actions"><span class="connection-pill" [class.connected]="isConnected$ | async" role="status"><span class="indicator-dot"></span>{{ (isConnected$ | async) ? 'Live sync' : 'Reconnecting' }}</span><button type="button" class="sanitized-toggle-btn" [class.is-sanitized]="sanitizedMode.isSanitizedMode()" (click)="toggleSanitizedMode()" [attr.aria-pressed]="sanitizedMode.isSanitizedMode()" title="Toggle sanitized view"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m8 12 3 3 5-6"/></svg><span class="view-mode-label">Sanitized view</span><span class="sanitized-pill-indicator"></span></button><button type="button" class="topbar-logout" (click)="logout()" aria-label="Sign out" title="Sign out"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 2 5 5-5 5m5-5H9"/></svg></button></div>
 </header><div class="admin-workspace" id="admin-content" tabindex="-1">
-<section class="workspace-heading"><div><span class="workspace-kicker">Control center</span><h1>{{ tabLabels[activeTab] }}<span class="heading-dot">.</span></h1><p>{{ tabDescriptions[activeTab] }}</p></div><div class="heading-actions" *ngIf="activeTab === 'monitor' || activeTab === 'game'"><button type="button" class="action-btn outline" (click)="setTab('users')"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg>Manage users</button><button type="button" class="action-btn primary" (click)="setTab('transactions')">View transactions<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button></div></section>
-<section class="stats-bar" *ngIf="activeTab === 'monitor' || activeTab === 'game'" aria-label="Platform overview"><button type="button" (click)="openOnlinePlayers()" title="View connected players across all rooms" class="stat-card blue clickable-stat-card online-player-card">
+<section class="workspace-heading" *ngIf="activeTab !== 'game'"><div><span class="workspace-kicker">Control center</span><h1>{{ tabLabels[activeTab] }}<span class="heading-dot">.</span></h1><p>{{ tabDescriptions[activeTab] }}</p></div><div class="heading-actions" *ngIf="activeTab === 'monitor'"><button type="button" class="action-btn outline" (click)="setTab('users')"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg>Manage users</button><button type="button" class="action-btn primary" (click)="setTab('transactions')">View transactions<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button></div></section>
+<section class="stats-bar" *ngIf="activeTab === 'monitor'" aria-label="Platform overview"><button type="button" (click)="openOnlinePlayers()" title="View connected players across all rooms" class="stat-card blue clickable-stat-card online-player-card">
   <span class="stat-card-top"><span class="stat-label">Online players</span><span class="stat-icon-wrapper"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg></span></span>
   <strong class="stat-val">{{ onlinePlayersSummary ? (onlinePlayersSummary.onlineUsers | number) : '--' }}</strong>
   <span class="online-card-caption" *ngIf="onlinePlayersSummary?.topPlayers?.length">Top online by balance</span>
@@ -75,8 +76,254 @@
     <span>{{ error }}</span>
   </section>
 
-  <!-- TAB: GAME & ENGINE MONITOR (COMPACT SIMULTANEOUS VIEW) -->
-  <ng-container *ngIf="activeTab === 'monitor' || activeTab === 'game'">
+  <!-- TAB: GAME MONITOR (DEDICATED SINGLE-SCREEN VIEW WITH ONLY MINIGAME & CRASH SETTERS) -->
+  <ng-container *ngIf="activeTab === 'game'">
+    <ng-container *ngIf="nextRound$ | async as nextRound">
+      <section class="panel game-monitor-panel">
+        <div class="game-monitor-header">
+          <div class="game-monitor-title-group">
+            <span class="live-stream-pip"></span>
+            <h3>Live Game Monitor</h3>
+            <span class="room-stream-chip">Room #{{ selectedMiniRoom }} Stream</span>
+          </div>
+
+          <div class="game-monitor-header-actions">
+            <div class="room-stream-switcher">
+              <button 
+                type="button" 
+                class="room-stream-btn" 
+                [class.active]="selectedMiniRoom === 1" 
+                (click)="switchMiniRoom(1)"
+                title="Stream Room 1 Radar"
+              >
+                <span class="stream-dot" [class.flying]="roomStatus(nextRound.rooms, 1)?.phase === 'flying'"></span>
+                R1
+              </button>
+              <button 
+                type="button" 
+                class="room-stream-btn" 
+                [class.active]="selectedMiniRoom === 2" 
+                (click)="switchMiniRoom(2)"
+                title="Stream Room 2 Radar"
+              >
+                <span class="stream-dot" [class.flying]="roomStatus(nextRound.rooms, 2)?.phase === 'flying'"></span>
+                R2
+              </button>
+              <button 
+                type="button" 
+                class="room-stream-btn" 
+                [class.active]="selectedMiniRoom === 3" 
+                (click)="switchMiniRoom(3)"
+                title="Stream Room 3 Radar"
+              >
+                <span class="stream-dot" [class.flying]="roomStatus(nextRound.rooms, 3)?.phase === 'flying'"></span>
+                R3
+              </button>
+            </div>
+
+            <button type="button" class="action-btn outline-sm" (click)="backToGame()" title="Open Player Fullscreen Aviator Game">
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span>Player Game ↗</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="game-monitor-grid">
+          <!-- LEFT COLUMN: MINIGAME RADAR & STREAM TELEMETRY -->
+          <div class="game-monitor-flight-col">
+            <div class="mini-game-frame game-monitor-frame">
+              <app-aviator-game [isMiniView]="true" [muteAudio]="true" [activeRoom]="selectedMiniRoom"></app-aviator-game>
+            </div>
+
+            <div class="rooms-stream-quick-bar">
+              <div 
+                *ngFor="let rNum of [1, 2, 3]"
+                class="stream-quick-item"
+                [class.active-stream]="selectedMiniRoom === rNum"
+                (click)="switchMiniRoom(rNum)"
+                [title]="'Click to stream Room ' + rNum"
+              >
+                <span class="room-indicator-pip" 
+                      [class.flying]="roomStatus(nextRound.rooms, rNum)?.phase === 'flying'" 
+                      [class.crashed]="roomStatus(nextRound.rooms, rNum)?.phase === 'crashed'"></span>
+                <strong class="stream-room-name">Room {{ rNum }}</strong>
+                <span class="stream-room-phase" [class]="'phase-' + (roomStatus(nextRound.rooms, rNum)?.phase || 'offline')">
+                  {{ roomStatus(nextRound.rooms, rNum)?.phase || 'offline' }}
+                </span>
+                <span class="stream-room-mult mono" *ngIf="roomStatus(nextRound.rooms, rNum)?.phase === 'flying'">
+                  {{ formatMultiplier(roomStatus(nextRound.rooms, rNum)?.multiplier ?? null) }}
+                </span>
+                <span class="stream-room-bets mono text-muted" *ngIf="roomStatus(nextRound.rooms, rNum) as rs">
+                  {{ rs.activeBets }} bet{{ rs.activeBets === 1 ? '' : 's' }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN: PLACE TO SET NEXT CRASHES FOR THE ROOMS (ROOMS 1, 2, 3) -->
+          <div class="game-monitor-controls-col">
+            <!-- ROOM 1 -->
+            <div class="monitor-room-card" [class.is-streaming]="selectedMiniRoom === 1">
+              <div class="monitor-card-header">
+                <div class="monitor-card-title" (click)="switchMiniRoom(1)">
+                  <span class="room-badge-pip pip-r1"></span>
+                  <strong>ROOM 1 (MAIN)</strong>
+                  <span *ngIf="selectedMiniRoom === 1" class="streaming-pill">STREAMING</span>
+                </div>
+                <div class="monitor-card-meta">
+                  <span class="room-phase-tag" [class]="'phase-' + (roomStatus(nextRound.rooms, 1)?.phase || nextRound.status.toLowerCase())">
+                    {{ roomStatus(nextRound.rooms, 1)?.phase || nextRound.status }}
+                  </span>
+                  <span *ngIf="roomStatus(nextRound.rooms, 1)?.phase === 'flying'" class="live-mult-chip mono">
+                    live {{ formatMultiplier(roomStatus(nextRound.rooms, 1)?.multiplier ?? null) }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="monitor-card-body">
+                <div class="crash-preview-compact">
+                  <span class="crash-preview-label">NEXT CRASH</span>
+                  <strong class="crash-preview-value mono">{{ formatMultiplier(nextRound.nextCrashPoint) }}</strong>
+                </div>
+
+                <div class="crash-input-compact">
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="1.00"
+                    max="1000.00"
+                    [(ngModel)]="customCrashPoint"
+                    class="styled-input-xs mono"
+                    placeholder="2.00"
+                  />
+                  <button class="sm-btn primary" (click)="overrideCrashPoint()">Set</button>
+                  <button class="sm-btn warning" (click)="resetCrashPoint()" title="Reset to Provably Fair">Reset</button>
+                </div>
+              </div>
+
+              <div class="quick-preset-bar-compact">
+                <button class="preset-pill-xs" (click)="quickSetCrashPoint(1.15)">1.15x</button>
+                <button class="preset-pill-xs" (click)="quickSetCrashPoint(1.50)">1.50x</button>
+                <button class="preset-pill-xs" (click)="quickSetCrashPoint(2.00)">2.00x</button>
+                <button class="preset-pill-xs" (click)="quickSetCrashPoint(3.50)">3.50x</button>
+                <button class="preset-pill-xs" (click)="quickSetCrashPoint(5.00)">5.00x</button>
+                <button class="preset-pill-xs" (click)="quickSetCrashPoint(10.00)">10x</button>
+              </div>
+
+              <div *ngIf="overrideSuccessMsg" class="success-callout-micro mono">
+                ✓ {{ overrideSuccessMsg }}
+              </div>
+            </div>
+
+            <!-- ROOM 2 -->
+            <div class="monitor-room-card" [class.is-streaming]="selectedMiniRoom === 2">
+              <div class="monitor-card-header">
+                <div class="monitor-card-title" (click)="switchMiniRoom(2)">
+                  <span class="room-badge-pip pip-r2"></span>
+                  <strong>ROOM 2</strong>
+                  <span *ngIf="selectedMiniRoom === 2" class="streaming-pill">STREAMING</span>
+                </div>
+                <div class="monitor-card-meta">
+                  <ng-container *ngIf="roomStatus(nextRound.rooms, 2) as rs2">
+                    <span class="room-phase-tag" [class]="'phase-' + rs2.phase">{{ rs2.phase }}</span>
+                    <span *ngIf="rs2.phase === 'flying'" class="live-mult-chip mono">live {{ formatMultiplier(rs2.multiplier) }}</span>
+                  </ng-container>
+                </div>
+              </div>
+
+              <div class="monitor-card-body">
+                <div class="crash-preview-compact">
+                  <span class="crash-preview-label">NEXT CRASH</span>
+                  <strong class="crash-preview-value mono">{{ formatMultiplier(roomStatus(nextRound.rooms, 2)?.nextCrashPoint ?? null) }}</strong>
+                </div>
+
+                <div class="crash-input-compact">
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="1.00"
+                    max="1000.00"
+                    [(ngModel)]="roomCrashInput[2]"
+                    class="styled-input-xs mono"
+                    placeholder="2.00"
+                  />
+                  <button class="sm-btn primary" (click)="overrideRoomCrash(2)">Set</button>
+                  <button class="sm-btn warning" (click)="resetRoomCrash(2)" title="Reset to Provably Fair">Reset</button>
+                </div>
+              </div>
+
+              <div class="quick-preset-bar-compact">
+                <button class="preset-pill-xs" (click)="quickSetRoomCrash(2, 1.15)">1.15x</button>
+                <button class="preset-pill-xs" (click)="quickSetRoomCrash(2, 1.50)">1.50x</button>
+                <button class="preset-pill-xs" (click)="quickSetRoomCrash(2, 2.00)">2.00x</button>
+                <button class="preset-pill-xs" (click)="quickSetRoomCrash(2, 3.50)">3.50x</button>
+                <button class="preset-pill-xs" (click)="quickSetRoomCrash(2, 5.00)">5.00x</button>
+                <button class="preset-pill-xs" (click)="quickSetRoomCrash(2, 10.00)">10x</button>
+              </div>
+
+              <div *ngIf="roomOverrideMsg[2]" class="success-callout-micro mono">
+                ✓ {{ roomOverrideMsg[2] }}
+              </div>
+            </div>
+
+            <!-- ROOM 3 -->
+            <div class="monitor-room-card" [class.is-streaming]="selectedMiniRoom === 3">
+              <div class="monitor-card-header">
+                <div class="monitor-card-title" (click)="switchMiniRoom(3)">
+                  <span class="room-badge-pip pip-r3"></span>
+                  <strong>ROOM 3</strong>
+                  <span *ngIf="selectedMiniRoom === 3" class="streaming-pill">STREAMING</span>
+                </div>
+                <div class="monitor-card-meta">
+                  <ng-container *ngIf="roomStatus(nextRound.rooms, 3) as rs3">
+                    <span class="room-phase-tag" [class]="'phase-' + rs3.phase">{{ rs3.phase }}</span>
+                    <span *ngIf="rs3.phase === 'flying'" class="live-mult-chip mono">live {{ formatMultiplier(rs3.multiplier) }}</span>
+                  </ng-container>
+                </div>
+              </div>
+
+              <div class="monitor-card-body">
+                <div class="crash-preview-compact">
+                  <span class="crash-preview-label">NEXT CRASH</span>
+                  <strong class="crash-preview-value mono">{{ formatMultiplier(roomStatus(nextRound.rooms, 3)?.nextCrashPoint ?? null) }}</strong>
+                </div>
+
+                <div class="crash-input-compact">
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="1.00"
+                    max="1000.00"
+                    [(ngModel)]="roomCrashInput[3]"
+                    class="styled-input-xs mono"
+                    placeholder="2.00"
+                  />
+                  <button class="sm-btn primary" (click)="overrideRoomCrash(3)">Set</button>
+                  <button class="sm-btn warning" (click)="resetRoomCrash(3)" title="Reset to Provably Fair">Reset</button>
+                </div>
+              </div>
+
+              <div class="quick-preset-bar-compact">
+                <button class="preset-pill-xs" (click)="quickSetRoomCrash(3, 1.15)">1.15x</button>
+                <button class="preset-pill-xs" (click)="quickSetRoomCrash(3, 1.50)">1.50x</button>
+                <button class="preset-pill-xs" (click)="quickSetRoomCrash(3, 2.00)">2.00x</button>
+                <button class="preset-pill-xs" (click)="quickSetRoomCrash(3, 3.50)">3.50x</button>
+                <button class="preset-pill-xs" (click)="quickSetRoomCrash(3, 5.00)">5.00x</button>
+                <button class="preset-pill-xs" (click)="quickSetRoomCrash(3, 10.00)">10x</button>
+              </div>
+
+              <div *ngIf="roomOverrideMsg[3]" class="success-callout-micro mono">
+                ✓ {{ roomOverrideMsg[3] }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </ng-container>
+  </ng-container>
+
+  <!-- TAB: OVERVIEW / ENGINE MONITOR (PLATFORM METRICS & DETAILED ENGINE AUDIT) -->
+  <ng-container *ngIf="activeTab === 'monitor'">
     <ng-container *ngIf="nextRound$ | async as nextRound">
       <!-- TOP ROW: MINI GAME RADAR + NEXT CRASH HERO CARD -->
       <section class="mini-console-grid">

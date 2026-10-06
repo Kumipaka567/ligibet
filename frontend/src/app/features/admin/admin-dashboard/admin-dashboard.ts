@@ -122,13 +122,13 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public mobileMenuOpen: boolean = false;
   public selectedMiniRoom: number = 1;
   public readonly tabLabels: Record<AdminDashboardComponent['activeTab'], string> = {
-    monitor: 'Overview', game: 'Live game', 'active-users': 'Player activity', 'online-users': 'Online players',
+    game: 'Game monitor', monitor: 'Overview', 'active-users': 'Player activity', 'online-users': 'Online players',
     transactions: 'Transactions', users: 'Users', admins: 'Administrators',
     logs: 'Audit log', 'withdrawal-settings': 'Payment settings', predator: 'Predator'
   };
   public readonly tabDescriptions: Record<AdminDashboardComponent['activeTab'], string> = {
-    monitor: 'Your platform at a glance, updated live.',
-    game: 'Follow the action across all game rooms.',
+    game: 'Live flight radar and next crash controls for all rooms on one screen.',
+    monitor: 'Platform overview, metrics and settlement audit.',
     'active-users': 'Online players, account activity and withdrawal requests.',
     'online-users': 'Connected players across all game rooms, counted once per account.',
     transactions: 'Track deposits and withdrawals as they happen.',
