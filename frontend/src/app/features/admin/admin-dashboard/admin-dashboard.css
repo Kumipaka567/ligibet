@@ -2711,22 +2711,424 @@
   line-height: 1.4;
 }
 
-@media (max-width: 768px) {
+/* ==========================================================================
+   GAME MONITOR: RESPONSIVE MOBILE ADAPTATIONS (<= 900px, <= 680px, <= 400px)
+   ========================================================================== */
+@media (max-width: 900px) {
+  .game-monitor-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .game-monitor-frame {
+    min-height: 280px;
+    height: clamp(280px, 38vh, 360px);
+  }
+
+  .game-monitor-controls-col {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 10px;
+  }
+}
+
+@media (max-width: 680px) {
+  .game-monitor-panel {
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 0;
+  }
+
+  .game-monitor-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+  }
+
+  .game-monitor-title-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .game-monitor-title-group h3 {
+    font-size: 0.9rem;
+  }
+
+  .room-stream-chip {
+    font-size: 9px;
+    padding: 2px 7px;
+  }
+
+  .game-monitor-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 6px;
+  }
+
+  .game-monitor-header-actions .room-stream-switcher {
+    flex: 1;
+    display: flex;
+    gap: 3px;
+  }
+
+  .game-monitor-header-actions .room-stream-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 6px 4px;
+    font-size: 11px;
+    min-height: 34px;
+    border-radius: 6px;
+  }
+
+  .game-monitor-header-actions .action-btn {
+    padding: 6px 10px;
+    font-size: 11px;
+    min-height: 34px;
+    white-space: nowrap;
+    border-radius: 6px;
+  }
+
+  .game-monitor-frame {
+    height: 230px !important;
+    min-height: 200px !important;
+    max-height: 250px !important;
+    border-radius: 8px;
+  }
+
+  .rooms-stream-quick-bar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .stream-quick-item {
+    padding: 6px 5px;
+    flex-wrap: wrap;
+    gap: 3px;
+    min-height: 48px;
+    align-content: center;
+    border-radius: 6px;
+  }
+
+  .stream-room-name {
+    font-size: 10px;
+  }
+
+  .stream-room-phase {
+    font-size: 7.5px;
+    padding: 1px 4px;
+  }
+
+  .stream-room-mult {
+    font-size: 10px;
+    margin-left: auto;
+  }
+
+  .stream-room-bets {
+    font-size: 8px;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .game-monitor-controls-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .monitor-room-card {
+    padding: 9px 10px;
+    border-radius: 8px;
+  }
+
+  .monitor-card-header {
+    margin-bottom: 6px;
+  }
+
+  .monitor-card-title strong {
+    font-size: 11px;
+  }
+
+  .monitor-card-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .crash-preview-compact {
+    gap: 4px;
+  }
+
+  .crash-preview-label {
+    font-size: 8px;
+  }
+
+  .crash-preview-value {
+    font-size: 18px;
+  }
+
+  .crash-input-compact {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .styled-input-xs {
+    width: 58px;
+    height: 32px;
+    min-height: 32px;
+    font-size: 13px !important;
+    padding: 2px 4px;
+    text-align: center;
+    border-radius: 5px;
+  }
+
+  .monitor-room-card .sm-btn {
+    height: 32px;
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 11.5px;
+    font-weight: 700;
+    border-radius: 5px;
+  }
+
+  .quick-preset-bar-compact {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    width: 100%;
+    margin-top: 6px;
+  }
+
+  .preset-pill-xs {
+    width: 100%;
+    text-align: center;
+    padding: 5px 0;
+    font-size: 10.5px;
+    font-weight: 700;
+    border-radius: 5px;
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .game-monitor-stakes-section {
+    margin-top: 10px;
+    padding: 11px 10px;
+    border-radius: 8px;
+    gap: 10px;
+  }
+
   .stakes-section-header {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .stakes-title-row {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .stakes-title-row h4 {
+    font-size: 0.88rem;
+  }
+
+  .stakes-count-pill {
+    font-size: 11px;
+    padding: 2px 8px;
+  }
+
+  .stakes-subtext {
+    font-size: 11px;
+    color: #718294;
+    line-height: 1.35;
   }
 
   .stakes-header-meta {
     width: 100%;
-    justify-content: space-between;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .stakes-room-filter {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2px;
+    padding: 2px;
+  }
+
+  .stakes-filter-btn {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+    padding: 6px 2px;
+    font-size: 11px;
+    border-radius: 5px;
+    min-height: 30px;
   }
 
   .total-staked-badge {
     width: 100%;
+    display: flex;
     justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 7px;
+    box-sizing: border-box;
+  }
+
+  .total-staked-badge .badge-label {
+    font-size: 10.5px;
+  }
+
+  .total-staked-badge .badge-value {
+    font-size: 16px;
+  }
+
+  .stakes-table-wrap {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  .stakes-table {
+    display: block;
+    width: 100%;
+  }
+
+  .stakes-table thead {
+    display: none;
+  }
+
+  .stakes-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .stakes-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "player stake"
+      "phone room"
+      "status time";
+    row-gap: 6px;
+    column-gap: 8px;
+    align-items: center;
+    background: #0c141d;
+    border: 1px solid #1c2b3a;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  .stakes-table tbody tr:hover {
+    background: #111b27;
+  }
+
+  .stakes-table td {
+    padding: 0 !important;
+    border: none !important;
+    white-space: normal;
+  }
+
+  .stakes-table td[data-label="Player"] {
+    grid-area: player;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    padding-bottom: 6px !important;
+  }
+
+  .stakes-table td[data-label="Staked Amount"] {
+    grid-area: stake;
+    text-align: right;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    padding-bottom: 6px !important;
+  }
+
+  .stakes-table td[data-label="Phone Number"] {
+    grid-area: phone;
+  }
+
+  .stakes-table td[data-label="Room"] {
+    grid-area: room;
+    text-align: right;
+  }
+
+  .stakes-table td[data-label="Status"] {
+    grid-area: status;
+    padding-top: 4px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+  }
+
+  .stakes-table td[data-label="Time"] {
+    grid-area: time;
+    text-align: right;
+    padding-top: 4px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+    font-size: 10px;
+    color: #718294;
+  }
+
+  .stakes-table .stake-amount-val {
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .stakes-table .phone-chip {
+    font-size: 11px;
+    padding: 2px 7px;
+  }
+
+  .stakes-table .room-pill-chip {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  .stakes-table .bet-status-chip {
+    font-size: 10px;
+    padding: 3px 7px;
+  }
+
+  .stakes-empty-state {
+    padding: 24px 14px;
+  }
+
+  .stakes-empty-state h5 {
+    font-size: 12.5px;
+  }
+
+  .stakes-empty-state p {
+    font-size: 11px;
   }
 }
+
+@media (max-width: 400px) {
+  .game-monitor-title-group h3 {
+    font-size: 0.85rem;
+  }
+
+  .quick-preset-bar-compact {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .crash-input-compact .styled-input-xs {
+    width: 50px;
+  }
+}
+
 
 
