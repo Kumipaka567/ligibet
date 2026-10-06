@@ -18,6 +18,7 @@ import {
 } from '../../../core/services/admin-socket.service';
 import { getBackendOrigin } from '../../../core/config/backend-url';
 import { AuthService } from '../../../core/services/auth.service';
+import { AviatorGameComponent } from '../../game/aviator/aviator-game.component';
 import { SanitizedModeService } from '../../../core/services/sanitized-mode.service';
 
 export interface AdminUser {
@@ -98,7 +99,7 @@ export interface PendingWithdrawal {
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AviatorGameComponent],
   templateUrl: './admin-dashboard.html',
   styleUrl: './admin-dashboard.css'
 })
