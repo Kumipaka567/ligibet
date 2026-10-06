@@ -393,8 +393,8 @@
     <section class="panel predator-dashboard-tab-panel">
       <div class="panel-title-row">
         <div>
-          <h2>Predator Screen & Signal Writings Configuration</h2>
-          <p class="panel-desc">Configure the numbers, words, notes, or instructions displayed prominently under the predicted next crash on the clean white Predator screen (Sanitized Mode).</p>
+          <h2>Predator Screen & Writings</h2>
+          <p class="panel-desc">Configure signal writings displayed under the next crash on the clean white Predator screen.</p>
         </div>
         <div class="predator-header-actions">
           <button 
@@ -427,13 +427,13 @@
           </div>
 
           <p class="config-box-help">
-            These words and numbers appear in large bold font directly under the big crash number on the clean white screen. You can write phone numbers, instructions, VIP notices, or add words using the quick word buttons below.
+            Words appear in bold directly under the crash multiplier on the clean white screen.
           </p>
 
           <label class="editor-label">Configured Words & Number:</label>
           <textarea
             class="styled-textarea predator-textarea"
-            rows="4"
+            rows="2"
             [(ngModel)]="predatorInputText"
             placeholder="Type words, phone number or instructions (e.g. +254 712 345 678 VIP SIGNALS)..."
           ></textarea>
@@ -496,20 +496,16 @@
               <span class="preview-mode-tag">Sanitized White View</span>
             </div>
             <button type="button" class="preview-fullscreen-btn" (click)="togglePredatorPreviewFullscreen()" title="Open Fullscreen Preview">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
               </svg>
               <span>Fullscreen</span>
             </button>
           </div>
 
-          <p class="config-box-help">
-            Exact live mockup of the Predator screen (/predator) with crash number and your configured writings directly underneath:
-          </p>
-
           <div class="clean-white-screen-mockup" (dblclick)="togglePredatorPreviewFullscreen()" title="Double-click to open Fullscreen Preview">
             <button type="button" class="mockup-fullscreen-badge" (click)="togglePredatorPreviewFullscreen()" title="Expand to Fullscreen">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
               </svg>
               <span>Fullscreen</span>
@@ -521,19 +517,6 @@
               {{ predatorInputText || sanitizedMode.predatorCustomText() || 'Your configured words & number will appear here' }}
             </div>
           </div>
-
-          <div class="preview-footer-actions">
-            <button type="button" class="action-btn outline-sm full-width preview-launch-btn" (click)="togglePredatorPreviewFullscreen()" title="Launch Fullscreen Preview">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-              </svg>
-              <span>Launch Fullscreen Preview</span>
-            </button>
-          </div>
-
-          <p class="mockup-caption-sub">
-            💡 The crash integer updates live with Room 1. The writings underneath update instantly when saved.
-          </p>
         </div>
       </div>
     </section>
