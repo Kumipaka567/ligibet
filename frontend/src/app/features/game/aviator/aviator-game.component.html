@@ -1274,7 +1274,7 @@
             </div>
             <div *ngFor="let msg of walletSupportMessages()" class="wallet-msg-bubble" [class.user]="msg.sender === 'user'" [class.admin]="msg.sender === 'admin'">
               <div class="wallet-msg-header">
-                <strong>{{ msg.sender === 'admin' ? (msg.sender_name ? 'Support (' + msg.sender_name + ')' : 'LigiBet Support') : 'You' }}</strong>
+                <strong>{{ msg.sender === 'admin' ? 'LigiBet Support' : 'You' }}</strong>
                 <span class="mono">{{ msg.created_at | date:'shortTime' }}</span>
               </div>
               <div class="wallet-msg-body">{{ msg.text }}</div>

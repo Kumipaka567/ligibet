@@ -536,7 +536,7 @@
         </div>
         <div *ngFor="let msg of supportMessages()" class="support-bubble" [class.user]="msg.sender === 'user'" [class.admin]="msg.sender === 'admin'">
           <div class="support-bubble-head">
-            <strong>{{ msg.sender === 'admin' ? (msg.sender_name ? 'Support (' + msg.sender_name + ')' : 'LigiBet Support') : 'You' }}</strong>
+            <strong>{{ msg.sender === 'admin' ? 'LigiBet Support' : 'You' }}</strong>
             <span>{{ msg.created_at | date:'shortTime' }}</span>
           </div>
           <div class="support-bubble-text">{{ msg.text }}</div>

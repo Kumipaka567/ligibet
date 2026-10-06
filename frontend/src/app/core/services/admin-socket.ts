@@ -229,6 +229,7 @@ export class AdminSocketService {
   public onlinePlayers$ = new BehaviorSubject<AdminOnlinePlayersSummary | null>(null);
   public accessRevoked$ = new BehaviorSubject<{ userId: number; reason: string } | null>(null);
   public predatorTextUpdate$ = new BehaviorSubject<string | null>(null);
+  public supportTicketUpdated$ = new BehaviorSubject<{ ticket: any } | null>(null);
 
   public connect(token: string): void {
     if (this.socket) {
@@ -362,6 +363,10 @@ export class AdminSocketService {
       }
     });
 
+    this.listen('support_ticket_update', (data: { ticket: any }) => {
+      this.supportTicketUpdated$.next(data);
+    });
+
     this.listen('admin_access_revoked', (data: { userId: number; reason: string }) => {
       this.accessRevoked$.next(data);
       this.socket?.disconnect();
@@ -414,6 +419,7 @@ export class AdminSocketService {
     this.activityUpdated$.next(null);
     this.onlinePlayers$.next(null);
     this.accessRevoked$.next(null);
+    this.supportTicketUpdated$.next(null);
   }
 
   private applySnapshot(snapshot: AdminSnapshot): void {

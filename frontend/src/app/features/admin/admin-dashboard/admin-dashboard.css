@@ -3139,5 +3139,301 @@
   }
 }
 
+/* ============================================================
+   SUPPORT & APPEALS DESK RESPONSIVE STYLES
+   ============================================================ */
+
+.support-desk-panel {
+  padding: 20px;
+}
+
+.support-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.support-filter-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.support-desk-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.support-tickets-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 620px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.support-empty-tickets {
+  padding: 16px;
+  text-align: center;
+}
+
+.support-ticket-item {
+  padding: 12px;
+  cursor: pointer;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  transition: all 0.18s ease;
+}
+
+.support-ticket-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.support-ticket-item.active-ticket {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+}
+
+.support-ticket-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.support-ticket-phone {
+  display: block;
+  font-size: 13px;
+  color: #f8fafc;
+}
+
+.support-ticket-snippet {
+  margin: 4px 0 6px;
+  font-size: 11.5px;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.support-chat-column {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  height: 620px;
+  min-height: 480px;
+}
+
+.support-chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 12px;
+  gap: 10px;
+}
+
+.support-chat-info h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #f8fafc;
+}
+
+.support-back-btn {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #38bdf8;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  white-space: nowrap;
+}
+
+.support-back-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.support-back-btn:hover {
+  background: rgba(56, 189, 248, 0.15);
+}
+
+.support-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+
+.support-msg-wrapper {
+  display: flex;
+  width: 100%;
+}
+
+.support-msg-wrapper.from-admin {
+  justify-content: flex-end;
+}
+
+.support-msg-wrapper.from-player {
+  justify-content: flex-start;
+}
+
+.support-msg-bubble {
+  max-width: 82%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.support-msg-bubble.admin-bubble {
+  background: #0284c7;
+  color: #f8fafc;
+}
+
+.support-msg-bubble.player-bubble {
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+.support-msg-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 10.5px;
+  margin-bottom: 4px;
+  opacity: 0.85;
+  font-weight: 600;
+}
+
+.support-reply-form {
+  display: flex;
+  gap: 10px;
+}
+
+.support-reply-input {
+  flex: 1;
+  height: 42px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 0 12px;
+  color: #fff;
+  font-size: 13px;
+}
+
+.support-reply-input:focus {
+  border-color: #38bdf8;
+  outline: none;
+}
+
+.support-reply-submit {
+  white-space: nowrap;
+}
+
+.support-chat-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 620px;
+  text-align: center;
+  color: #64748b;
+  padding: 24px;
+}
+
+/* Mobile & tablet responsive breakpoint */
+@media (max-width: 860px) {
+  .support-desk-panel {
+    padding: 14px;
+  }
+
+  .support-title-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .support-filter-actions {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .support-desk-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .support-tickets-column {
+    max-height: calc(100vh - 260px);
+    min-height: 380px;
+  }
+
+  .support-tickets-column.hidden-on-mobile {
+    display: none !important;
+  }
+
+  .support-chat-placeholder.hidden-on-mobile {
+    display: none !important;
+  }
+
+  .support-chat-column {
+    height: calc(100vh - 250px);
+    min-height: 420px;
+    padding: 12px;
+  }
+
+  .support-back-btn {
+    display: inline-flex;
+  }
+
+  .support-chat-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .support-msg-bubble {
+    max-width: 90%;
+  }
+
+  .support-reply-form {
+    gap: 8px;
+  }
+
+  .support-reply-input {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .support-reply-form {
+    flex-direction: column;
+  }
+
+  .support-reply-submit {
+    width: 100%;
+    height: 40px;
+  }
+}
+
+
 
 

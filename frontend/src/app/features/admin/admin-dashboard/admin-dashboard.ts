@@ -873,6 +873,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.fetchOverview();
     this.fetchPayHeroBalance();
     this.fetchOnlinePlayersSummary();
+    this.fetchSupportTickets(true);
     this.payHeroPollTimer = setInterval(() => {
       this.fetchOverviewStats();
       this.fetchPayHeroBalance();
@@ -1020,6 +1021,26 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           if (!this.predatorInputText) this.predatorInputText = text;
           this.cdr.markForCheck();
         }
+      }),
+      this.adminSocket.supportTicketUpdated$.subscribe(data => {
+        if (!data || !data.ticket) return;
+        const updatedTicket = data.ticket;
+        const existingIdx = this.supportTickets.findIndex(t => t.id === updatedTicket.id);
+        if (existingIdx !== -1) {
+          this.supportTickets[existingIdx] = updatedTicket;
+        } else {
+          this.supportTickets.unshift(updatedTicket);
+        }
+
+        if (this.activeTab === 'support') {
+          this.unreadSupportCount = 0;
+          if (this.selectedTicket && this.selectedTicket.id === updatedTicket.id) {
+            this.selectedTicket = updatedTicket;
+          }
+        } else {
+          this.unreadSupportCount++;
+        }
+        this.cdr.markForCheck();
       })
     );
   }
@@ -1204,6 +1225,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       this.fetchLogs();
     }
     if (tab === 'support') {
+      this.unreadSupportCount = 0;
       this.fetchSupportTickets();
     }
     this.cdr.markForCheck();
@@ -2435,6 +2457,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   // Support & Appeals Desk State
   public supportTickets: any[] = [];
+  public unreadSupportCount: number = 0;
   public selectedTicket: any = null;
   public supportReplyText: string = '';
   public isSendingReply: boolean = false;
@@ -2446,7 +2469,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     return this.supportTickets.filter(t => t.category === this.supportCategoryFilter);
   }
 
-  public fetchSupportTickets(): void {
+  public fetchSupportTickets(isBackground: boolean = false): void {
     const token = this.authService.getToken();
     if (!token) return;
     this.isLoadingSupport = true;
@@ -2457,11 +2480,16 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.isLoadingSupport = false;
         this.supportTickets = res?.tickets || [];
-        if (this.selectedTicket) {
-          const updated = this.supportTickets.find(t => t.id === this.selectedTicket?.id);
-          if (updated) this.selectedTicket = updated;
-        } else if (this.supportTickets.length > 0) {
-          this.selectedTicket = this.supportTickets[0];
+        if (this.activeTab === 'support') {
+          this.unreadSupportCount = 0;
+          if (this.selectedTicket) {
+            const updated = this.supportTickets.find(t => t.id === this.selectedTicket?.id);
+            if (updated) this.selectedTicket = updated;
+          } else if (this.supportTickets.length > 0 && typeof window !== 'undefined' && window.innerWidth > 860) {
+            this.selectedTicket = this.supportTickets[0];
+          }
+        } else {
+          this.unreadSupportCount = this.supportTickets.filter(t => t.status === 'open').length;
         }
         this.cdr.markForCheck();
       },

@@ -3744,13 +3744,30 @@ app.post('/api/support/message', async (req, res) => {
 
     return res.json({
       message: 'Support message received. An administrator will reply shortly.',
-      ticket: payload
+      ticket: sanitizeTicketForPlayer(payload)
     });
   } catch (err) {
     console.error('Support message error:', err);
     return res.status(500).json({ error: 'Failed to send support message' });
   }
 });
+
+function sanitizeTicketForPlayer(ticket) {
+  if (!ticket) return ticket;
+  const obj = typeof ticket.toJSON === 'function' ? ticket.toJSON() : (typeof ticket.toObject === 'function' ? ticket.toObject() : JSON.parse(JSON.stringify(ticket)));
+  if (obj.messages && Array.isArray(obj.messages)) {
+    obj.messages = obj.messages.map(m => {
+      if (m.sender === 'admin') {
+        return {
+          ...m,
+          sender_name: 'LigiBet Support'
+        };
+      }
+      return m;
+    });
+  }
+  return obj;
+}
 
 // GET /api/support/messages - Public endpoint to retrieve thread for a phone number
 app.get('/api/support/messages', async (req, res) => {
@@ -3767,10 +3784,10 @@ app.get('/api/support/messages', async (req, res) => {
       const tickets = await SupportTicket.find({
         phone_number: { $in: variations }
       }).sort({ updated_at: -1 }).limit(10).lean();
-      return res.json({ tickets });
+      return res.json({ tickets: tickets.map(sanitizeTicketForPlayer) });
     } else {
       const tickets = localDevSupportTickets.filter(t => variations.includes(t.phone_number));
-      return res.json({ tickets });
+      return res.json({ tickets: tickets.map(sanitizeTicketForPlayer) });
     }
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch support messages' });
@@ -3811,7 +3828,7 @@ app.post('/api/admin/support/reply', authenticateAdminToken, async (req, res) =>
 
       ticket.messages.push({
         sender: 'admin',
-        sender_name: req.user.username || 'Admin Support',
+        sender_name: 'LigiBet Support',
         text: replyText,
         created_at: new Date()
       });
@@ -3823,7 +3840,7 @@ app.post('/api/admin/support/reply', authenticateAdminToken, async (req, res) =>
 
       ticket.messages.push({
         sender: 'admin',
-        sender_name: req.user.username || 'Admin Support',
+        sender_name: 'LigiBet Support',
         text: replyText,
         created_at: new Date()
       });

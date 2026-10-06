@@ -11,7 +11,7 @@
 <button type="button"  [class.active]="activeTab === 'transactions'" [attr.aria-current]="(activeTab === 'transactions') ? 'page' : null" (click)="setTab('transactions')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></svg><span>Transactions</span></button>
 <button type="button"  [class.active]="activeTab === 'users'" [attr.aria-current]="(activeTab === 'users') ? 'page' : null" (click)="setTab('users')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg><span>Users</span></button>
 <button type="button" *ngIf="isSuperAdmin" [class.active]="activeTab === 'admins'" [attr.aria-current]="(activeTab === 'admins') ? 'page' : null" (click)="setTab('admins')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m8 12 3 3 5-6"/></svg><span>Administrators</span></button>
-<button type="button" [class.active]="activeTab === 'support'" [attr.aria-current]="(activeTab === 'support') ? 'page' : null" (click)="setTab('support')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Support & Appeals</span><span *ngIf="supportTickets.length" class="badge-count">{{ supportTickets.length }}</span></button>
+<button type="button" [class.active]="activeTab === 'support'" [attr.aria-current]="(activeTab === 'support') ? 'page' : null" (click)="setTab('support')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Support & Appeals</span><span *ngIf="unreadSupportCount > 0 && activeTab !== 'support'" class="badge-count">{{ unreadSupportCount }}</span></button>
 <span class="nav-section-label">Configuration</span><button type="button"  [class.active]="activeTab === 'withdrawal-settings'" [attr.aria-current]="(activeTab === 'withdrawal-settings') ? 'page' : null" (click)="setTab('withdrawal-settings')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg><span>Payment settings</span></button>
 <button type="button"  [class.active]="activeTab === 'predator'" [attr.aria-current]="(activeTab === 'predator') ? 'page' : null" (click)="setTab('predator')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M1 12h4m14 0h4"/></svg><span>Predator screen</span></button>
 <button type="button"  [class.active]="activeTab === 'logs'" [attr.aria-current]="(activeTab === 'logs') ? 'page' : null" (click)="setTab('logs')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8m-8 4h5"/></svg><span>Audit log</span></button></nav>
@@ -1572,13 +1572,13 @@
 
   <!-- TAB: SUPPORT & APPEALS -->
   <ng-container *ngIf="activeTab === 'support'">
-    <section class="panel">
-      <div class="panel-title-row">
+    <section class="panel support-desk-panel">
+      <div class="panel-title-row support-title-row">
         <div>
           <h2>Player Support & Suspension Appeals Desk</h2>
           <p class="panel-desc">Direct communications raised by players and suspended accounts from the landing page.</p>
         </div>
-        <div class="filter-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
+        <div class="filter-actions support-filter-actions">
           <button type="button" class="sm-btn" [class.primary]="supportCategoryFilter === 'all'" (click)="supportCategoryFilter = 'all'">All</button>
           <button type="button" class="sm-btn" [class.primary]="supportCategoryFilter === 'appeal'" (click)="supportCategoryFilter = 'appeal'">Appeals</button>
           <button type="button" class="sm-btn" [class.primary]="supportCategoryFilter === 'deposit'" (click)="supportCategoryFilter = 'deposit'">Deposits</button>
@@ -1588,69 +1588,70 @@
         </div>
       </div>
 
-      <div class="support-desk-grid margin-top" style="display:grid;grid-template-columns:minmax(280px,360px) 1fr;gap:16px;">
-        <!-- Tickets list on the left -->
-        <div class="support-tickets-column" style="display:flex;flex-direction:column;gap:8px;max-height:600px;overflow-y:auto;">
-          <div *ngIf="filteredSupportTickets.length === 0" class="panel text-muted" style="padding:16px;text-align:center;">
+      <div class="support-desk-grid margin-top">
+        <!-- Tickets list on the left (on mobile, hidden when a ticket is selected) -->
+        <div class="support-tickets-column" [class.hidden-on-mobile]="selectedTicket">
+          <div *ngIf="filteredSupportTickets.length === 0" class="panel text-muted support-empty-tickets">
             No support tickets or appeals found in this category.
           </div>
           <div *ngFor="let t of filteredSupportTickets" 
-               class="panel clickable-stat-card" 
-               [style.border-color]="selectedTicket?.id === t.id ? '#38bdf8' : 'rgba(255,255,255,0.08)'"
-               [style.background]="selectedTicket?.id === t.id ? 'rgba(56,189,248,0.1)' : 'rgba(255,255,255,0.03)'"
-               style="padding:12px;cursor:pointer;border-radius:10px;"
+               class="panel clickable-stat-card support-ticket-item" 
+               [class.active-ticket]="selectedTicket?.id === t.id"
                (click)="selectTicket(t)">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <div class="support-ticket-header">
               <span class="role-badge" [class.admin]="t.category === 'appeal'">{{ t.category | uppercase }}</span>
               <span class="status-badge" [class.completed]="t.status === 'answered'" [class.pending]="t.status === 'open'">{{ t.status | uppercase }}</span>
             </div>
-            <strong style="display:block;font-size:13px;color:#f8fafc;">{{ t.phone_number }}</strong>
-            <p style="margin:4px 0 6px;font-size:11.5px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            <strong class="support-ticket-phone">{{ t.phone_number }}</strong>
+            <p class="support-ticket-snippet">
               {{ t.messages && t.messages.length ? t.messages[t.messages.length - 1].text : 'No messages' }}
             </p>
             <span class="mono text-xs text-muted">{{ t.updated_at | date:'short' }}</span>
           </div>
         </div>
 
-        <!-- Conversation and reply view on the right -->
-        <div class="support-chat-column panel" *ngIf="selectedTicket; else noTicketSelected" style="padding:16px;display:flex;flex-direction:column;height:600px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:12px;">
-            <div>
-              <h3 style="margin:0;font-size:16px;color:#f8fafc;">{{ selectedTicket.phone_number }}</h3>
+        <!-- Conversation and reply view on the right (on mobile, shown only when a ticket is selected) -->
+        <div class="support-chat-column panel" *ngIf="selectedTicket; else noTicketSelected" [class.shown-on-mobile]="selectedTicket">
+          <div class="support-chat-header">
+            <button type="button" class="support-back-btn" (click)="selectedTicket = null" aria-label="Back to tickets list">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              <span>Back to tickets</span>
+            </button>
+            <div class="support-chat-info">
+              <h3>{{ selectedTicket.phone_number }}</h3>
               <span class="text-xs text-muted">Category: {{ selectedTicket.category | uppercase }} &bull; Ticket #{{ selectedTicket.id }}</span>
             </div>
             <span class="status-badge" [class.completed]="selectedTicket.status === 'answered'" [class.pending]="selectedTicket.status === 'open'">{{ selectedTicket.status | uppercase }}</span>
           </div>
 
-          <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:10px;background:rgba(0,0,0,0.25);border-radius:10px;margin-bottom:12px;">
+          <div class="support-chat-messages">
             <div *ngFor="let m of selectedTicket.messages" 
-                 style="display:flex;width:100%;"
-                 [style.justify-content]="m.sender === 'admin' ? 'flex-end' : 'flex-start'">
-              <div style="max-width:80%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.4;"
-                   [style.background]="m.sender === 'admin' ? '#0284c7' : '#1e293b'"
-                   [style.color]="'#f8fafc'">
-                <div style="display:flex;justify-content:space-between;gap:12px;font-size:10.5px;margin-bottom:4px;opacity:0.85;font-weight:600;">
-                  <span>{{ m.sender === 'admin' ? ('Admin: ' + m.sender_name) : ('Player: ' + selectedTicket.phone_number) }}</span>
+                 class="support-msg-wrapper"
+                 [class.from-admin]="m.sender === 'admin'"
+                 [class.from-player]="m.sender !== 'admin'">
+              <div class="support-msg-bubble" [class.admin-bubble]="m.sender === 'admin'" [class.player-bubble]="m.sender !== 'admin'">
+                <div class="support-msg-meta">
+                  <span>{{ m.sender === 'admin' ? 'Support Desk' : ('Player: ' + selectedTicket.phone_number) }}</span>
                   <span class="mono">{{ m.created_at | date:'shortTime' }}</span>
                 </div>
-                <div>{{ m.text }}</div>
+                <div class="support-msg-text">{{ m.text }}</div>
               </div>
             </div>
           </div>
 
-          <form (ngSubmit)="sendSupportReply()" style="display:flex;gap:10px;">
+          <form (ngSubmit)="sendSupportReply()" class="support-reply-form">
             <input type="text" [(ngModel)]="supportReplyText" name="supportReplyText" 
-                   class="input-styled" style="flex:1;height:42px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:0 12px;color:#fff;"
+                   class="input-styled support-reply-input"
                    placeholder="Type reply to player..." 
                    [disabled]="isSendingReply" required />
-            <button type="submit" class="action-btn primary" [disabled]="isSendingReply || !supportReplyText.trim()">
+            <button type="submit" class="action-btn primary support-reply-submit" [disabled]="isSendingReply || !supportReplyText.trim()">
               {{ isSendingReply ? 'Sending...' : 'Send Reply' }}
             </button>
           </form>
         </div>
 
         <ng-template #noTicketSelected>
-          <div class="panel" style="display:flex;align-items:center;justify-content:center;height:600px;text-align:center;color:#64748b;">
+          <div class="panel support-chat-placeholder hidden-on-mobile">
             <p>Select a support ticket or appeal from the list to view the conversation and reply.</p>
           </div>
         </ng-template>
