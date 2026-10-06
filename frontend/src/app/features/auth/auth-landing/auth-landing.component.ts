@@ -64,7 +64,13 @@ import { getBackendOrigin } from '../../../core/config/backend-url';
 
           <!-- SUSPENSION NOTICE BANNER -->
           <div class="lb-suspension-banner" *ngIf="isSuspendedNotice">
-            <div class="lb-suspension-icon">⚠️</div>
+            <div class="lb-suspension-icon">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#ef4444" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+            </div>
             <div class="lb-suspension-text">
               <strong>Account Suspended</strong>
               <p>Your account has been suspended contact our support using the chat below to appeal</p>
@@ -210,8 +216,8 @@ import { getBackendOrigin } from '../../../core/config/backend-url';
           </div>
         </section>
 
-        <!-- LIVE CHAT SUPPORT & APPEALS SECTION -->
-        <section class="lb-support-section" id="support-chat">
+        <!-- SUSPENSION APPEAL SECTION (ONLY DISPLAYED WHEN ACCOUNT IS SUSPENDED) -->
+        <section class="lb-support-section" id="support-chat" *ngIf="isSuspendedNotice">
           <div class="lb-support-card">
             <div class="lb-support-header" (click)="toggleSupportExpanded()">
               <div class="lb-support-title-wrap">
@@ -219,39 +225,29 @@ import { getBackendOrigin } from '../../../core/config/backend-url';
                   <span class="live-dot"></span>
                 </div>
                 <div>
-                  <h3 class="lb-support-title">LigiBet Live Support & Appeals</h3>
-                  <p class="lb-support-sub">Raise an issue or appeal account suspension</p>
+                  <h3 class="lb-support-title">Account Suspension Appeal Desk</h3>
+                  <p class="lb-support-sub">Your account has been suspended contact our support using the chat below to appeal</p>
                 </div>
               </div>
               <button type="button" class="lb-support-toggle-btn">
-                {{ isSupportExpanded ? 'Minimize' : 'Open Support Chat' }}
+                {{ isSupportExpanded ? 'Minimize Appeal' : 'Open Appeal Chat' }}
               </button>
             </div>
 
             <div class="lb-support-body" *ngIf="isSupportExpanded">
               <!-- Issue Category Selector -->
               <div class="lb-support-category-group">
-                <label class="lb-label">Select Topic / Issue</label>
+                <label class="lb-label">Appeal Category</label>
                 <div class="lb-support-categories">
                   <button type="button" 
                           [class.active]="supportCategory === 'appeal'" 
                           (click)="setSupportCategory('appeal')">
-                    ⚠️ Suspension Appeal
-                  </button>
-                  <button type="button" 
-                          [class.active]="supportCategory === 'deposit'" 
-                          (click)="setSupportCategory('deposit')">
-                    💳 Deposit / STK
-                  </button>
-                  <button type="button" 
-                          [class.active]="supportCategory === 'withdrawal'" 
-                          (click)="setSupportCategory('withdrawal')">
-                    💰 Withdrawal
+                    Suspension Appeal
                   </button>
                   <button type="button" 
                           [class.active]="supportCategory === 'general'" 
                           (click)="setSupportCategory('general')">
-                    💬 General Inquiry
+                    General Inquiry
                   </button>
                 </div>
               </div>
@@ -271,7 +267,7 @@ import { getBackendOrigin } from '../../../core/config/backend-url';
               <div class="lb-support-thread">
                 <div *ngIf="supportMessages.length === 0" class="lb-support-empty">
                   <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                  <p>Send your message or suspension appeal below to chat directly with support.</p>
+                  <p>Send your suspension appeal below to chat directly with support.</p>
                 </div>
                 <div *ngFor="let msg of supportMessages" 
                      class="lb-support-bubble-row" 
@@ -279,7 +275,7 @@ import { getBackendOrigin } from '../../../core/config/backend-url';
                      [class.from-admin]="msg.sender === 'admin'">
                   <div class="lb-support-bubble">
                     <div class="lb-bubble-meta">
-                      <span class="lb-bubble-sender">{{ msg.sender === 'admin' ? '🛡️ LigiBet Admin' : 'You' }}</span>
+                      <span class="lb-bubble-sender">{{ msg.sender === 'admin' ? 'LigiBet Support' : 'You' }}</span>
                       <span class="lb-bubble-time">{{ msg.created_at | date:'shortTime' }}</span>
                     </div>
                     <div class="lb-bubble-text">{{ msg.text }}</div>
@@ -291,10 +287,10 @@ import { getBackendOrigin } from '../../../core/config/backend-url';
               <form (ngSubmit)="sendSupportMessage()" class="lb-support-input-row">
                 <input type="text" [(ngModel)]="supportInputText" name="supportInputText" 
                        class="lb-input lb-support-input" 
-                       placeholder="Type your message or appeal here..." 
+                       placeholder="Type your appeal message here..." 
                        [disabled]="isSendingSupport" required />
                 <button type="submit" class="lb-support-send-btn" [disabled]="isSendingSupport || !supportInputText.trim()">
-                  {{ isSendingSupport ? 'Sending...' : 'Send' }}
+                  {{ isSendingSupport ? 'Sending...' : 'Send Appeal' }}
                 </button>
               </form>
 

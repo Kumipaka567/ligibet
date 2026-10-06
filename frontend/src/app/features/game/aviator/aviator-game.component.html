@@ -1089,7 +1089,7 @@
       <div class="custom-wallet-top-header">
         <button class="back-glass-btn" (click)="showWalletModal.set(false)" title="Close">←</button>
         <h2 class="top-header-title">
-          {{ walletTab() === 'deposit' ? 'Deposit' : 'Withdrawal' }}
+          {{ walletTab() === 'deposit' ? 'Deposit' : (walletTab() === 'withdraw' ? 'Withdrawal' : 'Contact Support') }}
         </h2>
         <div class="top-balance-pill">{{ userBalance() | number:'1.2-2' }} KES</div>
       </div>
@@ -1098,6 +1098,7 @@
       <div class="modal-tabs wallet-action-tabs" role="tablist" aria-label="Wallet actions">
         <button class="wallet-action-tab" [class.active]="walletTab() === 'deposit'" (click)="setWalletTab('deposit')">Deposit</button>
         <button class="wallet-action-tab" [class.active]="walletTab() === 'withdraw'" (click)="setWalletTab('withdraw')">Withdrawal</button>
+        <button class="wallet-action-tab" [class.active]="walletTab() === 'support'" (click)="setWalletTab('support')">Contact Support</button>
       </div>
 
       <!-- DEPOSIT TAB -->
@@ -1143,6 +1144,7 @@
               <span class="prompt-sub">{{ mpesaStatusMsg() || 'Check your phone and enter your M-Pesa PIN.' }}</span>
             </div>
           </div>
+          <p class="support-switch-link" (click)="setWalletTab('support')">Need help with deposits? Contact Support</p>
         </div>
       </div>
 
@@ -1229,8 +1231,76 @@
               <span class="step-label">Paid</span>
             </div>
           </div>
+          <p class="support-switch-link" (click)="setWalletTab('support')">Need help with withdrawals? Contact Support</p>
         </div>
 
+      </div>
+
+      <!-- SUPPORT TAB -->
+      <div *ngIf="walletTab() === 'support'" class="screenshot-tab-body wallet-support-tab">
+        <div class="mpesa-main-card">
+          <div class="wallet-support-intro">
+            <h3 class="mpesa-card-title">Customer Support Desk</h3>
+            <p class="mpesa-ownership-note">Raise any deposit, withdrawal, or transaction issues directly to our admins.</p>
+          </div>
+
+          <!-- TOPIC CATEGORY SELECTOR -->
+          <div class="wallet-support-categories">
+            <button type="button" 
+                    [class.active]="walletSupportCategory() === 'deposit'" 
+                    (click)="setWalletSupportCategory('deposit')">
+              Deposit / STK
+            </button>
+            <button type="button" 
+                    [class.active]="walletSupportCategory() === 'withdrawal'" 
+                    (click)="setWalletSupportCategory('withdrawal')">
+              Withdrawal
+            </button>
+            <button type="button" 
+                    [class.active]="walletSupportCategory() === 'general'" 
+                    (click)="setWalletSupportCategory('general')">
+              General Issue
+            </button>
+            <button type="button" class="refresh-pill" (click)="loadWalletSupportMessages()">
+              Refresh
+            </button>
+          </div>
+
+          <!-- CHAT THREAD -->
+          <div class="wallet-support-chat-box">
+            <div *ngIf="walletSupportMessages().length === 0" class="wallet-support-empty">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <span>How can we assist with your deposit or withdrawal? Send your message below.</span>
+            </div>
+            <div *ngFor="let msg of walletSupportMessages()" class="wallet-msg-bubble" [class.user]="msg.sender === 'user'" [class.admin]="msg.sender === 'admin'">
+              <div class="wallet-msg-header">
+                <strong>{{ msg.sender === 'admin' ? (msg.sender_name ? 'Support (' + msg.sender_name + ')' : 'LigiBet Support') : 'You' }}</strong>
+                <span class="mono">{{ msg.created_at | date:'shortTime' }}</span>
+              </div>
+              <div class="wallet-msg-body">{{ msg.text }}</div>
+            </div>
+          </div>
+
+          <!-- INPUT FORM -->
+          <div class="wallet-support-send-form">
+            <input type="text" 
+                   [ngModel]="walletSupportInputText()" 
+                   (ngModelChange)="walletSupportInputText.set($event)" 
+                   (keyup.enter)="sendWalletSupportMessage()"
+                   placeholder="Describe your deposit or withdrawal issue..." 
+                   class="custom-dark-input wallet-support-input"
+                   [disabled]="isSendingWalletSupport()" />
+            <button class="main-green-action-btn wallet-support-btn" 
+                    [disabled]="isSendingWalletSupport() || !walletSupportInputText().trim()" 
+                    (click)="sendWalletSupportMessage()">
+              {{ isSendingWalletSupport() ? 'Sending...' : 'Send' }}
+            </button>
+          </div>
+
+          <div class="wallet-support-status" *ngIf="walletSupportStatusMsg()">
+            {{ walletSupportStatusMsg() }}
+          </div>
+        </div>
       </div>
 
     </div>

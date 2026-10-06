@@ -55,6 +55,7 @@
               </div>
               <button type="button" (click)="openDeposit()">Deposit</button>
               <button type="button" (click)="openWithdraw()">Withdraw</button>
+              <button type="button" (click)="openSupport()">Contact Support</button>
               <button type="button" (click)="openAccountSettings()">Account Settings</button>
               <button type="button" (click)="goToAviator()">{{ isSanitized() ? 'Play Game' : 'Play Aviator' }}</button>
               <button type="button" (click)="downloadApp()">Download App</button>
@@ -431,6 +432,7 @@
     <div class="lb-sheet-actions">
       <button type="button" (click)="openDeposit()">Deposit</button>
       <button type="button" (click)="openWithdraw()">Withdraw</button>
+      <button type="button" (click)="openSupport()">Contact Support</button>
       <button type="button" (click)="openAccountSettings()">Account Settings</button>
       <button type="button" (click)="goToAviator()">{{ isSanitized() ? 'Play Game' : 'Play Aviator' }}</button>
       <button type="button" (click)="downloadApp()">Download App</button>
@@ -471,6 +473,7 @@
       </button>
 
       <p class="deposit-notice" *ngIf="depositNotice()">{{ depositNotice() }}</p>
+      <p class="modal-switch-link" (click)="openSupport('deposit')">Need help depositing? Contact Support</p>
     </section>
   </div>
 
@@ -504,6 +507,50 @@
       </button>
 
       <p class="deposit-notice warn" *ngIf="withdrawNotice()">{{ withdrawNotice() }}</p>
+      <p class="modal-switch-link" (click)="openSupport('withdrawal')">Need help withdrawing? Contact Support</p>
+    </section>
+  </div>
+
+  <!-- ============================ SUPPORT MODAL ============================ -->
+  <div class="modal-backdrop" *ngIf="showSupportModal()" (click)="closeSupportModal()">
+    <section class="deposit-modal support-modal" role="dialog" aria-modal="true" aria-label="Contact support" (click)="$event.stopPropagation()">
+      <button class="modal-close" type="button" (click)="closeSupportModal()">×</button>
+
+      <div class="mpesa-header">
+        <div class="mpesa-logo support">S</div>
+        <div>
+          <h2>Contact Support</h2>
+          <p class="modal-intro">Reach our team for deposit, withdrawal, or account help</p>
+        </div>
+      </div>
+
+      <div class="support-modal-tabs">
+        <button type="button" [class.active]="supportCategory() === 'deposit'" (click)="supportCategory.set('deposit')">Deposit Issue</button>
+        <button type="button" [class.active]="supportCategory() === 'withdrawal'" (click)="supportCategory.set('withdrawal')">Withdrawal Issue</button>
+        <button type="button" [class.active]="supportCategory() === 'general'" (click)="supportCategory.set('general')">General</button>
+      </div>
+
+      <div class="support-chat-thread">
+        <div *ngIf="supportMessages().length === 0" class="support-thread-empty">
+          <span>Send your message below to get direct support for your deposit or withdrawal.</span>
+        </div>
+        <div *ngFor="let msg of supportMessages()" class="support-bubble" [class.user]="msg.sender === 'user'" [class.admin]="msg.sender === 'admin'">
+          <div class="support-bubble-head">
+            <strong>{{ msg.sender === 'admin' ? (msg.sender_name ? 'Support (' + msg.sender_name + ')' : 'LigiBet Support') : 'You' }}</strong>
+            <span>{{ msg.created_at | date:'shortTime' }}</span>
+          </div>
+          <div class="support-bubble-text">{{ msg.text }}</div>
+        </div>
+      </div>
+
+      <div class="support-input-row">
+        <input type="text" [ngModel]="supportInputText()" (ngModelChange)="supportInputText.set($event)" (keyup.enter)="sendSupportMessage()" placeholder="Type your message..." class="support-text-input" [disabled]="isSendingSupport()" />
+        <button type="button" class="deposit-submit-btn support-btn" [disabled]="isSendingSupport() || !supportInputText().trim()" (click)="sendSupportMessage()">
+          {{ isSendingSupport() ? 'Sending...' : 'Send' }}
+        </button>
+      </div>
+
+      <p class="deposit-notice" *ngIf="supportStatusMsg()">{{ supportStatusMsg() }}</p>
     </section>
   </div>
 

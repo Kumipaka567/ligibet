@@ -788,7 +788,9 @@
             (click)="toggleSanitizedMode()"
             [title]="sanitizedMode.isSanitizedMode() ? 'Sanitized Mode is Active' : 'Sanitized Mode is Inactive'"
           >
-            <span class="sanitized-icon">🛡️</span>
+            <span class="sanitized-icon">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </span>
             <span class="sanitized-label">
               {{ sanitizedMode.isSanitizedMode() ? 'Sanitized Mode: ON' : 'Sanitized Mode: OFF' }}
             </span>
@@ -1578,10 +1580,10 @@
         </div>
         <div class="filter-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
           <button type="button" class="sm-btn" [class.primary]="supportCategoryFilter === 'all'" (click)="supportCategoryFilter = 'all'">All</button>
-          <button type="button" class="sm-btn" [class.primary]="supportCategoryFilter === 'appeal'" (click)="supportCategoryFilter = 'appeal'">⚠️ Appeals</button>
-          <button type="button" class="sm-btn" [class.primary]="supportCategoryFilter === 'deposit'" (click)="supportCategoryFilter = 'deposit'">💳 Deposits</button>
-          <button type="button" class="sm-btn" [class.primary]="supportCategoryFilter === 'withdrawal'" (click)="supportCategoryFilter = 'withdrawal'">💰 Withdrawals</button>
-          <button type="button" class="sm-btn" [class.primary]="supportCategoryFilter === 'general'" (click)="supportCategoryFilter = 'general'">💬 General</button>
+          <button type="button" class="sm-btn" [class.primary]="supportCategoryFilter === 'appeal'" (click)="supportCategoryFilter = 'appeal'">Appeals</button>
+          <button type="button" class="sm-btn" [class.primary]="supportCategoryFilter === 'deposit'" (click)="supportCategoryFilter = 'deposit'">Deposits</button>
+          <button type="button" class="sm-btn" [class.primary]="supportCategoryFilter === 'withdrawal'" (click)="supportCategoryFilter = 'withdrawal'">Withdrawals</button>
+          <button type="button" class="sm-btn" [class.primary]="supportCategoryFilter === 'general'" (click)="supportCategoryFilter = 'general'">General</button>
           <button type="button" class="sm-btn outline" (click)="fetchSupportTickets()">Refresh</button>
         </div>
       </div>

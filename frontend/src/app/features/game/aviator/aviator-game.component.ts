@@ -199,7 +199,12 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   });
   public selectedAvatarIcon = signal<string>('😎');
   public avatarOptions = ['😎', '🚀', '🔥', '⚡', '👑', '🏆', '💎', '🎯', '🦁', '🌟', '🦊', '🐯', '🐼', '🐺', '🎲'];
-  public walletTab = signal<'deposit' | 'withdraw' | 'transactions'>('deposit');
+  public walletTab = signal<'deposit' | 'withdraw' | 'support' | 'transactions'>('deposit');
+  public walletSupportCategory = signal<'deposit' | 'withdrawal' | 'general'>('deposit');
+  public walletSupportInputText = signal<string>('');
+  public isSendingWalletSupport = signal<boolean>(false);
+  public walletSupportStatusMsg = signal<string | null>(null);
+  public walletSupportMessages = signal<Array<{ sender: 'user' | 'admin'; sender_name?: string; text: string; created_at: string }>>([]);
   public depositVal = signal<number>(999);
   public minimumDeposit = signal<number>(999);
   // The first pill is always the configured minimum; the rest are the standard
@@ -2563,11 +2568,75 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
       .catch(() => window.location.assign('/admin'));
   }
 
-  public setWalletTab(tab: 'deposit' | 'withdraw' | 'transactions') {
+  public setWalletTab(tab: 'deposit' | 'withdraw' | 'support' | 'transactions') {
     this.walletTab.set(tab);
     if (tab === 'transactions') {
       this.loadTransactionsHistory();
     }
+    if (tab === 'support') {
+      this.loadWalletSupportMessages();
+    }
+  }
+
+  public setWalletSupportCategory(cat: 'deposit' | 'withdrawal' | 'general') {
+    this.walletSupportCategory.set(cat);
+  }
+
+  public loadWalletSupportMessages(isBackground = false) {
+    const user = this.currentUser();
+    const phone = user?.phone_number || user?.username || '';
+    if (!phone) return;
+    this.http.get<{ tickets: any[] }>(`${getBackendOrigin()}/api/support/messages?phone=${encodeURIComponent(phone)}`).subscribe({
+      next: (res) => {
+        if (res?.tickets && res.tickets.length > 0) {
+          const allMsgs: any[] = [];
+          for (const ticket of res.tickets) {
+            if (ticket.messages && Array.isArray(ticket.messages)) {
+              allMsgs.push(...ticket.messages);
+            }
+          }
+          allMsgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          this.walletSupportMessages.set(allMsgs);
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  public sendWalletSupportMessage() {
+    const user = this.currentUser();
+    const phone = user?.phone_number || user?.username || '';
+    const text = this.walletSupportInputText().trim();
+    if (!text || !phone) return;
+
+    this.isSendingWalletSupport.set(true);
+    this.walletSupportStatusMsg.set(null);
+
+    this.http.post<{ message: string; ticket: any }>(`${getBackendOrigin()}/api/support/message`, {
+      phone_number: phone,
+      text,
+      category: this.walletSupportCategory(),
+      username: user?.username || phone
+    }).subscribe({
+      next: (res) => {
+        this.isSendingWalletSupport.set(false);
+        this.walletSupportInputText.set('');
+        this.walletSupportStatusMsg.set('Message sent! Support will respond here.');
+        if (res?.ticket?.messages) {
+          this.walletSupportMessages.set(res.ticket.messages);
+        } else {
+          this.walletSupportMessages.update(msgs => [
+            ...msgs,
+            { sender: 'user', text, created_at: new Date().toISOString() }
+          ]);
+        }
+        setTimeout(() => { this.walletSupportStatusMsg.set(null); }, 4000);
+      },
+      error: (err) => {
+        this.isSendingWalletSupport.set(false);
+        this.walletSupportStatusMsg.set(err?.error?.error || 'Failed to send message.');
+      }
+    });
   }
 
   public loadTransactionsHistory() {

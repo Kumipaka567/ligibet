@@ -1,11 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { Component, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthService, User } from '../../core/services/auth.service';
 import { SanitizedModeService } from '../../core/services/sanitized-mode.service';
 import { FootballMatch, MatchOutcome, SportsMarketService } from '../../core/services/sports-market.service';
+import { getBackendOrigin } from '../../core/config/backend-url';
 
 interface BetSlipSelection {
   matchId: string;
@@ -26,6 +28,7 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly sanitizedModeService = inject(SanitizedModeService);
+  private readonly http = inject(HttpClient);
   readonly sports = inject(SportsMarketService);
   private readonly subscriptions: Subscription[] = [];
 
@@ -68,6 +71,15 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
   newUsername = '';
   currentPassword = '';
   accountNewPassword = '';
+  
+  // Support state
+  readonly showSupportModal = signal(false);
+  readonly supportCategory = signal<'deposit' | 'withdrawal' | 'general'>('deposit');
+  readonly supportPhone = signal('');
+  readonly supportInputText = signal('');
+  readonly isSendingSupport = signal(false);
+  readonly supportStatusMsg = signal<string | null>(null);
+  readonly supportMessages = signal<Array<{ sender: 'user' | 'admin'; sender_name?: string; text: string; created_at: string }>>([]);
 
   readonly isPrivileged = computed(() => {
     const role = this.currentUser()?.role;
@@ -465,6 +477,79 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
     this.mobileMenuOpen.set(false);
     this.showMobileSlipDrawer.set(false);
     this.showProfileMenu.set(false);
+  }
+
+  // ---- Support & Help ----------------------------------------------------
+  openSupport(category: 'deposit' | 'withdrawal' | 'general' = 'deposit'): void {
+    this.closeAllDrawers();
+    this.showDepositModal.set(false);
+    this.showWithdrawModal.set(false);
+    this.supportCategory.set(category);
+    const user = this.currentUser();
+    const phone = user?.phone_number || user?.username || '';
+    this.supportPhone.set(phone);
+    this.showSupportModal.set(true);
+    this.loadSupportMessages();
+  }
+
+  closeSupportModal(): void {
+    this.showSupportModal.set(false);
+  }
+
+  loadSupportMessages(): void {
+    const phone = this.supportPhone() || this.currentUser()?.phone_number || this.currentUser()?.username || '';
+    if (!phone) return;
+    this.http.get<{ tickets: any[] }>(`${getBackendOrigin()}/api/support/messages?phone=${encodeURIComponent(phone)}`).subscribe({
+      next: (res) => {
+        if (res?.tickets && res.tickets.length > 0) {
+          const allMsgs: any[] = [];
+          for (const ticket of res.tickets) {
+            if (ticket.messages && Array.isArray(ticket.messages)) {
+              allMsgs.push(...ticket.messages);
+            }
+          }
+          allMsgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          this.supportMessages.set(allMsgs);
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  sendSupportMessage(): void {
+    const user = this.currentUser();
+    const phone = this.supportPhone() || user?.phone_number || user?.username || '';
+    const text = this.supportInputText().trim();
+    if (!text || !phone) return;
+
+    this.isSendingSupport.set(true);
+    this.supportStatusMsg.set(null);
+
+    this.http.post<{ message: string; ticket: any }>(`${getBackendOrigin()}/api/support/message`, {
+      phone_number: phone,
+      text,
+      category: this.supportCategory(),
+      username: user?.username || phone
+    }).subscribe({
+      next: (res) => {
+        this.isSendingSupport.set(false);
+        this.supportInputText.set('');
+        this.supportStatusMsg.set('Message sent! Support will respond here.');
+        if (res?.ticket?.messages) {
+          this.supportMessages.set(res.ticket.messages);
+        } else {
+          this.supportMessages.update(msgs => [
+            ...msgs,
+            { sender: 'user', text, created_at: new Date().toISOString() }
+          ]);
+        }
+        setTimeout(() => { this.supportStatusMsg.set(null); }, 4000);
+      },
+      error: (err) => {
+        this.isSendingSupport.set(false);
+        this.supportStatusMsg.set(err?.error?.error || 'Failed to send message.');
+      }
+    });
   }
 
   // ---- Withdrawal --------------------------------------------------------
