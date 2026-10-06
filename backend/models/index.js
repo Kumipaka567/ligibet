@@ -314,6 +314,37 @@ ChatMessageSchema.pre('save', async function(next) {
   next();
 });
 
+// ─── SupportTicket Schema (Landing page appeals and user support) ────────
+const SupportMessageSchema = new mongoose.Schema({
+  sender: { type: String, enum: ['user', 'admin'], required: true },
+  sender_name: { type: String, default: '' },
+  text: { type: String, required: true, maxlength: 1000 },
+  created_at: { type: Date, default: Date.now }
+});
+
+const SupportTicketSchema = new mongoose.Schema({
+  id: { type: Number, unique: true, index: true },
+  phone_number: { type: String, required: true, index: true, trim: true },
+  username: { type: String, default: '', trim: true },
+  category: { type: String, enum: ['appeal', 'deposit', 'withdrawal', 'general'], default: 'general', index: true },
+  subject: { type: String, default: '' },
+  status: { type: String, enum: ['open', 'answered', 'closed'], default: 'open', index: true },
+  messages: [SupportMessageSchema],
+  created_at: { type: Date, default: Date.now, index: true },
+  updated_at: { type: Date, default: Date.now, index: true }
+}, {
+  toJSON: { virtuals: true, transform: (doc, ret) => { delete ret._id; delete ret.__v; return ret; } },
+  toObject: { virtuals: true, transform: (doc, ret) => { delete ret._id; delete ret.__v; return ret; } }
+});
+
+SupportTicketSchema.pre('save', async function(next) {
+  if (this.isNew && (this.id === undefined || this.id === null)) {
+    this.id = await getNextSequenceValue('support_tickets_id');
+  }
+  this.updated_at = new Date();
+  next();
+});
+
 // ─── Export Mongoose Models ──────────────────────────────────────────────
 module.exports = {
   Counter,
@@ -330,5 +361,7 @@ module.exports = {
   AdminLog: mongoose.models.AdminLog || mongoose.model('AdminLog', AdminLogSchema),
   LoginHistory: mongoose.models.LoginHistory || mongoose.model('LoginHistory', LoginHistorySchema),
   Notification: mongoose.models.Notification || mongoose.model('Notification', NotificationSchema),
-  ChatMessage: mongoose.models.ChatMessage || mongoose.model('ChatMessage', ChatMessageSchema)
+  ChatMessage: mongoose.models.ChatMessage || mongoose.model('ChatMessage', ChatMessageSchema),
+  SupportTicket: mongoose.models.SupportTicket || mongoose.model('SupportTicket', SupportTicketSchema)
 };
+

@@ -755,6 +755,20 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   // --------------------------------------------------------------------------
   private initAuthAndSockets() {
     this.subs.push(
+      this.gameSocket.accountSuspended$.subscribe(msg => {
+        if (msg) {
+          this.gameSocket.accountSuspended$.next(null);
+          this.gameSocket.disconnect();
+          this.authService.logout();
+          window.location.href = '/login?notice=suspended';
+        }
+      }),
+      this.authService.isAuthenticated$.subscribe(auth => {
+        if (!auth && !this.isSanitized()) {
+          this.gameSocket.disconnect();
+          window.location.href = '/login';
+        }
+      }),
       this.authService.currentUser$.subscribe(u => {
         this.currentUser.set(u);
         if (u) this.userBalance.set(u.balance);

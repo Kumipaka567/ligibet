@@ -95,13 +95,10 @@ export class App implements OnInit {
   private watchAccountSuspension(): void {
     this.gameSocket.accountSuspended$.subscribe(message => {
       if (!message) return;
-      // Clear it before acting: the stream holds its last value, and leaving a
-      // suspension notice sitting in it would throw out the next person to sign
-      // in on this device.
       this.gameSocket.accountSuspended$.next(null);
       this.gameSocket.disconnect();
       this.authService.logout();
-      this.router.navigate(['/login'], { queryParams: { notice: 'suspended' } });
+      window.location.href = '/login?notice=suspended';
     });
   }
 

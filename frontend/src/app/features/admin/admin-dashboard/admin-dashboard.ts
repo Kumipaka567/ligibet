@@ -120,13 +120,13 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     );
   }
 
-  public activeTab: 'game' | 'monitor' | 'predator' | 'withdrawal-settings' | 'active-users' | 'online-users' | 'transactions' | 'users' | 'admins' | 'logs' = 'monitor';
+  public activeTab: 'game' | 'monitor' | 'predator' | 'withdrawal-settings' | 'active-users' | 'online-users' | 'transactions' | 'users' | 'admins' | 'logs' | 'support' = 'monitor';
   public mobileMenuOpen: boolean = false;
   public selectedMiniRoom: number = 1;
   public readonly tabLabels: Record<AdminDashboardComponent['activeTab'], string> = {
     game: 'Game monitor', monitor: 'Overview', 'active-users': 'Player activity', 'online-users': 'Online players',
     transactions: 'Transactions', users: 'Users', admins: 'Administrators',
-    logs: 'Audit log', 'withdrawal-settings': 'Payment settings', predator: 'Predator'
+    logs: 'Audit log', 'withdrawal-settings': 'Payment settings', predator: 'Predator', support: 'Support & Appeals'
   };
   public readonly tabDescriptions: Record<AdminDashboardComponent['activeTab'], string> = {
     game: 'Live flight radar and next crash controls for all rooms on one screen.',
@@ -138,7 +138,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     admins: 'Manage administrator access to your platform.',
     logs: 'A clear record of administrator actions.',
     'withdrawal-settings': 'Configure deposits, withdrawals and player notices.',
-    predator: 'Customize your player-facing screen.'
+    predator: 'Customize your player-facing screen.',
+    support: 'Review support messages, inquiries and account suspension appeals raised by players.'
   };
   public lastSyncedAt: Date | null = null;
 
@@ -704,10 +705,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     return role === 'superadmin';
   }
 
-  /** True for any administrator or superadmin to promote users to admin */
+  /** True only for superadmin to promote users to admin */
   public get canPromoteUsers(): boolean {
-    const role = this.authService.currentUser$.getValue()?.role;
-    return role === 'superadmin' || role === 'admin';
+    return this.isSuperAdmin;
   }
 
   // PayHero Service Wallet Balance State
@@ -1202,6 +1202,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (tab === 'logs' && (this.isStale('logs') || this.pendingRealtimeRefresh.logs)) {
       this.pendingRealtimeRefresh.logs = false;
       this.fetchLogs();
+    }
+    if (tab === 'support') {
+      this.fetchSupportTickets();
     }
     this.cdr.markForCheck();
   }
@@ -1918,7 +1921,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   public claimTransactionTag(tx: AdminTransaction, tag: 'S' | 'G' | 'R' | 'V'): void {
     if (tx.status !== 'completed') return; // Only completed transactions can be claimed
-    if (tx.admin_tag) return; // Immutable: already claimed
+    if (tx.admin_tag && !this.isSuperAdmin) return; // Immutable for regular admins; superadmin can change
+    if (tx.admin_tag === tag) return; // Already set to this tag
     if (this.claimingTagTxId === tx.id) return; // Prevent double submit
     const token = this.authService.getToken();
     if (!token) return;
@@ -1939,7 +1943,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         if (res?.transaction?.admin_tag) {
           tx.admin_tag = res.transaction.admin_tag as ('S' | 'G' | 'R' | 'V');
         }
-        this.showAdminToast(`Transaction #${tx.id} claimed with tag [${tag}]`, 'success');
+        const actionLabel = previousTag ? 're-assigned' : 'claimed';
+        this.showAdminToast(`Transaction #${tx.id} ${actionLabel} with tag [${tag}]`, 'success');
         this.cdr.markForCheck();
       },
       error: (err) => {
@@ -2424,6 +2429,83 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.cdr.markForCheck();
         this.isResettingDeposits = false;
         this.showAdminToast(err?.error?.error || 'Failed to reset deposits table', 'error');
+      }
+    });
+  }
+
+  // Support & Appeals Desk State
+  public supportTickets: any[] = [];
+  public selectedTicket: any = null;
+  public supportReplyText: string = '';
+  public isSendingReply: boolean = false;
+  public isLoadingSupport: boolean = false;
+  public supportCategoryFilter: 'all' | 'appeal' | 'deposit' | 'withdrawal' | 'general' = 'all';
+
+  public get filteredSupportTickets(): any[] {
+    if (this.supportCategoryFilter === 'all') return this.supportTickets;
+    return this.supportTickets.filter(t => t.category === this.supportCategoryFilter);
+  }
+
+  public fetchSupportTickets(): void {
+    const token = this.authService.getToken();
+    if (!token) return;
+    this.isLoadingSupport = true;
+    this.http.get<{ tickets: any[] }>(
+      `${this.baseUrl}/api/admin/support/tickets`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).subscribe({
+      next: (res) => {
+        this.isLoadingSupport = false;
+        this.supportTickets = res?.tickets || [];
+        if (this.selectedTicket) {
+          const updated = this.supportTickets.find(t => t.id === this.selectedTicket?.id);
+          if (updated) this.selectedTicket = updated;
+        } else if (this.supportTickets.length > 0) {
+          this.selectedTicket = this.supportTickets[0];
+        }
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.isLoadingSupport = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  public selectTicket(ticket: any): void {
+    this.selectedTicket = ticket;
+    this.supportReplyText = '';
+    this.cdr.markForCheck();
+  }
+
+  public sendSupportReply(): void {
+    if (!this.selectedTicket || !this.supportReplyText.trim()) return;
+    const token = this.authService.getToken();
+    if (!token) return;
+    this.isSendingReply = true;
+    const ticketId = this.selectedTicket.id;
+    const text = this.supportReplyText.trim();
+
+    this.http.post<{ message: string; ticket: any }>(
+      `${this.baseUrl}/api/admin/support/reply`,
+      { ticket_id: ticketId, text },
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).subscribe({
+      next: (res) => {
+        this.isSendingReply = false;
+        this.supportReplyText = '';
+        if (res?.ticket) {
+          this.selectedTicket = res.ticket;
+          const idx = this.supportTickets.findIndex(t => t.id === ticketId);
+          if (idx !== -1) this.supportTickets[idx] = res.ticket;
+        }
+        this.showAdminToast('Reply sent successfully', 'success');
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        this.isSendingReply = false;
+        this.showAdminToast(err?.error?.error || 'Failed to send reply', 'error');
+        this.cdr.markForCheck();
       }
     });
   }

@@ -1734,8 +1734,17 @@
 .tag-r { background:rgba(239,68,68,0.18)!important; border-color:rgba(248,113,113,0.55)!important; color:#f87171!important; }
 .admin-tag-btn.tag-r:hover:not(:disabled) { background:rgba(239,68,68,0.4)!important; border-color:#f87171!important; color:#ffffff!important; box-shadow:0 0 8px rgba(248,113,113,0.4)!important; }
 
-.tag-v { background:rgba(168,85,247,0.18)!important; border-color:rgba(192,132,252,0.55)!important; color:#c084fc!important; }
+.admin-tag-btn.tag-v { background:rgba(168,85,247,0.18)!important; border-color:rgba(192,132,252,0.55)!important; color:#c084fc!important; }
 .admin-tag-btn.tag-v:hover:not(:disabled) { background:rgba(168,85,247,0.4)!important; border-color:#c084fc!important; color:#ffffff!important; box-shadow:0 0 8px rgba(192,132,252,0.4)!important; }
+.admin-tag-btn.active-tag {
+  outline: 2px solid #ffffff !important;
+  outline-offset: 1px !important;
+  border-width: 2px !important;
+  font-weight: 900 !important;
+  box-shadow: 0 0 10px rgba(255,255,255,0.7) !important;
+  transform: scale(1.12);
+  z-index: 2;
+}
 .registration-cell { white-space:nowrap; }
 .registration-cell strong,.registration-cell>span { display:block; }
 .registration-cell>span { font-size:10px; color:#8ea4bb; margin-top:3px; }

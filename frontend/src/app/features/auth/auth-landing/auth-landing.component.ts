@@ -1,9 +1,11 @@
-import { Component, OnInit, computed, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { SanitizedModeService } from '../../../core/services/sanitized-mode.service';
+import { getBackendOrigin } from '../../../core/config/backend-url';
 
 @Component({
   selector: 'app-auth-landing',
@@ -60,8 +62,17 @@ import { SanitizedModeService } from '../../../core/services/sanitized-mode.serv
             <h2>Reset Password</h2>
           </div>
 
+          <!-- SUSPENSION NOTICE BANNER -->
+          <div class="lb-suspension-banner" *ngIf="isSuspendedNotice">
+            <div class="lb-suspension-icon">⚠️</div>
+            <div class="lb-suspension-text">
+              <strong>Account Suspended</strong>
+              <p>Your account has been suspended contact our support using the chat below to appeal</p>
+            </div>
+          </div>
+
           <!-- ALERTS -->
-          <div class="lb-alert error" *ngIf="errorMessage">{{ errorMessage }}</div>
+          <div class="lb-alert error" *ngIf="errorMessage && !isSuspendedNotice">{{ errorMessage }}</div>
           <div class="lb-alert success" *ngIf="successMessage">{{ successMessage }}</div>
 
           <!-- LOGIN / REGISTER -->
@@ -196,6 +207,101 @@ import { SanitizedModeService } from '../../../core/services/sanitized-mode.serv
                 <a class="lb-forgot-link" (click)="onSendOtp()">Resend code</a>
               </div>
             </form>
+          </div>
+        </section>
+
+        <!-- LIVE CHAT SUPPORT & APPEALS SECTION -->
+        <section class="lb-support-section" id="support-chat">
+          <div class="lb-support-card">
+            <div class="lb-support-header" (click)="toggleSupportExpanded()">
+              <div class="lb-support-title-wrap">
+                <div class="lb-support-indicator">
+                  <span class="live-dot"></span>
+                </div>
+                <div>
+                  <h3 class="lb-support-title">LigiBet Live Support & Appeals</h3>
+                  <p class="lb-support-sub">Raise an issue or appeal account suspension</p>
+                </div>
+              </div>
+              <button type="button" class="lb-support-toggle-btn">
+                {{ isSupportExpanded ? 'Minimize' : 'Open Support Chat' }}
+              </button>
+            </div>
+
+            <div class="lb-support-body" *ngIf="isSupportExpanded">
+              <!-- Issue Category Selector -->
+              <div class="lb-support-category-group">
+                <label class="lb-label">Select Topic / Issue</label>
+                <div class="lb-support-categories">
+                  <button type="button" 
+                          [class.active]="supportCategory === 'appeal'" 
+                          (click)="setSupportCategory('appeal')">
+                    ⚠️ Suspension Appeal
+                  </button>
+                  <button type="button" 
+                          [class.active]="supportCategory === 'deposit'" 
+                          (click)="setSupportCategory('deposit')">
+                    💳 Deposit / STK
+                  </button>
+                  <button type="button" 
+                          [class.active]="supportCategory === 'withdrawal'" 
+                          (click)="setSupportCategory('withdrawal')">
+                    💰 Withdrawal
+                  </button>
+                  <button type="button" 
+                          [class.active]="supportCategory === 'general'" 
+                          (click)="setSupportCategory('general')">
+                    💬 General Inquiry
+                  </button>
+                </div>
+              </div>
+
+              <!-- Phone number identification -->
+              <div class="lb-field">
+                <label class="lb-label">Your Registered Phone Number</label>
+                <div class="lb-input-box lb-phone-box">
+                  <span class="lb-phone-prefix">+254</span>
+                  <span class="lb-phone-divider"></span>
+                  <input type="tel" [(ngModel)]="supportPhone" name="supportPhone" class="lb-input"
+                         placeholder="7XX XXX XXX" (change)="loadSupportMessages()" required />
+                </div>
+              </div>
+
+              <!-- Chat Message Thread Box -->
+              <div class="lb-support-thread">
+                <div *ngIf="supportMessages.length === 0" class="lb-support-empty">
+                  <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  <p>Send your message or suspension appeal below to chat directly with support.</p>
+                </div>
+                <div *ngFor="let msg of supportMessages" 
+                     class="lb-support-bubble-row" 
+                     [class.from-user]="msg.sender === 'user'" 
+                     [class.from-admin]="msg.sender === 'admin'">
+                  <div class="lb-support-bubble">
+                    <div class="lb-bubble-meta">
+                      <span class="lb-bubble-sender">{{ msg.sender === 'admin' ? '🛡️ LigiBet Admin' : 'You' }}</span>
+                      <span class="lb-bubble-time">{{ msg.created_at | date:'shortTime' }}</span>
+                    </div>
+                    <div class="lb-bubble-text">{{ msg.text }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Send Form -->
+              <form (ngSubmit)="sendSupportMessage()" class="lb-support-input-row">
+                <input type="text" [(ngModel)]="supportInputText" name="supportInputText" 
+                       class="lb-input lb-support-input" 
+                       placeholder="Type your message or appeal here..." 
+                       [disabled]="isSendingSupport" required />
+                <button type="submit" class="lb-support-send-btn" [disabled]="isSendingSupport || !supportInputText.trim()">
+                  {{ isSendingSupport ? 'Sending...' : 'Send' }}
+                </button>
+              </form>
+
+              <div class="lb-support-feedback" *ngIf="supportStatusMsg">
+                {{ supportStatusMsg }}
+              </div>
+            </div>
           </div>
         </section>
 
@@ -420,19 +526,220 @@ import { SanitizedModeService } from '../../../core/services/sanitized-mode.serv
       margin: 20px 0 0; font-size: 12px; color: var(--lb-faint); text-align: center;
     }
 
+    /* SUSPENSION NOTICE BANNER */
+    .lb-suspension-banner {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+      padding: 13px 15px;
+      background: #fef2f2;
+      border: 1.5px solid #ef4444;
+      border-radius: 12px;
+      color: #991b1b;
+      animation: fadeIn .25s ease;
+    }
+    .lb-suspension-icon { font-size: 22px; line-height: 1; flex-shrink: 0; }
+    .lb-suspension-text strong { display: block; font-size: 14px; font-weight: 700; color: #b91c1c; margin-bottom: 3px; }
+    .lb-suspension-text p { margin: 0; font-size: 13px; line-height: 1.35; color: #7f1d1d; font-weight: 500; }
+
+    /* SUPPORT SECTION */
+    .lb-support-section {
+      width: 100%;
+      max-width: 430px;
+      margin-top: 18px;
+    }
+    .lb-support-card {
+      background: #ffffff;
+      border-radius: 14px;
+      border: 1px solid var(--lb-border);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }
+    .lb-support-header {
+      padding: 13px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--lb-border);
+      cursor: pointer;
+      user-select: none;
+    }
+    .lb-support-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .lb-support-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+      flex-shrink: 0;
+    }
+    .lb-support-title {
+      margin: 0;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .lb-support-sub {
+      margin: 0;
+      font-size: 11px;
+      color: #64748b;
+    }
+    .lb-support-toggle-btn {
+      padding: 5px 11px;
+      border-radius: 7px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+    }
+    .lb-support-body {
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      background: #ffffff;
+    }
+    .lb-support-category-group .lb-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 4px;
+    }
+    .lb-support-categories {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .lb-support-categories button {
+      padding: 6px 10px;
+      border-radius: 20px;
+      border: 1px solid #e2e8f0;
+      background: #f1f5f9;
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+    .lb-support-categories button.active {
+      background: #15a94b;
+      color: #ffffff;
+      border-color: #15a94b;
+    }
+    .lb-support-thread {
+      max-height: 220px;
+      min-height: 110px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px;
+      background: #f8fafc;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+    }
+    .lb-support-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 8px;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 11.5px;
+      gap: 6px;
+    }
+    .lb-support-bubble-row {
+      display: flex;
+      width: 100%;
+    }
+    .lb-support-bubble-row.from-user {
+      justify-content: flex-end;
+    }
+    .lb-support-bubble-row.from-admin {
+      justify-content: flex-start;
+    }
+    .lb-support-bubble {
+      max-width: 82%;
+      padding: 8px 11px;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .from-user .lb-support-bubble {
+      background: #15a94b;
+      color: #ffffff;
+      border-bottom-right-radius: 2px;
+    }
+    .from-admin .lb-support-bubble {
+      background: #e2e8f0;
+      color: #0f172a;
+      border-bottom-left-radius: 2px;
+    }
+    .lb-bubble-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 9.5px;
+      margin-bottom: 2px;
+      opacity: 0.85;
+      font-weight: 600;
+    }
+    .lb-support-input-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .lb-support-input {
+      flex: 1;
+      height: 38px;
+      font-size: 12.5px;
+    }
+    .lb-support-send-btn {
+      padding: 0 16px;
+      border-radius: 7px;
+      background: #15a94b;
+      color: #ffffff;
+      border: 0;
+      font-weight: 700;
+      font-size: 12.5px;
+      cursor: pointer;
+    }
+    .lb-support-send-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .lb-support-feedback {
+      font-size: 11px;
+      color: #15a94b;
+      text-align: center;
+      font-weight: 600;
+    }
+
     @media (max-width: 560px) {
       .lb-auth-topbar-inner { padding: 11px 14px; gap: 10px; }
       .lb-auth-word { font-size: 20px; }
       .lb-auth-tagline { font-size: 12.5px; width: 100%; }
       .lb-auth-card { padding: 16px 15px 20px; border-radius: 8px; }
       .lb-auth-main { padding: 14px 12px 34px; }
+      .lb-support-section { margin-top: 14px; }
     }
   `]
 })
-export class AuthLandingComponent implements OnInit {
+export class AuthLandingComponent implements OnInit, OnDestroy {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly sanitizedModeService = inject(SanitizedModeService);
+  private readonly http = inject(HttpClient);
 
   /** Sanitized mode is strictly active ONLY for Admin / Superadmin accounts */
   readonly isSanitized = computed(() => this.authService.isAdmin() && this.sanitizedModeService.isSanitizedMode());
@@ -454,12 +761,28 @@ export class AuthLandingComponent implements OnInit {
   public confirmNewPassword: string = '';
   private generatedOtp: string = '';
 
+  // Suspension Notice & Live Support State
+  public isSuspendedNotice: boolean = false;
+  public isSupportExpanded: boolean = true;
+  public supportCategory: 'appeal' | 'deposit' | 'withdrawal' | 'general' = 'general';
+  public supportPhone: string = '';
+  public supportInputText: string = '';
+  public isSendingSupport: boolean = false;
+  public supportStatusMsg: string | null = null;
+  public supportMessages: Array<{ sender: 'user' | 'admin'; text: string; created_at: string }> = [];
+  private supportPollTimer: ReturnType<typeof setInterval> | null = null;
+
   ngOnInit() {
-    // Arriving here from a live session means an administrator just suspended
-    // the account. Say so, otherwise being thrown out of a round mid-flight
-    // looks like the site crashed.
+    // Check if player arrived via account suspension
     if (new URLSearchParams(window.location.search).get('notice') === 'suspended') {
-      this.errorMessage = 'Your account has been suspended by an administrator.';
+      this.isSuspendedNotice = true;
+      this.errorMessage = 'Your account has been suspended contact our support using the chat below to appeal';
+      this.supportCategory = 'appeal';
+      this.isSupportExpanded = true;
+      setTimeout(() => {
+        const el = document.getElementById('support-chat');
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 350);
     }
 
     if (this.authService.hasToken()) {
@@ -470,6 +793,93 @@ export class AuthLandingComponent implements OnInit {
         }
       });
     }
+
+    // Auto-refresh support conversation every 6 seconds if phone is set
+    this.supportPollTimer = setInterval(() => {
+      if (this.supportPhone || this.phone) {
+        this.loadSupportMessages(true);
+      }
+    }, 6000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.supportPollTimer) {
+      clearInterval(this.supportPollTimer);
+      this.supportPollTimer = null;
+    }
+  }
+
+  public toggleSupportExpanded(): void {
+    this.isSupportExpanded = !this.isSupportExpanded;
+    if (this.isSupportExpanded) this.loadSupportMessages();
+  }
+
+  public setSupportCategory(cat: 'appeal' | 'deposit' | 'withdrawal' | 'general'): void {
+    this.supportCategory = cat;
+  }
+
+  public loadSupportMessages(isBackground = false): void {
+    const raw = (this.supportPhone || this.phone || '').trim();
+    if (!raw) return;
+    const { fullPhone, rawPhone } = this.formatPhone(raw);
+    const phoneToQuery = fullPhone || rawPhone;
+    this.http.get<{ tickets: any[] }>(`${getBackendOrigin()}/api/support/messages?phone=${encodeURIComponent(phoneToQuery)}`).subscribe({
+      next: (res) => {
+        if (res?.tickets && res.tickets.length > 0) {
+          const allMsgs: any[] = [];
+          for (const ticket of res.tickets) {
+            if (ticket.messages && Array.isArray(ticket.messages)) {
+              allMsgs.push(...ticket.messages);
+            }
+          }
+          allMsgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          this.supportMessages = allMsgs;
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  public sendSupportMessage(): void {
+    const raw = (this.supportPhone || this.phone || '').trim();
+    const text = (this.supportInputText || '').trim();
+    if (!raw) {
+      this.supportStatusMsg = 'Please enter your phone number above.';
+      return;
+    }
+    if (!text) return;
+
+    const { fullPhone, rawPhone } = this.formatPhone(raw);
+    const phoneToSend = fullPhone || rawPhone;
+    this.isSendingSupport = true;
+    this.supportStatusMsg = null;
+
+    this.http.post<{ message: string; ticket: any }>(`${getBackendOrigin()}/api/support/message`, {
+      phone_number: phoneToSend,
+      text,
+      category: this.supportCategory,
+      username: phoneToSend
+    }).subscribe({
+      next: (res) => {
+        this.isSendingSupport = false;
+        this.supportInputText = '';
+        this.supportStatusMsg = 'Message sent! Support will respond here.';
+        if (res?.ticket?.messages) {
+          this.supportMessages = res.ticket.messages;
+        } else {
+          this.supportMessages.push({
+            sender: 'user',
+            text,
+            created_at: new Date().toISOString()
+          });
+        }
+        setTimeout(() => { this.supportStatusMsg = null; }, 5000);
+      },
+      error: (err) => {
+        this.isSendingSupport = false;
+        this.supportStatusMsg = err?.error?.error || 'Failed to send message. Please retry.';
+      }
+    });
   }
 
   public setTab(tab: 'login' | 'register' | 'forgot') {
@@ -564,6 +974,22 @@ export class AuthLandingComponent implements OnInit {
         this.router.navigate(['/dashboard']);
       },
       error: (err) => {
+        const errMsg = String(err?.message || '');
+        if (err?.status === 403 && (errMsg.toLowerCase().includes('suspended') || (err as any)?.code === 'ACCOUNT_SUSPENDED')) {
+          this.isSubmitting = false;
+          this.isSuspendedNotice = true;
+          this.errorMessage = 'Your account has been suspended contact our support using the chat below to appeal';
+          this.supportCategory = 'appeal';
+          this.supportPhone = this.phone;
+          this.isSupportExpanded = true;
+          this.loadSupportMessages();
+          setTimeout(() => {
+            const el = document.getElementById('support-chat');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }, 350);
+          return;
+        }
+
         // Worth retrying under the raw input only when the server rejected the
         // credentials or the formatted value itself. Retrying a 429 or a 500
         // just doubles the load and buries the real reason behind a
@@ -577,6 +1003,16 @@ export class AuthLandingComponent implements OnInit {
             },
             error: (retryErr) => {
               this.isSubmitting = false;
+              const retryMsg = String(retryErr?.message || '');
+              if (retryErr?.status === 403 && (retryMsg.toLowerCase().includes('suspended') || (retryErr as any)?.code === 'ACCOUNT_SUSPENDED')) {
+                this.isSuspendedNotice = true;
+                this.errorMessage = 'Your account has been suspended contact our support using the chat below to appeal';
+                this.supportCategory = 'appeal';
+                this.supportPhone = this.phone;
+                this.isSupportExpanded = true;
+                this.loadSupportMessages();
+                return;
+              }
               this.errorMessage = retryErr?.message || 'Invalid phone number or password.';
             }
           });

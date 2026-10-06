@@ -42,6 +42,7 @@ const {
   LoginHistory,
   Notification,
   ChatMessage,
+  SupportTicket,
   Counter
 } = require('./models');
 
@@ -532,8 +533,9 @@ function isSuspendedUser(userId) {
 // immediate rather than "next time they sign in".
 function enforceSuspensionNow(userId) {
   try {
-    io.to(`user_${userId}`).emit('account_suspended', {
-      message: 'Your account has been suspended by an administrator.'
+    const suspendedMsg = 'Your account has been suspended contact our support using the chat below to appeal';
+    io.to(`user_${userId}`).to(`user_${String(userId)}`).emit('account_suspended', {
+      message: suspendedMsg
     });
     // Let the message reach the client before the socket goes away.
     setTimeout(() => {
@@ -563,7 +565,7 @@ function authenticateToken(req, res, next) {
     // rather than at the next login.
     if (isSuspendedUser(user?.id)) {
       return res.status(403).json({
-        error: 'Your account has been suspended by an administrator.',
+        error: 'Your account has been suspended contact our support using the chat below to appeal',
         code: 'ACCOUNT_SUSPENDED'
       });
     }
@@ -782,7 +784,10 @@ app.post('/api/auth/login', rateLimit(120, 60000), async (req, res) => {
       return res.status(401).json({ error: 'Invalid phone number/username or password' });
     }
     if (user.is_suspended) {
-      return res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
+      return res.status(403).json({
+        error: 'Your account has been suspended contact our support using the chat below to appeal',
+        code: 'ACCOUNT_SUSPENDED'
+      });
     }
 
     const validPassword = await bcrypt.compare(password, user.password_hash);
@@ -2777,16 +2782,20 @@ app.post('/api/admin/transactions/:id/claim-tag', authenticateAdminToken, async 
       });
     }
 
-    // IMMUTABLE RULE: once selected, it cannot be rechanged once claimed!
-    if (existingTx.admin_tag) {
-      return res.status(400).json({
+    // IMMUTABLE RULE: regular admins cannot change once claimed, but superadmin can change/reassign tags
+    if (existingTx.admin_tag && !isSuperAdmin(req.user.role)) {
+      return res.status(403).json({
         error: `Transaction has already been claimed by admin [${existingTx.admin_tag}] and cannot be changed.`
       });
     }
 
-    // Atomic update where status is 'completed' and admin_tag is currently null
+    const query = isSuperAdmin(req.user.role)
+      ? { id: txId, status: 'completed' }
+      : { id: txId, status: 'completed', admin_tag: null };
+
+    // Atomic update
     const updatedTx = await Transaction.findOneAndUpdate(
-      { id: txId, status: 'completed', admin_tag: null },
+      query,
       {
         $set: {
           admin_tag: cleanTag,
@@ -2803,10 +2812,13 @@ app.post('/api/admin/transactions/:id/claim-tag', authenticateAdminToken, async 
       });
     }
 
+    const isReassignment = Boolean(existingTx.admin_tag);
     await AdminLog.create({
       admin_id: req.user.id,
-      action: 'CLAIM_TRANSACTION',
-      details: `Admin ${req.user.username} claimed transaction #${txId} with tag [${cleanTag}]`,
+      action: isReassignment ? 'REASSIGN_TRANSACTION_TAG' : 'CLAIM_TRANSACTION',
+      details: isReassignment
+        ? `Superadmin ${req.user.username} changed tag on transaction #${txId} from [${existingTx.admin_tag}] to [${cleanTag}]`
+        : `Admin ${req.user.username} claimed transaction #${txId} with tag [${cleanTag}]`,
       target_user_id: updatedTx.user_id
     }).catch(err => console.warn('AdminLog error:', err.message));
 
@@ -2884,9 +2896,12 @@ app.post('/api/admin/create-admin', authenticateSuperAdminToken, async (req, res
   }
 });
 
-// Admin Set User Role
+// Admin Set User Role - Superadmin Only
 app.post('/api/admin/users/:id/set-role', authenticateAdminToken, async (req, res) => {
   try {
+    if (!isSuperAdmin(req.user.role)) {
+      return res.status(403).json({ error: 'Only a superadmin can promote users to admin' });
+    }
     const targetUserId = Number(req.params.id);
     if (!Number.isSafeInteger(targetUserId) || targetUserId <= 0) {
       return res.status(400).json({ error: 'Invalid user ID' });
@@ -3638,6 +3653,204 @@ app.get('/api/admin/rounds', authenticateAdminToken, async (req, res) => {
     return res.json({ rounds });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch rounds' });
+  }
+});
+
+// ============================================================================
+// SUPPORT & APPEALS SYSTEM (Landing Page Chat & Admin Desk)
+// ============================================================================
+
+const localDevSupportTickets = [];
+
+// POST /api/support/message - Public endpoint for landing page visitors and suspended accounts
+app.post('/api/support/message', async (req, res) => {
+  try {
+    const { phone_number, text, category, username } = req.body || {};
+    const cleanPhone = String(phone_number || '').trim();
+    const cleanText = String(text || '').trim();
+    const validCategory = ['appeal', 'deposit', 'withdrawal', 'general'].includes(category)
+      ? category
+      : 'general';
+
+    if (!cleanPhone) {
+      return res.status(400).json({ error: 'Please enter your phone number so support can assist you.' });
+    }
+    if (!cleanText) {
+      return res.status(400).json({ error: 'Please enter your support message or appeal details.' });
+    }
+
+    let ticket = null;
+    const isMongoConnected = mongoose.connection.readyState === 1;
+
+    if (isMongoConnected) {
+      ticket = await SupportTicket.findOne({
+        phone_number: cleanPhone,
+        status: { $in: ['open', 'answered'] }
+      }).sort({ updated_at: -1 });
+
+      if (!ticket) {
+        ticket = new SupportTicket({
+          phone_number: cleanPhone,
+          username: String(username || '').trim(),
+          category: validCategory,
+          subject: validCategory === 'appeal' ? 'Account Suspension Appeal' : 'User Support Inquiry',
+          status: 'open',
+          messages: []
+        });
+      }
+
+      ticket.messages.push({
+        sender: 'user',
+        sender_name: String(username || cleanPhone),
+        text: cleanText,
+        created_at: new Date()
+      });
+      ticket.status = 'open';
+      ticket.category = validCategory;
+      await ticket.save();
+    } else {
+      ticket = localDevSupportTickets.find(t => t.phone_number === cleanPhone && t.status !== 'closed');
+      if (!ticket) {
+        ticket = {
+          id: localDevSupportTickets.length + 1,
+          phone_number: cleanPhone,
+          username: String(username || '').trim(),
+          category: validCategory,
+          subject: validCategory === 'appeal' ? 'Account Suspension Appeal' : 'User Support Inquiry',
+          status: 'open',
+          messages: [],
+          created_at: new Date(),
+          updated_at: new Date()
+        };
+        localDevSupportTickets.push(ticket);
+      }
+      ticket.messages.push({
+        sender: 'user',
+        sender_name: String(username || cleanPhone),
+        text: cleanText,
+        created_at: new Date()
+      });
+      ticket.status = 'open';
+      ticket.category = validCategory;
+      ticket.updated_at = new Date();
+    }
+
+    const payload = typeof ticket.toJSON === 'function' ? ticket.toJSON() : ticket;
+    try {
+      adminNamespace.emit('support_ticket_update', { ticket: payload });
+    } catch (e) {
+      /* ignore */
+    }
+
+    return res.json({
+      message: 'Support message received. An administrator will reply shortly.',
+      ticket: payload
+    });
+  } catch (err) {
+    console.error('Support message error:', err);
+    return res.status(500).json({ error: 'Failed to send support message' });
+  }
+});
+
+// GET /api/support/messages - Public endpoint to retrieve thread for a phone number
+app.get('/api/support/messages', async (req, res) => {
+  try {
+    const rawPhone = String(req.query.phone || '').trim();
+    if (!rawPhone) {
+      return res.json({ tickets: [] });
+    }
+
+    const variations = generatePhoneVariations(rawPhone);
+    const isMongoConnected = mongoose.connection.readyState === 1;
+
+    if (isMongoConnected) {
+      const tickets = await SupportTicket.find({
+        phone_number: { $in: variations }
+      }).sort({ updated_at: -1 }).limit(10).lean();
+      return res.json({ tickets });
+    } else {
+      const tickets = localDevSupportTickets.filter(t => variations.includes(t.phone_number));
+      return res.json({ tickets });
+    }
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch support messages' });
+  }
+});
+
+// GET /api/admin/support/tickets - Admin view of all tickets
+app.get('/api/admin/support/tickets', authenticateAdminToken, async (req, res) => {
+  try {
+    const isMongoConnected = mongoose.connection.readyState === 1;
+    if (isMongoConnected) {
+      const tickets = await SupportTicket.find().sort({ updated_at: -1 }).limit(100).lean();
+      return res.json({ tickets });
+    } else {
+      return res.json({ tickets: localDevSupportTickets.slice().reverse() });
+    }
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch support tickets' });
+  }
+});
+
+// POST /api/admin/support/reply - Admin replies to a ticket
+app.post('/api/admin/support/reply', authenticateAdminToken, async (req, res) => {
+  try {
+    const ticketId = Number(req.body.ticket_id);
+    const replyText = String(req.body.text || '').trim();
+
+    if (!ticketId || !replyText) {
+      return res.status(400).json({ error: 'Ticket ID and reply message are required.' });
+    }
+
+    const isMongoConnected = mongoose.connection.readyState === 1;
+    let ticket = null;
+
+    if (isMongoConnected) {
+      ticket = await SupportTicket.findOne({ id: ticketId });
+      if (!ticket) return res.status(404).json({ error: 'Support ticket not found.' });
+
+      ticket.messages.push({
+        sender: 'admin',
+        sender_name: req.user.username || 'Admin Support',
+        text: replyText,
+        created_at: new Date()
+      });
+      ticket.status = req.body.close ? 'closed' : 'answered';
+      await ticket.save();
+    } else {
+      ticket = localDevSupportTickets.find(t => t.id === ticketId);
+      if (!ticket) return res.status(404).json({ error: 'Support ticket not found.' });
+
+      ticket.messages.push({
+        sender: 'admin',
+        sender_name: req.user.username || 'Admin Support',
+        text: replyText,
+        created_at: new Date()
+      });
+      ticket.status = req.body.close ? 'closed' : 'answered';
+      ticket.updated_at = new Date();
+    }
+
+    await AdminLog.create({
+      admin_id: req.user.id,
+      action: 'REPLY_SUPPORT_TICKET',
+      details: `Admin ${req.user.username} replied to support ticket #${ticketId} (${ticket.phone_number})`,
+      target_user_id: null
+    }).catch(err => console.warn('AdminLog error:', err.message));
+
+    const payload = typeof ticket.toJSON === 'function' ? ticket.toJSON() : ticket;
+    try {
+      adminNamespace.emit('support_ticket_update', { ticket: payload });
+    } catch (e) {
+      /* ignore */
+    }
+
+    return res.json({
+      message: 'Reply sent successfully.',
+      ticket: payload
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to send reply' });
   }
 });
 
