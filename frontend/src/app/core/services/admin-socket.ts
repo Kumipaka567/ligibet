@@ -128,6 +128,9 @@ export interface AdminTransactionUpdate {
   amount: number;
   status: string;
   reference?: string;
+  admin_tag?: 'S' | 'G' | 'R' | 'V' | null;
+  admin_tagged_by?: number | null;
+  admin_tagged_at?: string | null;
   created_at?: string;
 }
 

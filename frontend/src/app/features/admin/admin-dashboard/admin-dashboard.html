@@ -673,6 +673,7 @@
               <th scope="col">Amount</th>
               <th scope="col">Reference / Receipt</th>
               <th scope="col">Status</th>
+              <th scope="col" class="admin-tag-th">Admin Tag</th>
               <th scope="col">Timestamp</th>
             </tr>
           </thead>
@@ -685,7 +686,6 @@
                 <div class="tx-amount-block">
                   <span class="tx-amount-currency">KES</span>
                   <strong class="mono tx-amount-val">{{ tx.amount | number:'1.2-2' }}</strong>
-                  <span class="tx-type-tag" *ngIf="tx.type">{{ tx.type === 'deposit' ? 'Deposit' : 'Withdrawal' }}</span>
                 </div>
               </td>
               <td class="mono text-xs" data-label="Reference / Receipt">{{ tx.reference || '--' }}</td>
@@ -694,10 +694,35 @@
                   {{ tx.status | uppercase }}
                 </span>
               </td>
+              <td data-label="Admin Tag" class="admin-tag-td">
+                <ng-container *ngIf="tx.status === 'completed'; else notCompletedTx">
+                  <ng-container *ngIf="tx.admin_tag; else unclaimedTag">
+                    <span class="admin-claimed-tag"
+                          [ngClass]="'tag-' + tx.admin_tag.toLowerCase()"
+                          [attr.title]="'Claimed by Admin ' + tx.admin_tag">{{ tx.admin_tag }}</span>
+                  </ng-container>
+                  <ng-template #unclaimedTag>
+                    <div class="admin-tag-options" role="group" aria-label="Claim transaction">
+                      <button type="button"
+                              *ngFor="let tag of allowedAdminTags"
+                              class="admin-tag-btn"
+                              [ngClass]="'tag-' + tag.toLowerCase()"
+                              [disabled]="claimingTagTxId === tx.id"
+                              (click)="claimTransactionTag(tx, tag)"
+                              [title]="'Claim transaction as Admin ' + tag">
+                        {{ tag }}
+                      </button>
+                    </div>
+                  </ng-template>
+                </ng-container>
+                <ng-template #notCompletedTx>
+                  <span class="text-muted mono text-xs">--</span>
+                </ng-template>
+              </td>
               <td class="mono text-xs" data-label="Timestamp">{{ tx.created_at | date:'medium' }}</td>
             </tr>
             <tr *ngIf="transactionsList.length === 0">
-              <td colspan="7" class="text-center padding-lg text-muted">No records found matching query.</td>
+              <td colspan="8" class="text-center padding-lg text-muted">No records found matching query.</td>
             </tr>
           </tbody>
         </table>

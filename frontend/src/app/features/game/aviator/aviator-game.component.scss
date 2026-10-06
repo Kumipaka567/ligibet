@@ -1308,6 +1308,18 @@
   }
 }
 
+.spribe-menu-btn.bonus-claim-item {
+  color: #fef3c7;
+  font-weight: 700;
+
+  &.claimed,
+  &:disabled {
+    color: #bbf7d0;
+    cursor: default;
+    opacity: 0.85;
+  }
+}
+
 .bonus-notification {
   position: fixed;
   z-index: 2000;

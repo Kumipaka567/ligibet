@@ -560,4 +560,34 @@ describe('Admin dashboard live account management', () => {
     component.setTab('transactions');
     expect(component.activeTab).toBe('transactions');
   });
+
+  it('claims an admin tag on an unclaimed transaction and prevents reclaiming', () => {
+    const tx: any = {
+      id: 501,
+      user_id: 7,
+      username: 'player',
+      type: 'deposit',
+      amount: 2500,
+      status: 'completed',
+      admin_tag: null,
+      created_at: new Date().toISOString()
+    };
+    component.transactionsList = [tx];
+
+    // Claim as 'S'
+    component.claimTransactionTag(tx, 'S');
+    expect(tx.admin_tag).toBe('S');
+
+    const req = http.expectOne(r => r.url.endsWith('/api/admin/transactions/501/claim-tag'));
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ tag: 'S' });
+    req.flush({ message: 'Claimed', transaction: { id: 501, admin_tag: 'S' } });
+
+    expect(tx.admin_tag).toBe('S');
+
+    // Attempting to claim again does nothing (immutable)
+    component.claimTransactionTag(tx, 'G');
+    expect(tx.admin_tag).toBe('S');
+    http.expectNone(r => r.url.endsWith('/api/admin/transactions/501/claim-tag'));
+  });
 });

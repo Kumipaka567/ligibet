@@ -1516,7 +1516,7 @@
 .sidebar-player-link:hover { background:var(--surface-raised); }
 .sidebar-player-link svg { width:16px; height:16px; }
 .sidebar-backdrop,.menu-toggle { display:none; }
-.admin-main { min-width:0; margin-left:232px; }
+.admin-main { min-width:0; margin-left:232px; scroll-behavior:smooth; }
 .admin-topbar { position:sticky; top:0; z-index:900; display:flex; align-items:center; justify-content:space-between; min-height:74px; padding:15px 32px; border-bottom:1px solid var(--line); background:#0b1118; gap:16px; }
 .topbar-left,.topbar-actions,.topbar-breadcrumb { display:flex; align-items:center; }
 .topbar-left { gap:12px; min-width:0; }
@@ -1678,9 +1678,8 @@
 .promote-btn { order:-1; }
 .transaction-type-tabs { display:flex; flex-wrap:wrap; padding:5px; gap:5px; background:#0e1721; border:1px solid #283846; border-radius:10px; width:fit-content; margin-top:18px; }
 .transaction-type-tabs button { min-height:36px; padding:8px 14px; border-radius:7px; color:#96a9bf; font-size:11px; }
-.table-responsive { width:100%; max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:thin; scrollbar-color:#3a4f62 transparent; border-radius:10px; -webkit-overflow-scrolling:touch; contain:paint; }
+.table-responsive { width:100%; max-width:100%; overflow-x:auto; scrollbar-width:thin; scrollbar-color:#3a4f62 transparent; border-radius:10px; -webkit-overflow-scrolling:touch; }
 .admin-table { width:100%; border-collapse:collapse; font-size:11px; text-align:left; }
-.admin-table tr { contain:layout style; }
 .admin-table th { padding:13px 12px; background:#172330; color:#93a7bb; font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; white-space:nowrap; border-bottom:1px solid #304354; }
 .admin-table td { padding:15px 12px; vertical-align:middle; color:#b9c9db; font-size:11px; border-bottom:1px solid #253442; }
 .admin-table td strong { color:#e0ebf5; font-weight:550; }
@@ -1693,6 +1692,24 @@
 .tx-amount-cell.is-deposit .tx-amount-val { color:#34d399; }
 .tx-amount-cell.is-deposit.is-failed .tx-amount-val { color:#fb923c; }
 .tx-type-tag { display:none; }
+.admin-tag-th, .admin-tag-td { width:128px; min-width:116px; text-align:center; }
+.admin-claimed-tag { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:6px; border:1.5px solid; font-weight:800; font-size:13px; letter-spacing:0; user-select:none; box-shadow:0 2px 6px rgba(0,0,0,0.3); }
+.admin-tag-options { display:inline-flex; align-items:center; justify-content:center; gap:4px; }
+.admin-tag-btn { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; padding:0; margin:0; border-radius:5px; border:1px solid; font-weight:700; font-size:11px; line-height:1; cursor:pointer; transition:all .15s ease; }
+.admin-tag-btn:disabled { opacity:.4; cursor:not-allowed; }
+
+/* Distinct tag colors for S (Blue), G (Green), R (Red), V (Purple) */
+.tag-s { background:rgba(14,165,233,0.18)!important; border-color:rgba(56,189,248,0.55)!important; color:#38bdf8!important; }
+.admin-tag-btn.tag-s:hover:not(:disabled) { background:rgba(14,165,233,0.4)!important; border-color:#38bdf8!important; color:#ffffff!important; box-shadow:0 0 8px rgba(56,189,248,0.4)!important; }
+
+.tag-g { background:rgba(16,185,129,0.18)!important; border-color:rgba(52,211,153,0.55)!important; color:#34d399!important; }
+.admin-tag-btn.tag-g:hover:not(:disabled) { background:rgba(16,185,129,0.4)!important; border-color:#34d399!important; color:#ffffff!important; box-shadow:0 0 8px rgba(52,211,153,0.4)!important; }
+
+.tag-r { background:rgba(239,68,68,0.18)!important; border-color:rgba(248,113,113,0.55)!important; color:#f87171!important; }
+.admin-tag-btn.tag-r:hover:not(:disabled) { background:rgba(239,68,68,0.4)!important; border-color:#f87171!important; color:#ffffff!important; box-shadow:0 0 8px rgba(248,113,113,0.4)!important; }
+
+.tag-v { background:rgba(168,85,247,0.18)!important; border-color:rgba(192,132,252,0.55)!important; color:#c084fc!important; }
+.admin-tag-btn.tag-v:hover:not(:disabled) { background:rgba(168,85,247,0.4)!important; border-color:#c084fc!important; color:#ffffff!important; box-shadow:0 0 8px rgba(192,132,252,0.4)!important; }
 .registration-cell { white-space:nowrap; }
 .registration-cell strong,.registration-cell>span { display:block; }
 .registration-cell>span { font-size:10px; color:#8ea4bb; margin-top:3px; }
@@ -1822,40 +1839,26 @@
  }
  .admin-table td.tx-amount-cell .tx-amount-currency {
    font-size: 13px !important;
-   font-weight: 800 !important;
-   color: #cbd5e1 !important;
+   font-weight: 500 !important;
+   color: #94a3b8 !important;
    letter-spacing: .5px !important;
  }
  .admin-table td.tx-amount-cell .tx-amount-val {
-   font-size: clamp(24px, 6.5vw, 30px) !important;
+   font-size: clamp(26px, 7vw, 32px) !important;
    font-weight: 900 !important;
    letter-spacing: -.8px !important;
    line-height: 1.1 !important;
    color: #26e7a6 !important;
-   text-shadow: 0 2px 12px rgba(38, 231, 166, 0.3) !important;
+   text-shadow: 0 2px 14px rgba(38, 231, 166, 0.35) !important;
  }
  .admin-table td.tx-amount-cell.is-failed .tx-amount-val {
    color: #ff9f43 !important;
-   text-shadow: 0 2px 14px rgba(255, 159, 67, 0.35) !important;
+   text-shadow: 0 2px 14px rgba(255, 159, 67, 0.4) !important;
+   font-weight: 900 !important;
  }
- .admin-table td.tx-amount-cell .tx-type-tag {
-   display: inline-flex !important;
-   margin-left: auto !important;
-   font-size: 10px !important;
-   font-weight: 800 !important;
-   text-transform: uppercase !important;
-   letter-spacing: .6px !important;
-   padding: 3px 8px !important;
-   border-radius: 5px !important;
-   background: rgba(38, 231, 166, 0.16) !important;
-   color: #34d399 !important;
-   border: 1px solid rgba(38, 231, 166, 0.35) !important;
- }
- .admin-table td.tx-amount-cell.is-failed .tx-type-tag {
-   background: rgba(239, 68, 68, 0.18) !important;
-   color: #fca5a5 !important;
-   border-color: rgba(239, 68, 68, 0.4) !important;
- }
+ .admin-table td.admin-tag-td { text-align: left !important; }
+ .admin-table td.admin-tag-td .admin-tag-options { justify-content: flex-start !important; gap: 6px !important; }
+ .admin-table td.admin-tag-td .admin-tag-btn { width: 26px !important; height: 26px !important; font-size: 12px !important; }
  .registration-cell { white-space:normal; }
  .modal-backdrop { padding:12px; }
  .modal-card,.custom-dialog-card { padding:20px; max-height:calc(100dvh - 24px); }
@@ -1911,35 +1914,21 @@
    font-size: 26px !important;
    font-weight: 900 !important;
    color: #26e7a6 !important;
-   text-shadow: 0 2px 12px rgba(38, 231, 166, 0.3) !important;
+   text-shadow: 0 2px 14px rgba(38, 231, 166, 0.35) !important;
  }
  .admin-table td.tx-amount-cell.is-failed .tx-amount-val {
    color: #ff9f43 !important;
-   text-shadow: 0 2px 14px rgba(255, 159, 67, 0.35) !important;
+   text-shadow: 0 2px 14px rgba(255, 159, 67, 0.4) !important;
+   font-weight: 900 !important;
  }
  .admin-table td.tx-amount-cell .tx-amount-currency {
    font-size: 13px !important;
-   font-weight: 800 !important;
-   color: #cbd5e1 !important;
+   font-weight: 500 !important;
+   color: #94a3b8 !important;
  }
- .admin-table td.tx-amount-cell .tx-type-tag {
-   display: inline-flex !important;
-   margin-left: auto !important;
-   font-size: 10px !important;
-   font-weight: 800 !important;
-   text-transform: uppercase !important;
-   letter-spacing: .6px !important;
-   padding: 3px 8px !important;
-   border-radius: 5px !important;
-   background: rgba(38, 231, 166, 0.16) !important;
-   color: #34d399 !important;
-   border: 1px solid rgba(38, 231, 166, 0.35) !important;
- }
- .admin-table td.tx-amount-cell.is-failed .tx-type-tag {
-   background: rgba(239, 68, 68, 0.18) !important;
-   color: #fca5a5 !important;
-   border-color: rgba(239, 68, 68, 0.4) !important;
- }
+ .admin-table td.admin-tag-td { text-align: left !important; }
+ .admin-table td.admin-tag-td .admin-tag-options { justify-content: flex-start !important; gap: 6px !important; }
+ .admin-table td.admin-tag-td .admin-tag-btn { width: 26px !important; height: 26px !important; font-size: 12px !important; }
  .registration-cell { white-space:normal; }
  .filter-controls .user-search-wrap { flex-basis:100%; min-width:0; order:-1; }
  .filter-controls .styled-select { flex:1; min-width:0; }

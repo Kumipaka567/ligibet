@@ -42,6 +42,9 @@ export interface AdminTransaction {
   amount: number;
   status: 'completed' | 'failed' | 'pending';
   reference?: string;
+  admin_tag?: 'S' | 'G' | 'R' | 'V' | null;
+  admin_tagged_by?: number | null;
+  admin_tagged_at?: string | null;
   created_at: string;
 }
 
@@ -1870,6 +1873,45 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.txTypeFilter = type;
     this.txPage = 1;
     this.fetchTransactions();
+  }
+
+  public claimingTagTxId: number | null = null;
+  public readonly allowedAdminTags: ('S' | 'G' | 'R' | 'V')[] = ['S', 'G', 'R', 'V'];
+
+  public claimTransactionTag(tx: AdminTransaction, tag: 'S' | 'G' | 'R' | 'V'): void {
+    if (tx.status !== 'completed') return; // Only completed transactions can be claimed
+    if (tx.admin_tag) return; // Immutable: already claimed
+    if (this.claimingTagTxId === tx.id) return; // Prevent double submit
+    const token = this.authService.getToken();
+    if (!token) return;
+
+    this.claimingTagTxId = tx.id;
+    const previousTag = tx.admin_tag;
+    // Optimistic local update
+    tx.admin_tag = tag;
+    this.cdr.markForCheck();
+
+    this.http.post<{ message: string; transaction: Partial<AdminTransaction> }>(
+      `${this.baseUrl}/api/admin/transactions/${tx.id}/claim-tag`,
+      { tag },
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).subscribe({
+      next: (res) => {
+        this.claimingTagTxId = null;
+        if (res?.transaction?.admin_tag) {
+          tx.admin_tag = res.transaction.admin_tag as ('S' | 'G' | 'R' | 'V');
+        }
+        this.showAdminToast(`Transaction #${tx.id} claimed with tag [${tag}]`, 'success');
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        this.claimingTagTxId = null;
+        tx.admin_tag = previousTag;
+        const msg = err?.error?.error || 'Failed to claim transaction tag';
+        this.showAdminToast(msg, 'error');
+        this.cdr.markForCheck();
+      }
+    });
   }
 
   public fetchUsers(): void {

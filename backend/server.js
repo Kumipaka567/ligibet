@@ -940,14 +940,46 @@ app.post([
       });
     }
 
+    // Take the claim FIRST. BonusClaim has a unique index on (user_id, bonus_code),
+    // so when two requests race only one create() succeeds. Crediting before
+    // recording the claim let both requests credit and only the second one fail
+    // at the end — paying the bonus twice.
+    try {
+      await BonusClaim.create({
+        user_id: req.user.id,
+        bonus_code: bonusCode,
+        bonus_amount: bonusAmount
+      });
+    } catch (claimErr) {
+      if (claimErr.code === 11000) {
+        const racedUser = await User.findOne({ id: req.user.id }).lean();
+        return res.json({
+          message: `Your KES ${bonusAmount.toLocaleString()} welcome bonus is active on your account.`,
+          balance: racedUser ? racedUser.balance : 0,
+          bonusClaimed: true,
+          notification: {
+            id: Date.now(),
+            title: 'Bonus Active',
+            message: `KES ${bonusAmount.toLocaleString()} welcome bonus is active in your wallet balance.`,
+            type: 'bonus',
+            createdAt: new Date().toISOString()
+          }
+        });
+      }
+      throw claimErr;
+    }
+
     // Re-check the balance as part of the write. Reading it and then crediting
-    // in a separate step leaves a window where two requests both pass the check.
+    // in a separate step leaves a window where the balance can drop in between.
     const user = await User.findOneAndUpdate(
       { id: req.user.id, balance: { $gte: MIN_BONUS_BALANCE } },
       { $inc: { balance: bonusAmount } },
       { new: true }
     );
     if (!user) {
+      // Nothing was credited, so give the claim back or the player could never
+      // claim once they do qualify.
+      await BonusClaim.deleteOne({ user_id: req.user.id, bonus_code: bonusCode }).catch(() => {});
       const stillExists = await User.findOne({ id: req.user.id }, 'id').lean();
       if (!stillExists) return res.status(404).json({ error: 'User not found' });
       return res.status(400).json({
@@ -955,32 +987,39 @@ app.post([
       });
     }
 
-    await BonusClaim.create({
-      user_id: req.user.id,
-      bonus_code: bonusCode,
-      bonus_amount: bonusAmount
-    });
+    // The money has moved and the claim is recorded. The ledger row and the
+    // in-app notice are bookkeeping: if either fails, the player must still be
+    // told the bonus was paid rather than shown an error for a credited bonus.
+    let tx = null;
+    try {
+      tx = await Transaction.create({
+        user_id: req.user.id,
+        type: 'bonus',
+        amount: bonusAmount,
+        status: 'completed',
+        reference: `BONUS-${bonusCode.toUpperCase()}`
+      });
+    } catch (txErr) {
+      console.error(`Welcome bonus ledger entry failed for user ${req.user.id}: ${txErr.message}`);
+    }
 
-    const tx = await Transaction.create({
-      user_id: req.user.id,
-      type: 'bonus',
-      amount: bonusAmount,
-      status: 'completed',
-      reference: `BONUS-${bonusCode.toUpperCase()}`
-    });
-
-    const notif = await Notification.create({
-      user_id: req.user.id,
-      title: 'Welcome Bonus Credited!',
-      message: `KES ${bonusAmount.toLocaleString()} has been added to your wallet balance. Enjoy playing Aviator!`,
-      type: 'bonus'
-    });
+    let notif = null;
+    try {
+      notif = await Notification.create({
+        user_id: req.user.id,
+        title: 'Welcome Bonus Credited!',
+        message: `KES ${bonusAmount.toLocaleString()} has been added to your wallet balance. Enjoy playing Aviator!`,
+        type: 'bonus'
+      });
+    } catch (notifErr) {
+      console.error(`Welcome bonus notification failed for user ${req.user.id}: ${notifErr.message}`);
+    }
 
     emitRealtimeMutation({
       action: 'welcome_bonus_claimed',
       userId: req.user.id,
       balance: user.balance,
-      transaction: tx,
+      transaction: tx || null,
       deposits: true
     });
 
@@ -989,11 +1028,11 @@ app.post([
       balance: user.balance,
       bonusClaimed: true,
       notification: {
-        id: notif.id,
-        title: notif.title,
-        message: notif.message,
+        id: notif ? notif.id : Date.now(),
+        title: notif ? notif.title : 'Welcome Bonus Credited!',
+        message: notif ? notif.message : `KES ${bonusAmount.toLocaleString()} has been added to your wallet balance.`,
         type: 'bonus',
-        createdAt: notif.created_at
+        createdAt: notif ? notif.created_at : new Date().toISOString()
       }
     });
   } catch (err) {
@@ -2677,7 +2716,7 @@ app.get('/api/admin/transactions', authenticateAdminToken, async (req, res) => {
     if (statusFilter !== 'all') filter.status = statusFilter;
 
     const transactions = await Transaction.find(filter)
-      .select('id user_id type amount status reference created_at')
+      .select('id user_id type amount status reference created_at admin_tag admin_tagged_by admin_tagged_at')
       .sort({ created_at: -1 })
       .limit(100)
       .lean();
@@ -2697,13 +2736,102 @@ app.get('/api/admin/transactions', authenticateAdminToken, async (req, res) => {
         amount: t.amount,
         status: t.status,
         reference: t.reference || '',
-        created_at: t.created_at
+        created_at: t.created_at,
+        admin_tag: t.admin_tag || null,
+        admin_tagged_by: t.admin_tagged_by || null,
+        admin_tagged_at: t.admin_tagged_at || null
       };
     });
 
     return res.json({ transactions: result });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch admin transactions' });
+  }
+});
+
+// Admin Claim Transaction Tag (Immutable S, G, R, V)
+app.post('/api/admin/transactions/:id/claim-tag', authenticateAdminToken, async (req, res) => {
+  try {
+    const txId = parseInt(req.params.id, 10);
+    if (isNaN(txId)) {
+      return res.status(400).json({ error: 'Invalid transaction ID' });
+    }
+
+    const { tag } = req.body;
+    const ALLOWED_TAGS = ['S', 'G', 'R', 'V'];
+    if (!tag || !ALLOWED_TAGS.includes(String(tag).toUpperCase())) {
+      return res.status(400).json({ error: 'Invalid admin tag. Allowed initials: S, G, R, V' });
+    }
+    const cleanTag = String(tag).toUpperCase();
+
+    // Check if transaction exists
+    const existingTx = await Transaction.findOne({ id: txId });
+    if (!existingTx) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    // ONLY COMPLETED transactions can be claimed with an admin tag
+    if (existingTx.status !== 'completed') {
+      return res.status(400).json({
+        error: 'Only completed transactions can be claimed with an admin tag.'
+      });
+    }
+
+    // IMMUTABLE RULE: once selected, it cannot be rechanged once claimed!
+    if (existingTx.admin_tag) {
+      return res.status(400).json({
+        error: `Transaction has already been claimed by admin [${existingTx.admin_tag}] and cannot be changed.`
+      });
+    }
+
+    // Atomic update where status is 'completed' and admin_tag is currently null
+    const updatedTx = await Transaction.findOneAndUpdate(
+      { id: txId, status: 'completed', admin_tag: null },
+      {
+        $set: {
+          admin_tag: cleanTag,
+          admin_tagged_by: req.user.id,
+          admin_tagged_at: new Date()
+        }
+      },
+      { new: true }
+    );
+
+    if (!updatedTx) {
+      return res.status(400).json({
+        error: 'Transaction was already claimed and cannot be changed.'
+      });
+    }
+
+    await AdminLog.create({
+      admin_id: req.user.id,
+      action: 'CLAIM_TRANSACTION',
+      details: `Admin ${req.user.username} claimed transaction #${txId} with tag [${cleanTag}]`,
+      target_user_id: updatedTx.user_id
+    }).catch(err => console.warn('AdminLog error:', err.message));
+
+    emitRealtimeMutation({
+      action: 'transaction_tag_claimed',
+      transaction: {
+        id: updatedTx.id,
+        admin_tag: updatedTx.admin_tag,
+        admin_tagged_by: updatedTx.admin_tagged_by,
+        admin_tagged_at: updatedTx.admin_tagged_at
+      }
+    });
+
+    return res.json({
+      message: `Transaction #${txId} claimed with tag [${cleanTag}]`,
+      transaction: {
+        id: updatedTx.id,
+        admin_tag: updatedTx.admin_tag,
+        admin_tagged_by: updatedTx.admin_tagged_by,
+        admin_tagged_at: updatedTx.admin_tagged_at
+      }
+    });
+  } catch (err) {
+    console.error('Error claiming transaction tag:', err);
+    return res.status(500).json({ error: 'Failed to claim transaction tag' });
   }
 });
 

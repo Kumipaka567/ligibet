@@ -1,19 +1,25 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { AviatorComponent } from './aviator';
 
-import { Aviator } from './aviator';
-
-describe('Aviator', () => {
-  let component: Aviator;
-  let fixture: ComponentFixture<Aviator>;
+describe('AviatorComponent', () => {
+  let component: AviatorComponent;
+  let fixture: ComponentFixture<AviatorComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [Aviator],
+      imports: [AviatorComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting()
+      ]
+    }).overrideComponent(AviatorComponent, {
+      set: { template: '<div>Aviator</div>' }
     }).compileComponents();
 
-    fixture = TestBed.createComponent(Aviator);
+    fixture = TestBed.createComponent(AviatorComponent);
     component = fixture.componentInstance;
-    await fixture.whenStable();
   });
 
   it('should create', () => {

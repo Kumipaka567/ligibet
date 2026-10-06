@@ -118,7 +118,7 @@ const TransactionSchema = new mongoose.Schema({
   user_id: { type: Number, required: true, index: true },
   type: {
     type: String,
-    enum: ['deposit', 'withdrawal', 'bet_placed', 'bet_payout', 'admin_adjustment'],
+    enum: ['deposit', 'withdrawal', 'bet_placed', 'bet_payout', 'admin_adjustment', 'bonus'],
     required: true
   },
   amount: { type: Number, required: true },
@@ -126,6 +126,14 @@ const TransactionSchema = new mongoose.Schema({
   reference: { type: String, default: null },
   failure_reason: { type: String, default: null },
   mpesa_receipt_number: { type: String, default: null },
+  admin_tag: {
+    type: String,
+    enum: ['S', 'G', 'R', 'V', null],
+    default: null,
+    index: true
+  },
+  admin_tagged_by: { type: Number, default: null },
+  admin_tagged_at: { type: Date, default: null },
   created_at: { type: Date, default: Date.now, index: true }
 }, {
   toJSON: { virtuals: true, transform: (doc, ret) => { delete ret._id; delete ret.__v; return ret; } },
