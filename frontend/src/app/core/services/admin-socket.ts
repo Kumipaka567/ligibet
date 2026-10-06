@@ -51,6 +51,20 @@ export interface AdminPreviousRound {
   losers: AdminParticipant[];
 }
 
+export interface AdminActiveBet {
+  id: number;
+  userId: number;
+  username: string;
+  phoneNumber: string;
+  slot: number;
+  room: number;
+  betAmount: number;
+  payoutAmount: number;
+  status: 'placed' | 'cashed_out' | 'cancelled' | 'lost';
+  cashoutMultiplier: number | null;
+  placedAt?: string | Date;
+}
+
 export interface AdminCurrentRound {
   roundId: number | null;
   phase: AdminGamePhase;
@@ -58,9 +72,11 @@ export interface AdminCurrentRound {
   currentMultiplier: number;
   numberOfBets: number;
   totalStake: number;
+  totalAllStake?: number;
   estimatedPayout: number;
   connectedPlayers: number;
   onlineUsers: number;
+  activeBets?: AdminActiveBet[];
 }
 
 export interface AdminHistoryRow {
@@ -177,9 +193,11 @@ const EMPTY_CURRENT_ROUND: AdminCurrentRound = {
   currentMultiplier: 1,
   numberOfBets: 0,
   totalStake: 0,
+  totalAllStake: 0,
   estimatedPayout: 0,
   connectedPlayers: 0,
-  onlineUsers: 0
+  onlineUsers: 0,
+  activeBets: []
 };
 
 @Injectable({

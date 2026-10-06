@@ -12,6 +12,8 @@ import {
   AdminOnlinePlayer,
   AdminOnlinePlayersSummary,
   AdminRoomStatus,
+  AdminActiveBet,
+  AdminCurrentRound,
   AdminSocketService
 } from '../../../core/services/admin-socket.service';
 import { getBackendOrigin } from '../../../core/config/backend-url';
@@ -244,6 +246,42 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       this.selectedMiniRoom = room;
       this.cdr.markForCheck();
     }
+  }
+
+  public stakesRoomFilter: number = 0; // 0 = all rooms, 1 = room 1, 2 = room 2, 3 = room 3
+
+  public setStakesRoomFilter(room: number): void {
+    this.stakesRoomFilter = room;
+    this.cdr.markForCheck();
+  }
+
+  public getFilteredActiveBets(curRound: AdminCurrentRound | null | undefined): AdminActiveBet[] {
+    if (!curRound || !curRound.activeBets) return [];
+    if (this.stakesRoomFilter === 0) {
+      return curRound.activeBets;
+    }
+    return curRound.activeBets.filter((bet) => bet.room === this.stakesRoomFilter);
+  }
+
+  public getFilteredTotalStaked(curRound: AdminCurrentRound | null | undefined): number {
+    const bets = this.getFilteredActiveBets(curRound);
+    return bets.reduce((sum, bet) => sum + Number(bet.betAmount || 0), 0);
+  }
+
+  public getRoomStakedTotal(curRound: AdminCurrentRound | null | undefined, room: number): number {
+    if (!curRound || !curRound.activeBets) return 0;
+    return curRound.activeBets
+      .filter((bet) => bet.room === room)
+      .reduce((sum, bet) => sum + Number(bet.betAmount || 0), 0);
+  }
+
+  public getRoomActiveBetsCount(curRound: AdminCurrentRound | null | undefined, room: number): number {
+    if (!curRound || !curRound.activeBets) return 0;
+    return curRound.activeBets.filter((bet) => bet.room === room).length;
+  }
+
+  public trackByBetKey(_index: number, bet: AdminActiveBet): string {
+    return `${bet.room}:${bet.userId}:${bet.slot}:${bet.id}`;
   }
 
   public nextRound$ = this.adminSocket.nextRound$;

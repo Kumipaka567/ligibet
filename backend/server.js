@@ -3765,6 +3765,24 @@ function getAdminNextRoundPayload() {
   };
 }
 
+function getActiveBetsList(room = null) {
+  const allBets = Array.from(activeBets.values());
+  const filtered = room ? allBets.filter(b => b.room === room) : allBets;
+  return filtered.map(b => ({
+    id: b.id,
+    userId: b.userId,
+    username: b.username,
+    phoneNumber: b.phoneNumber || '',
+    slot: b.slot,
+    room: b.room,
+    betAmount: roundToMoney(b.betAmount),
+    payoutAmount: roundToMoney(b.payoutAmount),
+    status: b.status,
+    cashoutMultiplier: b.cashoutMultiplier,
+    placedAt: b.placedAt || new Date()
+  }));
+}
+
 function getCurrentRoundAdminStats() {
   const bets = Array.from(activeBets.values()).filter((bet) => bet.room === 1);
   const totalStake = bets.reduce((sum, bet) => sum + Number(bet.betAmount || 0), 0);
@@ -3774,6 +3792,9 @@ function getCurrentRoundAdminStats() {
     .reduce((sum, bet) => sum + Number(bet.betAmount || 0) * currentMultiplier, 0);
   const playerStats = getConnectedPlayerStats();
 
+  const allActiveBets = getActiveBetsList();
+  const totalAllStake = allActiveBets.reduce((sum, bet) => sum + Number(bet.betAmount || 0), 0);
+
   return {
     roundId: currentRound.id,
     phase: gamePhase,
@@ -3781,9 +3802,11 @@ function getCurrentRoundAdminStats() {
     currentMultiplier,
     numberOfBets: bets.length,
     totalStake: roundToMoney(totalStake),
+    totalAllStake: roundToMoney(totalAllStake),
     estimatedPayout: roundToMoney(paidOut + liveLiability),
     connectedPlayers: playerStats.connectedPlayers,
-    onlineUsers: playerStats.onlineUsers
+    onlineUsers: playerStats.onlineUsers,
+    activeBets: allActiveBets
   };
 }
 
@@ -4127,6 +4150,7 @@ function startSecondaryBettingPhase(room, initialDelay = 0) {
     // Keep the console's per-room readout current as this room rolls over.
     adminNamespace.emit('admin_next_round', getAdminNextRoundPayload());
     adminNamespace.emit('admin_snapshot', getAdminSnapshot());
+    emitAdminCurrentRound();
 
     setTimeout(() => launchSecondaryFlight(room), BETTING_DURATION_MS);
   };
@@ -4200,6 +4224,7 @@ async function handleSecondaryCrash(room) {
   io.to(playerRoomName(room)).emit('phase_update', { phase: 'crashed', multiplier: engine.currentRound.crashPoint, roundId: engine.currentRound.id, room });
   io.to(playerRoomName(room)).emit('history_update', { history: engine.history, room });
   adminNamespace.emit('admin_next_round', getAdminNextRoundPayload());
+  emitAdminCurrentRound();
 
   setTimeout(() => startSecondaryBettingPhase(room), 3000);
 }
@@ -4352,12 +4377,14 @@ io.on('connection', (socket) => {
         id: betDoc.id,
         userId: socket.user.id,
         username: socket.user.username,
+        phoneNumber: socket.user.phone_number || socket.presenceUser?.phone_number || '',
         slot,
         room,
         betAmount: amount,
         payoutAmount: 0,
         status: 'placed',
-        cashoutMultiplier: null
+        cashoutMultiplier: null,
+        placedAt: new Date()
       };
       activeBets.set(key, betState);
 

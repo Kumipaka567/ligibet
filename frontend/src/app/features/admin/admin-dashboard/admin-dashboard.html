@@ -318,6 +318,142 @@
             </div>
           </div>
         </div>
+
+        <!-- LIVE STAKED PLAYERS & STAKE AMOUNTS UNDER GAME MONITOR -->
+        <div class="game-monitor-stakes-section" *ngIf="currentRound$ | async as curRound">
+          <div class="stakes-section-header">
+            <div class="stakes-heading-group">
+              <div class="stakes-title-row">
+                <svg class="stakes-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+                <h4>Current Round Staked Players</h4>
+                <span class="stakes-count-pill" [class.has-bets]="(getFilteredActiveBets(curRound)).length > 0">
+                  {{ (getFilteredActiveBets(curRound)).length }} {{ (getFilteredActiveBets(curRound)).length === 1 ? 'Bet' : 'Bets' }}
+                </span>
+              </div>
+              <p class="stakes-subtext">
+                Live stakes placed by players for the active round across rooms with their phone numbers.
+              </p>
+            </div>
+
+            <div class="stakes-header-meta">
+              <!-- ROOM FILTER SELECTOR -->
+              <div class="stakes-room-filter">
+                <button
+                  type="button"
+                  class="stakes-filter-btn"
+                  [class.active]="stakesRoomFilter === 0"
+                  (click)="setStakesRoomFilter(0)"
+                >
+                  All Rooms
+                </button>
+                <button
+                  type="button"
+                  class="stakes-filter-btn"
+                  [class.active]="stakesRoomFilter === 1"
+                  (click)="setStakesRoomFilter(1)"
+                >
+                  Room 1
+                  <span class="sub-count" *ngIf="getRoomActiveBetsCount(curRound, 1) as c1">({{ c1 }})</span>
+                </button>
+                <button
+                  type="button"
+                  class="stakes-filter-btn"
+                  [class.active]="stakesRoomFilter === 2"
+                  (click)="setStakesRoomFilter(2)"
+                >
+                  Room 2
+                  <span class="sub-count" *ngIf="getRoomActiveBetsCount(curRound, 2) as c2">({{ c2 }})</span>
+                </button>
+                <button
+                  type="button"
+                  class="stakes-filter-btn"
+                  [class.active]="stakesRoomFilter === 3"
+                  (click)="setStakesRoomFilter(3)"
+                >
+                  Room 3
+                  <span class="sub-count" *ngIf="getRoomActiveBetsCount(curRound, 3) as c3">({{ c3 }})</span>
+                </button>
+              </div>
+
+              <!-- TOTAL STAKED METRIC CARD -->
+              <div class="total-staked-badge">
+                <span class="badge-label">TOTAL STAKED:</span>
+                <strong class="badge-value mono">KES {{ getFilteredTotalStaked(curRound) | number:'1.2-2' }}</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- STAKES TABLE -->
+          <div class="stakes-table-wrap" *ngIf="getFilteredActiveBets(curRound) as bets">
+            <table class="stakes-table" *ngIf="bets.length > 0; else noBetsTpl">
+              <thead>
+                <tr>
+                  <th scope="col">Player</th>
+                  <th scope="col">Phone Number</th>
+                  <th scope="col">Room</th>
+                  <th scope="col" class="text-right">Staked Amount</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" class="text-right">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let bet of bets; trackBy: trackByBetKey">
+                  <td data-label="Player">
+                    <div class="bet-player-cell">
+                      <div class="player-avatar-pip">{{ (bet.username || 'U')[0].toUpperCase() }}</div>
+                      <div>
+                        <strong class="bet-username">{{ bet.username }}</strong>
+                        <span class="bet-user-id text-xs text-muted">#{{ bet.userId }}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td data-label="Phone Number">
+                    <span class="phone-chip mono">{{ bet.phoneNumber || '--' }}</span>
+                  </td>
+                  <td data-label="Room">
+                    <span class="room-pill-chip" [class]="'room-pill-' + bet.room">Room {{ bet.room }}</span>
+                  </td>
+                  <td data-label="Staked Amount" class="text-right">
+                    <strong class="stake-amount-val mono">KES {{ bet.betAmount | number:'1.2-2' }}</strong>
+                  </td>
+                  <td data-label="Status">
+                    <span *ngIf="bet.status === 'placed'" class="bet-status-chip status-placed">
+                      <span class="pulse-dot"></span> In Flight
+                    </span>
+                    <span *ngIf="bet.status === 'cashed_out'" class="bet-status-chip status-cashed-out">
+                      ✓ Cashed {{ bet.cashoutMultiplier ? (bet.cashoutMultiplier | number:'1.2-2') + 'x' : '' }} (+KES {{ bet.payoutAmount | number:'1.2-2' }})
+                    </span>
+                    <span *ngIf="bet.status === 'cancelled'" class="bet-status-chip status-cancelled">
+                      Refunded
+                    </span>
+                    <span *ngIf="bet.status === 'lost'" class="bet-status-chip status-lost">
+                      Crashed
+                    </span>
+                  </td>
+                  <td data-label="Time" class="text-right text-muted mono text-xs">
+                    {{ bet.placedAt | date:'HH:mm:ss':'+0300' }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <ng-template #noBetsTpl>
+              <div class="stakes-empty-state">
+                <div class="empty-icon-ring">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12.01" y2="16"/>
+                  </svg>
+                </div>
+                <h5>No Stakes Placed in Current Round</h5>
+                <p>When players place bets in this round, their usernames, phone numbers, and staked amounts will appear here automatically in real time.</p>
+              </div>
+            </ng-template>
+          </div>
+        </div>
       </section>
     </ng-container>
   </ng-container>
