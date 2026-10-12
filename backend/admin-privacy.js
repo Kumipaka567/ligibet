@@ -184,7 +184,7 @@ function createAdminPrivacy(models, env = process.env) {
   }
 
   async function unlock(tag, pin, accountToken) {
-    if (!ADMIN_TAGS.includes(tag) || !/^\d{6,8}$/.test(String(pin || ''))) throw fail(400, 'Choose R, G, S or V and enter your 6–8 digit PIN.');
+    if (!ADMIN_TAGS.includes(tag) || !/^\d{4}$/.test(String(pin || ''))) throw fail(400, 'Choose R, G, S or V and enter your 4-digit PIN.');
     const hash = await configuredHash(tag);
     if (!/^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(hash)) throw fail(503, `PIN for ${tag} has not been configured. Contact the platform owner.`);
     const now = new Date();
@@ -213,7 +213,7 @@ function createAdminPrivacy(models, env = process.env) {
   async function configure(ownerKey, pins) {
     const hash = env.ADMIN_PIN_SETUP_KEY_HASH || '';
     if (!/^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(hash)) throw fail(503, 'The private owner key has not been configured on the server.');
-    if (typeof ownerKey !== 'string' || ownerKey.length < 12 || Buffer.byteLength(ownerKey, 'utf8') > 72) throw fail(403, 'Incorrect private owner key.');
+    if (typeof ownerKey !== 'string' || ownerKey.length < 4 || Buffer.byteLength(ownerKey, 'utf8') > 72) throw fail(403, 'Incorrect private owner key.');
     const now = new Date();
     const attempts = await AdminPinAttempt.findOneAndUpdate({ _id: 'owner-setup' }, [
       { $set: {
@@ -224,10 +224,11 @@ function createAdminPrivacy(models, env = process.env) {
     if (attempts.attempts > 5) throw fail(429, 'Too many owner-key attempts. Try again after 15 minutes.');
     if (!await bcrypt.compare(ownerKey, hash)) throw fail(403, 'Incorrect private owner key.');
     const tags = ADMIN_TAGS.filter(tag => pins?.[tag]);
-    if (!tags.length || tags.some(tag => typeof pins[tag] !== 'string' || !/^\d{6,8}$/.test(pins[tag]))) throw fail(400, 'Enter a 6–8 digit PIN for each admin you want to configure.');
+    if (!tags.length || tags.some(tag => typeof pins[tag] !== 'string' || !/^\d{4}$/.test(pins[tag]))) throw fail(400, 'Enter a 4-digit PIN for each admin you want to configure.');
     const current = await Promise.all(ADMIN_TAGS.map(configuredHash));
     const nextHashes = new Map();
     for (const tag of tags) {
+      if (await bcrypt.compare(pins[tag], hash)) throw fail(400, 'An admin PIN must be different from the private owner key.');
       for (const other of ADMIN_TAGS) {
         if (other === tag) continue;
         if (pins[other] && pins[other] === pins[tag]) throw fail(400, 'Each admin must have a different PIN.');

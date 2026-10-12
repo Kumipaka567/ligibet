@@ -66,7 +66,7 @@ test('database scopes exclude other owners before pagination, including support 
   assert.equal(filter.phone_number.$not.test('0700000000'), false);
 });
 
-function fixture() {
+function fixture(ownerKey = 'private-owner-key-only') {
   const profiles = new Map();
   const sessions = new Map();
   const attempts = new Map();
@@ -144,31 +144,51 @@ function fixture() {
       })
     }
   };
-  const env = { ADMIN_PIN_SETUP_KEY_HASH: bcrypt.hashSync('private-owner-key-only', 4) };
+  const env = { ADMIN_PIN_SETUP_KEY_HASH: bcrypt.hashSync(ownerKey, 4) };
   return { service: createAdminPrivacy(models, env), models, profiles, sessions, attempts, transactions, owners };
 }
 
 test('private setup requires the owner key, stores hashes, rejects duplicate PINs and invalidates existing access', async () => {
   const { service, profiles, sessions } = fixture();
-  await assert.rejects(service.configure('wrong-owner-key', { R: '135790' }), { status: 403 });
-  await assert.rejects(service.configure('private-owner-key-only', { R: '135790', G: '135790' }), { status: 400 });
-  await service.configure('private-owner-key-only', { R: '135790', G: '246801', S: '369012', V: '482613' });
-  assert.notEqual(profiles.get('R'), '135790');
-  assert.equal(await bcrypt.compare('135790', profiles.get('R')), true);
-  const session = await service.unlock('R', '135790', 'shared-account');
+  await assert.rejects(service.configure('wrong-owner-key', { R: '1357' }), { status: 403 });
+  await assert.rejects(service.configure('private-owner-key-only', { R: '1357', G: '1357' }), { status: 400 });
+  await service.configure('private-owner-key-only', { R: '1357', G: '2468', S: '3690', V: '4826' });
+  assert.notEqual(profiles.get('R'), '1357');
+  assert.equal(await bcrypt.compare('1357', profiles.get('R')), true);
+  const session = await service.unlock('R', '1357', 'shared-account');
   assert.equal((await service.identity(session.pinToken, 'shared-account')).tag, 'R');
   assert.ok(!JSON.stringify([...sessions.values()]).includes(session.pinToken));
-  await service.configure('private-owner-key-only', { R: '135791' });
+  await service.configure('private-owner-key-only', { R: '1358' });
   assert.equal(await service.identity(session.pinToken, 'shared-account'), null);
+});
+
+test('admin PINs must be exactly four digits and preserve a leading zero', async () => {
+  const { service, profiles } = fixture();
+  for (const invalid of ['123', '12345', '123456', '12a4']) {
+    await assert.rejects(service.unlock('R', invalid, 'shared-account'), { status: 400 });
+    await assert.rejects(service.configure('private-owner-key-only', { R: invalid }), { status: 400 });
+  }
+  await service.configure('private-owner-key-only', { R: '0123' });
+  assert.equal(await bcrypt.compare('0123', profiles.get('R')), true);
+  const session = await service.unlock('R', '0123', 'shared-account');
+  assert.equal((await service.identity(session.pinToken, 'shared-account')).tag, 'R');
+});
+
+test('a four-character owner key configures PINs and cannot be assigned as an admin PIN', async () => {
+  const { service, profiles } = fixture('3842');
+  await assert.rejects(service.configure('3841', { R: '1357' }), { status: 403 });
+  await assert.rejects(service.configure('3842', { R: '3842' }), { status: 400 });
+  await service.configure('3842', { R: '1357' });
+  assert.equal(await bcrypt.compare('1357', profiles.get('R')), true);
 });
 
 test('same account can hold independent PIN identities; wrong PIN, different login token, expiry and lock never unlock', async () => {
   const { service, profiles, sessions } = fixture();
-  profiles.set('R', bcrypt.hashSync('135790', 4));
-  profiles.set('G', bcrypt.hashSync('246801', 4));
-  await assert.rejects(service.unlock('R', '246801', 'shared-account'), { status: 403 });
-  const r = await service.unlock('R', '135790', 'shared-account');
-  const g = await service.unlock('G', '246801', 'shared-account');
+  profiles.set('R', bcrypt.hashSync('1357', 4));
+  profiles.set('G', bcrypt.hashSync('2468', 4));
+  await assert.rejects(service.unlock('R', '2468', 'shared-account'), { status: 403 });
+  const r = await service.unlock('R', '1357', 'shared-account');
+  const g = await service.unlock('G', '2468', 'shared-account');
   assert.equal((await service.identity(r.pinToken, 'shared-account')).tag, 'R');
   assert.equal((await service.identity(g.pinToken, 'shared-account')).tag, 'G');
   assert.equal(await service.identity(r.pinToken, 'another-account'), null);
@@ -180,9 +200,9 @@ test('same account can hold independent PIN identities; wrong PIN, different log
 
 test('sixth PIN attempt is blocked across accounts', async () => {
   const { service, profiles } = fixture();
-  profiles.set('R', bcrypt.hashSync('135790', 4));
-  for (let i = 0; i < 5; i++) await assert.rejects(service.unlock('R', '000000', 'account-' + i), { status: 403 });
-  await assert.rejects(service.unlock('R', '135790', 'correct-account'), { status: 429 });
+  profiles.set('R', bcrypt.hashSync('1357', 4));
+  for (let i = 0; i < 5; i++) await assert.rejects(service.unlock('R', '0000', 'account-' + i), { status: 403 });
+  await assert.rejects(service.unlock('R', '1357', 'correct-account'), { status: 429 });
 });
 
 test('completed deposit claims establish one client owner and reject transfers even with the same superadmin account id', async () => {
@@ -244,11 +264,11 @@ test('all HTTP admin response data fails closed if ownership lookup fails', asyn
 
 test('socket broadcasts verify each PIN independently and initial snapshots cannot expose claimed phones', async () => {
   const { service, profiles } = fixture();
-  profiles.set('R', bcrypt.hashSync('135790', 4));
-  profiles.set('G', bcrypt.hashSync('246801', 4));
+  profiles.set('R', bcrypt.hashSync('1357', 4));
+  profiles.set('G', bcrypt.hashSync('2468', 4));
   await service.claim(101, 'R', 1);
-  const r = await service.unlock('R', '135790', 'shared');
-  const g = await service.unlock('G', '246801', 'shared');
+  const r = await service.unlock('R', '1357', 'shared');
+  const g = await service.unlock('G', '2468', 'shared');
   function socket(pinToken) {
     const events = [];
     let resolve;

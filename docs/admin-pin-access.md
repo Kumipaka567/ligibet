@@ -8,9 +8,9 @@ Claiming requires a completed **deposit** and the PIN matching the selected init
 
 ## Private setup for the platform owner
 
-1. In a private terminal run `npm --prefix backend run setup-pin-owner`. Choose a strong owner key, at least 12 characters. The terminal hides your input. This command needs no database access and makes no account changes.
+1. In a private terminal run `npm --prefix backend run setup-pin-owner`. Choose your private owner key (4–72 characters). The terminal hides your input. This command needs no database access and makes no account changes.
 2. Copy the generated `ADMIN_PIN_SETUP_KEY_HASH=...` into the backend hosting environment (or `backend/.env` for local use), then restart/redeploy the backend. Store the **original owner key** privately in your password manager. The hash is not the key you enter in the dashboard.
-3. Sign in as superadmin, open **Administrators → Private PIN setup**, enter your original owner key, and choose a different 6–8 digit PIN for R, G, S, and V. Submit **Save private PINs**. Leave a field blank when keeping an existing PIN.
+3. Sign in as superadmin, open **Administrators → Private PIN setup**, enter your original owner key, and choose a different 4-digit PIN for R, G, S, and V. Admin PINs must also differ from your owner key. Submit **Save private PINs**. Leave a field blank when keeping an existing PIN.
 4. Give each admin only their own PIN privately. Keep the owner key to yourself. Someone sharing your superadmin login can see the setup button but cannot change PINs without that key. Knowing an admin's PIN grants that admin's client access; anyone you give the PIN to has that access.
 
 PINs are stored as bcrypt hashes. Saved PINs and the owner key cannot be displayed in the dashboard. Neither plaintext PINs nor the owner key are logged or stored by this feature. Setup requires both superadmin login and the private owner key, and setup does not unlock client phone numbers. Changing a PIN invalidates that admin's existing PIN sessions. Changing the owner key requires updating its backend environment hash.

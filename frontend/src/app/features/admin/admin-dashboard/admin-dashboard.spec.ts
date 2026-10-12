@@ -582,10 +582,10 @@ describe('Admin dashboard live account management', () => {
     expect(component.pinDialogOpen).toBe(true);
     expect(component.pinInitial).toBe('S');
     http.expectNone(r => r.url.endsWith('/api/admin/transactions/501/claim-tag'));
-    component.pinInput = '369012';
+    component.pinInput = '3690';
     component.unlockAdminPin();
     const unlock = http.expectOne(r => r.url.endsWith('/api/admin/pin/unlock'));
-    expect(unlock.request.body).toEqual({ tag: 'S', pin: '369012' });
+    expect(unlock.request.body).toEqual({ tag: 'S', pin: '3690' });
     unlock.flush({ tag: 'S', pinToken: 'a'.repeat(64), expiresAt: new Date(Date.now() + 900000).toISOString() });
     const flushPhoneRefresh = () => {
       http.expectOne(r => r.url.endsWith('/api/admin/overview')).flush({ users: [], stats: {}, logs: [] });

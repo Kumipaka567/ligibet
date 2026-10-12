@@ -1799,12 +1799,12 @@
     <ng-container *ngIf="!pinSetupOpen">
       <p class="panel-desc margin-top">Unlock your claimed clients and unclaimed clients. Access locks after 15 minutes.</p>
       <div class="form-group margin-top"><label for="admin-pin-initial">Your initial</label><select id="admin-pin-initial" name="pinInitial" class="styled-input" [(ngModel)]="pinInitial" [disabled]="pinBusy"><option *ngFor="let tag of allowedAdminTags" [value]="tag">{{ tag }}</option></select></div>
-      <div class="form-group margin-top"><label for="admin-pin-input">Your PIN</label><input id="admin-pin-input" name="adminPin" type="password" inputmode="numeric" pattern="[0-9]{6,8}" minlength="6" maxlength="8" class="styled-input" [(ngModel)]="pinInput" required autocomplete="off" [disabled]="pinBusy" /></div>
+      <div class="form-group margin-top"><label for="admin-pin-input">Your PIN (4 digits)</label><input id="admin-pin-input" name="adminPin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" class="styled-input" [(ngModel)]="pinInput" required autocomplete="off" [disabled]="pinBusy" /></div>
     </ng-container>
     <ng-container *ngIf="pinSetupOpen">
       <p class="panel-desc margin-top">Enter your private owner key to set or change the four PINs. Leave a PIN blank to keep it. Saved PINs cannot be displayed.</p>
-      <div class="form-group margin-top"><label for="pin-owner-key">Private owner key</label><input id="pin-owner-key" name="ownerKey" type="password" class="styled-input" [(ngModel)]="ownerKeyInput" minlength="12" maxlength="72" required autocomplete="off" [disabled]="pinBusy" /></div>
-      <div class="form-group margin-top" *ngFor="let tag of allowedAdminTags"><label [for]="'setup-pin-' + tag">New PIN for {{ tag }}</label><input [id]="'setup-pin-' + tag" [name]="'setupPin' + tag" type="password" inputmode="numeric" pattern="[0-9]{6,8}" minlength="6" maxlength="8" class="styled-input" [(ngModel)]="setupPins[tag]" autocomplete="new-password" [disabled]="pinBusy" /></div>
+      <div class="form-group margin-top"><label for="pin-owner-key">Private owner key</label><input id="pin-owner-key" name="ownerKey" type="password" class="styled-input" [(ngModel)]="ownerKeyInput" minlength="4" maxlength="72" required autocomplete="off" [disabled]="pinBusy" /></div>
+      <div class="form-group margin-top" *ngFor="let tag of allowedAdminTags"><label [for]="'setup-pin-' + tag">New PIN for {{ tag }} (4 digits)</label><input [id]="'setup-pin-' + tag" [name]="'setupPin' + tag" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" class="styled-input" [(ngModel)]="setupPins[tag]" autocomplete="new-password" [disabled]="pinBusy" /></div>
     </ng-container>
     <p *ngIf="pinError" class="text-red margin-top" role="alert">{{ pinError }}</p>
     <button type="submit" class="action-btn primary margin-top full-width" [disabled]="pinBusy">{{ pinBusy ? 'Please wait...' : (pinSetupOpen ? 'Save private PINs' : 'Unlock my clients') }}</button>

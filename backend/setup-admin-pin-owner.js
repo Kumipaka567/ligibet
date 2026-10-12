@@ -18,9 +18,9 @@ function ask(prompt) {
 }
 (async () => {
   try {
-    const key = await ask('Choose your private owner key (12–72 characters): ');
+    const key = await ask('Choose your private owner key (4–72 characters): ');
     const confirmation = await ask('Confirm private owner key: ');
-    if (key !== confirmation || key.length < 12 || Buffer.byteLength(key, 'utf8') > 72) throw new Error('Keys must match and contain 12–72 bytes.');
+    if (key !== confirmation || key.length < 4 || Buffer.byteLength(key, 'utf8') > 72) throw new Error('Keys must match and contain 4–72 bytes.');
     const hash = await bcrypt.hash(key, 12);
     console.log('\nSet this environment variable on the backend server, then restart it:');
     console.log('ADMIN_PIN_SETUP_KEY_HASH=' + hash);
