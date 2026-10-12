@@ -2792,9 +2792,9 @@ app.post('/api/admin/transactions/:id/claim-tag', authenticateAdminToken, async 
     const tx = await adminPrivacy.claim(txId, tag, req.user.id);
     await AdminLog.create({ admin_id: req.user.id, action: 'CLAIM_TRANSACTION', target_user_id: tx.user_id,
       details: 'Admin [' + tag + '] claimed completed deposit #' + txId }).catch(() => {});
-    adminNamespace.emit('admin_client_claimed', { userId: tx.user_id, tag });
+    adminNamespace.emit('admin_client_claimed', { userId: tx.user_id, tag, transactionId: tx.id });
     emitRealtimeMutation({ action: 'transaction_tag_claimed', userId: tx.user_id, transaction: tx, user: true });
-    return res.json({ message: 'Client claimed by admin ' + tag, transaction: tx });
+    return res.json({ message: 'Client claimed by admin ' + tag, transactionId: tx.id, tag: tx.admin_tag });
   } catch (err) {
     return res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to claim client. Please retry.' });
   }

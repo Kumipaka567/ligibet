@@ -2,6 +2,7 @@ import { Injectable, NgZone, inject } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { BehaviorSubject } from 'rxjs';
 import { getBackendOrigin } from '../config/backend-url';
+import { maskClientPhoneNumbers } from './admin-pin.service';
 
 export type AdminRoundStatus = 'Waiting' | 'Running' | 'Crashed';
 export type AdminGamePhase = 'betting' | 'flying' | 'crashed';
@@ -230,7 +231,7 @@ export class AdminSocketService {
   public accessRevoked$ = new BehaviorSubject<{ userId: number; reason: string } | null>(null);
   public predatorTextUpdate$ = new BehaviorSubject<string | null>(null);
   public supportTicketUpdated$ = new BehaviorSubject<{ ticket: any } | null>(null);
-  public clientClaimed$ = new BehaviorSubject<{ userId: number; tag: string } | null>(null);
+  public clientClaimed$ = new BehaviorSubject<{ userId: number; tag: string; transactionId?: number } | null>(null);
   public pinChanged$ = new BehaviorSubject<{ tags: string[] } | null>(null);
 
   public connect(token: string, pinToken: string | null = null): void {
@@ -263,7 +264,7 @@ export class AdminSocketService {
     this.listen('admin_snapshot', (snapshot: AdminSnapshot) => {
       this.applySnapshot(snapshot);
     });
-    this.listen('admin_client_claimed', (data: { userId: number; tag: string }) => {
+    this.listen('admin_client_claimed', (data: { userId: number; tag: string; transactionId?: number }) => {
       this.clientClaimed$.next(data);
     });
     this.listen('admin_pin_changed', (data: { tags: string[] }) => this.pinChanged$.next(data));
@@ -411,6 +412,14 @@ export class AdminSocketService {
     this.previousRound$.next(EMPTY_PREVIOUS_ROUND);
     this.currentRound$.next(EMPTY_CURRENT_ROUND);
     this.history$.next([]);
+  }
+
+  public maskClientData(): void {
+    this.clearRealtimeEvents();
+    this.nextRound$.next(maskClientPhoneNumbers(this.nextRound$.value));
+    this.previousRound$.next(maskClientPhoneNumbers(this.previousRound$.value));
+    this.currentRound$.next(maskClientPhoneNumbers(this.currentRound$.value));
+    this.history$.next(maskClientPhoneNumbers(this.history$.value));
   }
 
   private listen<T>(event: string, handler: (payload: T) => void): void {

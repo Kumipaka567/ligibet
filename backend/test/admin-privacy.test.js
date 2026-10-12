@@ -83,9 +83,15 @@ function fixture(ownerKey = 'private-owner-key-only') {
     [104, { id: 104, user_id: 8, type: 'withdrawal', status: 'completed', admin_tag: null }]
   ]);
   const query = value => ({ lean: async () => value, select() { return this; }, sort() { return this; }, session: async () => value });
+  const matchesUser = (user, filter) => Object.entries(filter).every(([field, condition]) => {
+    if (field === '$or') return condition.some(branch => matchesUser(user, branch));
+    if (condition instanceof RegExp) return condition.test(user[field] || '');
+    if (condition?.$in) return condition.$in.includes(user[field]);
+    return user[field] === condition;
+  });
   let queue = Promise.resolve();
   const models = {
-    User: { find: filter => query(users.filter(user => !filter.role || filter.role.$in.includes(user.role))), findOne: filter => query(users.find(user => user.id === filter.id)) },
+    User: { find: filter => query(users.filter(user => matchesUser(user, filter))), findOne: filter => query(users.find(user => user.id === filter.id)) },
     Deposit: { find: () => query([]) },
     AdminPinSettings: { findById: id => query(settings.get(id)), updateOne: async (filter, update) => {
       if (!settings.has(filter._id)) settings.set(filter._id, update.$setOnInsert);
@@ -244,6 +250,47 @@ test('completed deposit claims establish one client owner and reject transfers e
   await assert.rejects(service.claim(103, 'S', 1), { status: 400 });
   await assert.rejects(service.claim(104, 'S', 1), { status: 400 });
   assert.equal(phoneOwners.has('254711112222'), false);
+});
+
+test('claims avoid repeated historical scans and global user reads while ownership stays fresh', async () => {
+  const { service, models, phoneOwners } = fixture();
+  await service.directory();
+  models.Transaction.aggregate = async () => { throw new Error('A claim must not rescan history'); };
+  const find = models.User.find;
+  models.User.find = filter => {
+    assert.ok(filter.$or, 'claim reads only matching accounts and staff');
+    return find(filter);
+  };
+  await service.claim(101, 'R', 1);
+  models.User.find = find;
+  assert.equal((await service.directory()).find(client => client.id === 7).owner_tag, 'R');
+  phoneOwners.set('254711112222', { _id: '254711112222', owner_tag: 'G', user_id: 8, client_phone: '254711112222' });
+  assert.equal((await service.directory()).find(client => client.id === 8).owner_tag, 'G');
+});
+
+test('ownership migration shares concurrent work and can retry after a database failure', async () => {
+  const { service, models } = fixture();
+  const aggregate = models.Transaction.aggregate;
+  let reads = 0;
+  models.Transaction.aggregate = async () => { reads++; if (reads === 1) throw new Error('Temporary failure'); return aggregate(); };
+  await assert.rejects(service.directory(), /Temporary failure/);
+  await Promise.all([service.directory(), service.directory(), service.directory()]);
+  assert.equal(reads, 2);
+  await service.directory();
+  assert.equal(reads, 2);
+});
+
+test('PIN-free claim acknowledgements do not require a privacy-directory or PIN lookup', async () => {
+  const { models } = fixture();
+  models.Transaction.aggregate = async () => { throw new Error('No history read needed for an acknowledgement'); };
+  models.AdminPinSession.findOne = () => { throw new Error('No PIN needed for claiming'); };
+  const service = createAdminPrivacy(models);
+  const request = { method: 'POST', originalUrl: '/api/admin/transactions/101/claim-tag',
+    headers: { authorization: 'Bearer account', 'x-admin-pin': 'a'.repeat(64) }, query: {} };
+  const response = { set() {}, status() { return this; } };
+  const done = new Promise(resolve => { response.json = resolve; });
+  service.middleware(request, response, () => response.json({ message: 'Client claimed.', transactionId: 101, tag: 'R' }));
+  assert.deepEqual(await done, { message: 'Client claimed.', transactionId: 101, tag: 'R' });
 });
 
 test('one phone claim covers all statuses and equivalent numbers on different accounts without a PIN', async () => {

@@ -63,4 +63,25 @@ describe('Admin PIN isolation', () => {
     expect(receive).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
   });
+
+  it('claims without PIN headers and accepts safe acknowledgements after live ownership invalidation', () => {
+    unlock('R');
+    const receive = vi.fn();
+    client.post('/api/admin/transactions/501/claim-tag', { tag: 'S' }).subscribe(receive);
+    const claim = http.expectOne('/api/admin/transactions/501/claim-tag');
+    expect(claim.request.headers.has('X-Admin-Pin')).toBe(false);
+    pin.refresh();
+    claim.flush({ transactionId: 501, tag: 'S', phone_number: '0712345678', owner_key: 'private' });
+    expect(receive).toHaveBeenCalledWith({ message: 'Client claimed.', transactionId: 501, tag: 'S' });
+  });
+
+  it('finishes PIN setup after its live revocation event without exposing secret fields', () => {
+    unlock('R');
+    const receive = vi.fn();
+    client.post('/api/admin/pin/configure', {}).subscribe(receive);
+    const setup = http.expectOne('/api/admin/pin/configure');
+    pin.clear();
+    setup.flush({ configuredTags: ['R'], pin_hash: 'secret' });
+    expect(receive).toHaveBeenCalledWith({ message: 'PINs saved.', configuredTags: ['R'] });
+  });
 });

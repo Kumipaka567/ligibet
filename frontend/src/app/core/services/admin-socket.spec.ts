@@ -70,4 +70,18 @@ describe('Admin socket live delivery', () => {
     service.connect('new-token');
     expect(service.onlinePlayers$.value).toBeNull();
   });
+
+  it('masks old round phone numbers without disconnecting or dropping the round state', () => {
+    service.connect('token');
+    handlers.get('connect')!();
+    service.currentRound$.next({ ...service.currentRound$.value, activeBets: [
+      { userId: 7, phoneNumber: '0712345678', username: '0712345678', betAmount: 500 } as any
+    ] });
+    service.maskClientData();
+    expect(socket.disconnect).not.toHaveBeenCalled();
+    expect(service.isConnected$.value).toBe(true);
+    expect(service.currentRound$.value.activeBets![0].betAmount).toBe(500);
+    expect(service.currentRound$.value.activeBets![0].phoneNumber).toBe('071*****78');
+    expect(service.currentRound$.value.activeBets![0].username).toBe('071*****78');
+  });
 });

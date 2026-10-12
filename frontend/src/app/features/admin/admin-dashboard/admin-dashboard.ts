@@ -20,7 +20,7 @@ import { getBackendOrigin } from '../../../core/config/backend-url';
 import { AuthService } from '../../../core/services/auth.service';
 import { AviatorGameComponent } from '../../game/aviator/aviator-game.component';
 import { SanitizedModeService } from '../../../core/services/sanitized-mode.service';
-import { AdminInitial, AdminPinService } from '../../../core/services/admin-pin.service';
+import { AdminInitial, AdminPinService, maskClientPhoneNumbers } from '../../../core/services/admin-pin.service';
 
 export interface AdminUser {
   id: number;
@@ -168,15 +168,19 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (!token || this.pinBusy) return;
     this.pinBusy = true;
     this.pinError = '';
-    this.http.post<{ message: string }>(`${this.baseUrl}/api/admin/pin/configure`,
+    this.http.post<{ message: string; configuredTags: AdminInitial[] }>(`${this.baseUrl}/api/admin/pin/configure`,
       { ownerKey: this.ownerKeyInput, pins: this.setupPins }, { headers: { Authorization: `Bearer ${token}` } })
       .pipe(finalize(() => { this.pinBusy = false; this.cdr.markForCheck(); })).subscribe({
-        next: result => { this.closePinDialogs(); this.lockAdminPin(); this.showAdminToast(result.message, 'success'); },
+        next: result => {
+          this.closePinDialogs();
+          if (this.adminPin.tag && result.configuredTags.includes(this.adminPin.tag)) this.lockAdminPin();
+          this.showAdminToast(result.message, 'success');
+        },
         error: error => { this.ownerKeyInput = ''; this.pinError = error?.error?.error || 'Unable to save PINs.'; }
       });
   }
 
-  private refreshPhoneAccess(): void {
+  private refreshPhoneAccess(identityChanged = true): void {
     this.userRequest?.unsubscribe();
     this.activeUserRequest?.unsubscribe();
     this.onlinePlayerRequest?.unsubscribe();
@@ -190,7 +194,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.latestTransactionUpdates.clear();
     this.userList = [];
     this.adminsList = [];
-    this.transactionsList = [];
+    this.transactionsList = identityChanged ? [] : maskClientPhoneNumbers(this.transactionsList);
     this.activeUsersList = [];
     this.pendingWithdrawalsList = [];
     this.onlinePlayerRows = [];
@@ -208,10 +212,11 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.promptModal.isOpen = false;
     this.promptModal.message = '';
     this.promptModal.value = '';
-    this.adminSocket.disconnect();
+    if (identityChanged) this.adminSocket.disconnect();
+    else this.adminSocket.maskClientData();
     const token = this.authService.getToken();
     if (token && !this.destroyed) {
-      this.adminSocket.connect(token, this.adminPin.token);
+      if (identityChanged) this.adminSocket.connect(token, this.adminPin.token);
       this.fetchOverview();
       this.fetchSupportTickets(true);
       this.fetchOnlinePlayersSummary();
@@ -992,10 +997,10 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     let initialPinState = true;
     this.realtimeSubscriptions.push(this.adminPin.changed$.subscribe(() => {
       if (initialPinState) { initialPinState = false; return; }
-      this.refreshPhoneAccess();
+      this.refreshPhoneAccess(this.adminPin.changeReason === 'identity');
     }));
     if (this.adminSocket.clientClaimed$) this.realtimeSubscriptions.push(this.adminSocket.clientClaimed$.subscribe(event => {
-      if (event) this.adminPin.refresh();
+      if (event) this.refreshClientClaim(event.userId, event.tag, event.transactionId);
     }));
     if (this.adminSocket.pinChanged$) this.realtimeSubscriptions.push(this.adminSocket.pinChanged$.subscribe(event => {
       if (event && this.adminPin.tag && event.tags.includes(this.adminPin.tag)) {
@@ -2082,7 +2087,20 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
   public claimingTagTxId: number | null = null;
+  private readonly seenClaimTransactions = new Set<number>();
   public readonly allowedAdminTags: ('S' | 'G' | 'R' | 'V')[] = ['S', 'G', 'R', 'V'];
+
+  private refreshClientClaim(userId: number, tag: string, transactionId?: number): void {
+    if (transactionId && this.seenClaimTransactions.has(transactionId)) return;
+    if (transactionId) {
+      this.seenClaimTransactions.add(transactionId);
+      if (this.seenClaimTransactions.size > 500) this.seenClaimTransactions.delete(this.seenClaimTransactions.values().next().value!);
+    }
+    if (this.allowedAdminTags.includes(tag as AdminInitial)) {
+      for (const row of this.transactionsList) if (row.user_id === userId) row.admin_tag = tag as AdminInitial;
+    }
+    this.adminPin.refresh();
+  }
 
   public claimTransactionTag(tx: AdminTransaction, tag: 'S' | 'G' | 'R' | 'V'): void {
     if (tx.type !== 'deposit' || tx.status !== 'completed') return;
@@ -2097,19 +2115,19 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     tx.admin_tag = tag;
     this.cdr.markForCheck();
 
-    this.http.post<{ message: string; transaction: Partial<AdminTransaction> }>(
+    this.http.post<{ message: string; transactionId: number; tag: AdminInitial }>(
       `${this.baseUrl}/api/admin/transactions/${tx.id}/claim-tag`,
       { tag },
       { headers: { Authorization: `Bearer ${token}` } }
-    ).subscribe({
+    ).pipe(finalize(() => {
+      if (this.claimingTagTxId === tx.id) this.claimingTagTxId = null;
+      this.cdr.markForCheck();
+    })).subscribe({
       next: (res) => {
         this.claimingTagTxId = null;
-        if (res?.transaction?.admin_tag) {
-          tx.admin_tag = res.transaction.admin_tag as ('S' | 'G' | 'R' | 'V');
-        }
-        const actionLabel = previousTag ? 're-assigned' : 'claimed';
-        this.showAdminToast(`Transaction #${tx.id} ${actionLabel} with tag [${tag}]`, 'success');
-        this.adminPin.refresh();
+        tx.admin_tag = res.tag || tag;
+        this.refreshClientClaim(tx.user_id, tx.admin_tag, res.transactionId || tx.id);
+        this.showAdminToast(`Transaction #${tx.id} claimed with tag [${tx.admin_tag}]`, 'success');
         this.cdr.markForCheck();
       },
       error: (err) => {

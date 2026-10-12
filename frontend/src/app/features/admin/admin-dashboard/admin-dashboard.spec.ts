@@ -26,7 +26,7 @@ describe('Admin dashboard live account management', () => {
 
   beforeEach(async () => {
     socket = {
-      connect: vi.fn(), disconnect: vi.fn(),
+      connect: vi.fn(), disconnect: vi.fn(), maskClientData: vi.fn(),
       nextRound$: new BehaviorSubject({}), previousRound$: new BehaviorSubject({}),
       currentRound$: new BehaviorSubject({ onlineUsers: 0, connectedPlayers: 0 }),
       history$: new BehaviorSubject([]), isConnected$: new BehaviorSubject(false),
@@ -591,7 +591,7 @@ describe('Admin dashboard live account management', () => {
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ tag: 'S' });
     expect(req.request.headers.has('X-Admin-Pin')).toBe(false);
-    req.flush({ message: 'Claimed', transaction: { id: 501, admin_tag: 'S' } });
+    req.flush({ message: 'Claimed', transactionId: 501, tag: 'S' });
     flushPhoneRefresh();
 
     expect(tx.admin_tag).toBe('S');
@@ -600,5 +600,52 @@ describe('Admin dashboard live account management', () => {
     component.claimTransactionTag(tx, 'G');
     expect(tx.admin_tag).toBe('S');
     http.expectNone(r => r.url.endsWith('/api/admin/transactions/501/claim-tag'));
+  });
+
+  it('keeps the ledger stable and completes a claim when the live event arrives before its HTTP response', () => {
+    component.activeTab = 'transactions';
+    const tx: any = { id: 501, user_id: 7, username: '0712345678', phone_number: '0712345678',
+      type: 'deposit', amount: 500, status: 'completed', admin_tag: null, created_at: 'now' };
+    component.transactionsList = [tx];
+    socket.connect.mockClear();
+    socket.disconnect.mockClear();
+    component.claimTransactionTag(tx, 'R');
+    const claim = http.expectOne(r => r.url.endsWith('/api/admin/transactions/501/claim-tag'));
+    socket.clientClaimed$.next({ userId: 7, tag: 'R', transactionId: 501 });
+    expect(component.transactionsList.length).toBe(1);
+    expect(component.transactionsList[0].admin_tag).toBe('R');
+    expect(component.transactionsList[0].phone_number).toBe('071*****78');
+    expect(component.pinDialogOpen).toBe(false);
+    expect(socket.disconnect).not.toHaveBeenCalled();
+    expect(socket.connect).not.toHaveBeenCalled();
+    http.expectOne(r => r.url.endsWith('/api/admin/overview')).flush({ users: [], stats: {}, logs: [] });
+    http.expectOne(r => r.url.endsWith('/api/admin/support/tickets')).flush({ tickets: [] });
+    http.expectOne(r => r.url.endsWith('/api/admin/online-players/summary')).flush({ onlineUsers: 0, connectedPlayers: 0, topPlayers: [], version: 0 });
+    http.expectOne(r => r.url.includes('/api/admin/transactions?')).flush({ transactions: [{ ...tx, phone_number: '071*****78' }] });
+    claim.flush({ message: 'Claimed', transactionId: 501, tag: 'R' });
+    expect(component.claimingTagTxId).toBeNull();
+    expect(component.adminToast?.message).toContain('claimed');
+    http.expectNone(r => r.url.endsWith('/api/admin/overview'));
+  });
+
+  it('keeps claims PIN-free after successfully saving the four PINs', () => {
+    component.pinSetupOpen = true;
+    component.ownerKeyInput = 'private-key';
+    component.setupPins = { R: '1357', G: '2468', S: '3690', V: '4826' };
+    socket.connect.mockClear();
+    socket.disconnect.mockClear();
+    component.saveAdminPins();
+    http.expectOne(r => r.url.endsWith('/api/admin/pin/configure')).flush({ configuredTags: ['R', 'G', 'S', 'V'] });
+    expect(component.pinSetupOpen).toBe(false);
+    expect(component.pinBusy).toBe(false);
+    expect(socket.disconnect).not.toHaveBeenCalled();
+    const tx: any = { id: 502, user_id: 8, type: 'deposit', status: 'completed', admin_tag: null };
+    component.claimTransactionTag(tx, 'G');
+    expect(component.pinDialogOpen).toBe(false);
+    const claim = http.expectOne(r => r.url.endsWith('/api/admin/transactions/502/claim-tag'));
+    expect(claim.request.headers.has('X-Admin-Pin')).toBe(false);
+    claim.flush({ transactionId: 502, tag: 'G' }, { status: 500, statusText: 'Error' });
+    expect(component.claimingTagTxId).toBeNull();
+    expect(tx.admin_tag).toBeNull();
   });
 });

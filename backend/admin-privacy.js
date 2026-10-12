@@ -138,8 +138,17 @@ function fail(status, message) {
 function createAdminPrivacy(models) {
   const { User, Transaction, Deposit, AdminClientOwner, AdminPhoneOwner, AdminPinSettings, AdminPinSession, AdminPinAttempt, AdminPinProfile } = models;
   const configuredHash = async tag => (await AdminPinProfile.findById(tag).lean())?.pin_hash || '';
+  let migrationPromise;
 
-  async function directory() {
+  function ensureOwnershipMigration() {
+    if (!migrationPromise) migrationPromise = migrateLegacyOwnership().catch(error => {
+      migrationPromise = null;
+      throw error;
+    });
+    return migrationPromise;
+  }
+
+  async function migrateLegacyOwnership() {
     const [users, persisted, legacy] = await Promise.all([
       User.find({}).select('id username phone_number role').lean(),
       AdminClientOwner.find({}).lean(),
@@ -174,10 +183,18 @@ function createAdminPrivacy(models) {
     if (writes.length) {
       await AdminPhoneOwner.init();
       await AdminPhoneOwner.bulkWrite(writes);
-      // Read the winner if another request imported or claimed this phone concurrently.
-      owners.clear();
-      for (const row of await AdminPhoneOwner.find({}).lean()) owners.set(row._id, row);
     }
+  }
+
+  async function directory() {
+    await ensureOwnershipMigration();
+    // Only the legacy import is memoized. Live ownership and exemptions are always fresh.
+    const [users, existing] = await Promise.all([
+      User.find({}).select('id username phone_number role').lean(),
+      AdminPhoneOwner.find({}).lean()
+    ]);
+    const exemptPhones = staffPhones(users);
+    const owners = new Map(existing.map(row => [row._id, row]));
     const ownedUsers = users.filter(user => !isStaff(user) && !exemptPhones.has(phoneFor(user)) && owners.has(phoneFor(user)));
     const ids = [...new Set([...ownedUsers.map(user => user.id), ...[...owners.values()].map(owner => owner.user_id)])];
     const deposits = ids.length ? await Deposit.find({ user_id: { $in: ids }, payer_phone: { $ne: null } }).select('user_id payer_phone').lean() : [];
@@ -193,9 +210,10 @@ function createAdminPrivacy(models) {
       return { ...user, ...owner, id: user.id, username: user.username, phone_number: user.phone_number || phoneFor(user),
         payer_phones: [...new Set([...(payerPhones.get(Number(user.id)) || []), ...(payerPhones.get(Number(owner.user_id)) || [])])] };
     });
+    const representedPhones = new Set(ownedUsers.map(phoneFor));
     for (const owner of owners.values()) {
       if (exemptPhones.has(owner._id)) continue;
-      if (!result.some(user => phoneFor(user) === owner._id)) result.push({ ...owner, id: owner.user_id,
+      if (!representedPhones.has(owner._id)) result.push({ ...owner, id: owner.user_id,
         username: owner.client_username, phone_number: owner._id, payer_phones: payerPhones.get(Number(owner.user_id)) || [] });
     }
     return [...result, ...users.filter(user => isStaff(user) || exemptPhones.has(phoneFor(user))).map(user => ({ ...user, exempt: true }))];
@@ -255,7 +273,7 @@ function createAdminPrivacy(models) {
     const current = await Promise.all(ADMIN_TAGS.map(configuredHash));
     const nextHashes = new Map();
     for (const tag of tags) {
-      if (await bcrypt.compare(pins[tag], hash)) throw fail(400, 'An admin PIN must be different from the private owner key.');
+      if (pins[tag] === ownerKey) throw fail(400, 'An admin PIN must be different from the private owner key.');
       for (const other of ADMIN_TAGS) {
         if (other === tag) continue;
         if (pins[other] && pins[other] === pins[tag]) throw fail(400, 'Each admin must have a different PIN.');
@@ -272,7 +290,7 @@ function createAdminPrivacy(models) {
 
   async function claim(txId, tag, adminId) {
     if (!ADMIN_TAGS.includes(tag)) throw fail(400, 'Invalid admin initial.');
-    await directory();
+    await ensureOwnershipMigration();
     await AdminPhoneOwner.init();
     const session = await Transaction.startSession();
     let result;
@@ -283,8 +301,13 @@ function createAdminPrivacy(models) {
         if (tx.type !== 'deposit' || tx.status !== 'completed') throw fail(400, 'Only completed deposits can be claimed.');
         const client = await User.findOne({ id: tx.user_id }).select('id username phone_number role').session(session);
         if (!client) throw fail(404, 'Client account not found.');
-        const users = await User.find({}).select('id username phone_number role').session(session);
         const phone = normalizePhone(tx.client_phone || phoneFor(client));
+        const phoneDigits = /^254[17]\d{8}$/.test(phone) ? phone.slice(3) : phone;
+        const prefix = /^254[17]\d{8}$/.test(phone) ? '(?:\\+?254[\\s().-]*|0[\\s().-]*)?' : '\\+?';
+        const equivalentPhone = new RegExp('^\\s*' + prefix + phoneDigits.split('').join('[\\s().-]*') + '\\s*$');
+        const users = await User.find({ $or: [
+          { role: { $in: ['admin', 'superadmin'] } }, { phone_number: equivalentPhone }, { username: equivalentPhone }
+        ] }).select('id username phone_number role').session(session);
         if (isStaff(client) || staffPhones(users).has(phone)) throw fail(400, 'Admin and superadmin numbers are excluded from client ownership.');
         if (phone.length < 9) throw fail(400, 'Client needs a valid phone number before claiming.');
         if (tx.admin_tag && tx.admin_tag !== tag) throw fail(403, `Transaction belongs to admin ${tx.admin_tag}.`);
@@ -314,15 +337,18 @@ function createAdminPrivacy(models) {
     res.set('Cache-Control', 'no-store');
     const accountToken = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
     req.adminAccountToken = accountToken;
-    identity(req.headers['x-admin-pin'], accountToken).then(async pinIdentity => {
+    const controlRequest = req.method === 'POST' && /^\/api\/admin\/(?:pin\/(?:unlock|lock|configure)|transactions\/\d+\/claim-tag)$/.test((req.originalUrl || '').split('?')[0]);
+    (controlRequest ? Promise.resolve(null) : identity(req.headers['x-admin-pin'], accountToken)).then(async pinIdentity => {
       req.pinIdentity = pinIdentity;
-      const clients = pinIdentity || req.method !== 'GET' ? await directory() : [];
+      if (!controlRequest && req.method !== 'GET') await ensureOwnershipMigration();
+      const clients = pinIdentity && !controlRequest ? await directory() : [];
       req.blockedClients = pinIdentity ? clients.filter(client => !client.exempt && client.owner_tag !== pinIdentity.tag) : [];
       req.blockedClientIds = req.blockedClients.map(client => client.id);
       res.json = payload => {
         // Serialize immediately so concurrent mutations cannot alter an outbound snapshot.
         const snapshot = JSON.parse(JSON.stringify(payload));
-        Promise.all([needsPrivacy(snapshot) ? directory() : [], identity(req.headers['x-admin-pin'], accountToken)])
+        const privateData = needsPrivacy(snapshot);
+        Promise.all([privateData ? directory() : [], privateData ? identity(req.headers['x-admin-pin'], accountToken) : null])
           .then(([users, currentIdentity]) => sendJson(protectPayload(snapshot, users, currentIdentity?.tag, req.query?.search)))
           .catch(() => { if (!res.headersSent) { res.status(503); sendJson({ error: 'Phone privacy verification unavailable. Please retry.' }); } });
         return res;
