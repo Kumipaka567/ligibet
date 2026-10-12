@@ -42,6 +42,7 @@ export interface AdminTransaction {
   username: string;
   phone_number?: string;
   client_admin_tag?: AdminInitial;
+  ownership_exempt?: boolean;
   type: 'deposit' | 'withdrawal';
   amount: number;
   status: 'completed' | 'failed' | 'pending';
@@ -121,7 +122,6 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public pinBusy = false;
   public ownerKeyInput = '';
   public setupPins: Record<AdminInitial, string> = { R: '', G: '', S: '', V: '' };
-  private pendingPinClaim: AdminTransaction | null = null;
 
   public openPinDialog(tag?: AdminInitial): void {
     this.pinInitial = tag || this.adminPin.tag || 'R';
@@ -137,7 +137,6 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.ownerKeyInput = '';
     this.setupPins = { R: '', G: '', S: '', V: '' };
     this.pinError = '';
-    this.pendingPinClaim = null;
   }
 
   public unlockAdminPin(): void {
@@ -149,11 +148,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       { tag: this.pinInitial, pin: this.pinInput }, { headers: { Authorization: `Bearer ${token}` } })
       .pipe(finalize(() => { this.pinBusy = false; this.cdr.markForCheck(); })).subscribe({
         next: session => {
-          const transaction = this.pendingPinClaim;
           this.closePinDialogs();
           this.adminPin.unlock(session);
           this.showAdminToast(`Admin ${session.tag} unlocked. Showing your clients and unclaimed clients.`, 'success');
-          if (transaction) this.claimTransactionTag(transaction, session.tag);
         },
         error: error => { this.pinInput = ''; this.pinError = error?.error?.error || 'Unable to verify PIN.'; }
       });
@@ -2089,12 +2086,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   public claimTransactionTag(tx: AdminTransaction, tag: 'S' | 'G' | 'R' | 'V'): void {
     if (tx.type !== 'deposit' || tx.status !== 'completed') return;
-    if (tx.admin_tag) return;
-    if (this.adminPin.tag !== tag) {
-      this.pendingPinClaim = tx;
-      this.openPinDialog(tag);
-      return;
-    }
+    if (tx.admin_tag || tx.ownership_exempt) return;
     if (this.claimingTagTxId === tx.id) return; // Prevent double submit
     const token = this.authService.getToken();
     if (!token) return;

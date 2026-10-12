@@ -2,6 +2,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const bcrypt = require('bcryptjs');
 const { protectPayload, maskPhone, adminClientScope, adminTicketScope, createAdminPrivacy } = require('../admin-privacy');
+const { normalizePhone, transactionOwnershipFields } = require('../admin-phone-ownership');
+const { migratePinSettings } = require('../admin-pin-database');
 
 const directory = [
   { id: 7, username: '0712345678', phone_number: '+254712345678', owner_tag: 'R', payer_phones: ['0799887766'] },
@@ -71,6 +73,9 @@ function fixture(ownerKey = 'private-owner-key-only') {
   const sessions = new Map();
   const attempts = new Map();
   const owners = new Map();
+  const phoneOwners = new Map();
+  const settings = new Map([['owner', { owner_key_hash: bcrypt.hashSync(ownerKey, 4) }]]);
+  const users = directory.map(user => ({ ...user, role: 'user' }));
   const transactions = new Map([
     [101, { id: 101, user_id: 7, type: 'deposit', status: 'completed', admin_tag: null }],
     [102, { id: 102, user_id: 7, type: 'deposit', status: 'completed', admin_tag: null }],
@@ -80,11 +85,14 @@ function fixture(ownerKey = 'private-owner-key-only') {
   const query = value => ({ lean: async () => value, select() { return this; }, sort() { return this; }, session: async () => value });
   let queue = Promise.resolve();
   const models = {
-    User: { find: () => query(directory), findOne: filter => query(directory.find(user => user.id === filter.id)) },
+    User: { find: filter => query(users.filter(user => !filter.role || filter.role.$in.includes(user.role))), findOne: filter => query(users.find(user => user.id === filter.id)) },
     Deposit: { find: () => query([]) },
+    AdminPinSettings: { findById: id => query(settings.get(id)), updateOne: async (filter, update) => {
+      if (!settings.has(filter._id)) settings.set(filter._id, update.$setOnInsert);
+    } },
     AdminPinProfile: { findById: tag => query(profiles.has(tag) ? { pin_hash: profiles.get(tag) } : null), bulkWrite: async operations => {
       for (const op of operations) profiles.set(op.updateOne.filter._id, op.updateOne.update.$set.pin_hash);
-    } },
+    }, updateOne: async (filter, update) => { if (!profiles.has(filter._id)) profiles.set(filter._id, update.$setOnInsert.pin_hash); } },
     AdminPinSession: {
       create: async session => sessions.set(session.token_hash, session),
       findOne: filter => {
@@ -113,6 +121,17 @@ function fixture(ownerKey = 'private-owner-key-only') {
         return owners.get(filter.user_id);
       }
     },
+    AdminPhoneOwner: {
+      init: async () => {}, find: () => query([...phoneOwners.values()]), findById: phone => query(phoneOwners.get(phone)),
+      bulkWrite: async operations => { for (const op of operations) {
+        const phone = op.updateOne.filter._id;
+        if (!phoneOwners.has(phone)) phoneOwners.set(phone, op.updateOne.update.$setOnInsert);
+      } },
+      findOneAndUpdate: async (filter, update) => {
+        if (!phoneOwners.has(filter._id)) phoneOwners.set(filter._id, { _id: filter._id, ...update.$setOnInsert });
+        return phoneOwners.get(filter._id);
+      }
+    },
     Transaction: {
       aggregate: async () => {
         const found = new Map();
@@ -126,15 +145,24 @@ function fixture(ownerKey = 'private-owner-key-only') {
         Object.assign(tx, update.$set);
         return tx;
       },
+      updateMany: async (filter, update) => {
+        for (const tx of transactions.values()) {
+          const byPhone = tx.client_phone === filter.$or[0].client_phone;
+          const byAccount = tx.client_phone == null && filter.$or[1].user_id.$in.includes(tx.user_id);
+          if ((byPhone || byAccount) && !filter.user_id.$nin.includes(tx.user_id)) Object.assign(tx, update.$set);
+        }
+      },
       startSession: async () => ({
         withTransaction: callback => {
           const work = queue.then(async () => {
             const beforeOwners = structuredClone(owners);
+            const beforePhoneOwners = structuredClone(phoneOwners);
             const beforeTransactions = structuredClone(transactions);
             try { return await callback(); } catch (error) {
-              owners.clear(); transactions.clear();
+              owners.clear(); transactions.clear(); phoneOwners.clear();
               for (const [key, value] of beforeOwners) owners.set(key, value);
               for (const [key, value] of beforeTransactions) transactions.set(key, value);
+              for (const [key, value] of beforePhoneOwners) phoneOwners.set(key, value);
               throw error;
             }
           });
@@ -144,8 +172,7 @@ function fixture(ownerKey = 'private-owner-key-only') {
       })
     }
   };
-  const env = { ADMIN_PIN_SETUP_KEY_HASH: bcrypt.hashSync(ownerKey, 4) };
-  return { service: createAdminPrivacy(models, env), models, profiles, sessions, attempts, transactions, owners };
+  return { service: createAdminPrivacy(models), models, profiles, sessions, attempts, transactions, owners, phoneOwners, users, settings };
 }
 
 test('private setup requires the owner key, stores hashes, rejects duplicate PINs and invalidates existing access', async () => {
@@ -206,24 +233,94 @@ test('sixth PIN attempt is blocked across accounts', async () => {
 });
 
 test('completed deposit claims establish one client owner and reject transfers even with the same superadmin account id', async () => {
-  const { service, transactions, owners } = fixture();
+  const { service, transactions, phoneOwners } = fixture();
   await service.claim(101, 'R', 1);
-  assert.equal(owners.get(7).owner_tag, 'R');
+  assert.equal(phoneOwners.get('254712345678').owner_tag, 'R');
   await assert.rejects(service.claim(102, 'G', 1), { status: 403 });
   await assert.rejects(service.claim(101, 'G', 1), { status: 403 });
-  assert.equal(transactions.get(102).admin_tag, null);
+  assert.equal(transactions.get(102).admin_tag, 'R');
   await service.claim(102, 'R', 1);
   assert.equal(transactions.get(102).admin_tag, 'R');
   await assert.rejects(service.claim(103, 'S', 1), { status: 400 });
   await assert.rejects(service.claim(104, 'S', 1), { status: 400 });
-  assert.equal(owners.has(8), false);
+  assert.equal(phoneOwners.has('254711112222'), false);
+});
+
+test('one phone claim covers all statuses and equivalent numbers on different accounts without a PIN', async () => {
+  const { service, users, models, transactions, profiles } = fixture();
+  users.push({ id: 9, username: 'another-account', phone_number: '0712 345 678', role: 'user' });
+  transactions.set(105, { id: 105, user_id: 9, type: 'deposit', status: 'failed', admin_tag: null });
+  transactions.set(106, { id: 106, user_id: 9, type: 'withdrawal', status: 'pending', admin_tag: null });
+  assert.equal(profiles.size, 0);
+  await service.claim(101, 'R', 1);
+  for (const id of [101, 102, 105, 106]) {
+    assert.equal(transactions.get(id).admin_tag, 'R');
+    assert.equal(transactions.get(id).client_phone, '254712345678');
+  }
+  const clients = await service.directory();
+  assert.equal(clients.find(client => client.id === 9).owner_tag, 'R');
+  assert.equal(protectPayload({ tickets: [{ phone_number: '0712345678' }] }, clients).tickets[0].phone_number, '071*****78');
+  for (const type of ['deposit', 'withdrawal', 'bet_placed', 'bet_payout']) {
+    for (const status of ['completed', 'failed', 'pending']) {
+      const fields = await transactionOwnershipFields(models, { user_id: 9, type, status });
+      assert.equal(fields.admin_tag, 'R');
+    }
+  }
+});
+
+test('failed transactions remain masked; their owner can unlock them and all statuses show inherited initials', () => {
+  const payload = { transactions: [
+    { id: 1, user_id: 7, type: 'deposit', status: 'failed', admin_tag: null, phone_number: '0712345678' },
+    { id: 2, user_id: 9, type: 'deposit', status: 'failed', phone_number: '0700000000' },
+    { id: 3, user_id: 9, type: 'deposit', status: 'completed', phone_number: '0700000000' },
+    { id: 4, user_id: 7, type: 'withdrawal', status: 'pending', phone_number: '0712345678' }
+  ] };
+  const locked = protectPayload(payload, directory);
+  assert.equal(locked.transactions[0].phone_number, '071*****78');
+  assert.equal(locked.transactions[0].admin_tag, 'R');
+  assert.equal(locked.transactions[1].phone_number, '070*****00');
+  assert.equal(locked.transactions[2].phone_number, '0700000000');
+  assert.equal(locked.transactions[3].admin_tag, 'R');
+  assert.equal(protectPayload(payload, directory, 'R').transactions[0].phone_number, '0712345678');
+});
+
+test('admin/superadmin accounts and numbers never acquire client ownership', async () => {
+  const { service, users, transactions, models, phoneOwners } = fixture();
+  users.push({ id: 1, role: 'superadmin', username: 'owner', phone_number: '0712345678' });
+  users.push({ id: 2, role: 'admin', username: 'staff', phone_number: '0799001122' });
+  transactions.set(105, { id: 105, user_id: 2, type: 'deposit', status: 'completed', admin_tag: null });
+  await assert.rejects(service.claim(101, 'R', 1), { status: 400 });
+  await assert.rejects(service.claim(105, 'G', 1), { status: 400 });
+  assert.equal(phoneOwners.size, 0);
+  // Exemption also applies to old claims created before the exclusion existed.
+  phoneOwners.set('254712345678', { _id: '254712345678', user_id: 7, owner_tag: 'R', client_phone: '254712345678' });
+  const clients = await service.directory();
+  const payload = protectPayload({ transactions: [{ id: 101, user_id: 7, client_phone: '254712345678',
+    type: 'deposit', status: 'failed', admin_tag: 'R', phone_number: '0712345678' }] }, clients, 'G');
+  assert.equal(payload.transactions[0].phone_number, '0712345678');
+  assert.equal(payload.transactions[0].admin_tag, null);
+  assert.equal(payload.transactions[0].ownership_exempt, true);
+  assert.equal((await transactionOwnershipFields(models, { user_id: 7 })).admin_tag, null);
+  assert.equal((await transactionOwnershipFields(models, { user_id: 2 })).admin_tag, null);
+});
+
+test('database PIN settings override legacy environment hashes and migrate without replacing existing values', async () => {
+  const { service, models, settings, profiles } = fixture('3842');
+  await migratePinSettings(models, { ADMIN_PIN_SETUP_KEY_HASH: bcrypt.hashSync('9999', 4), ADMIN_PIN_R_HASH: bcrypt.hashSync('0123', 4) });
+  assert.equal(await bcrypt.compare('3842', settings.get('owner').owner_key_hash), true);
+  await service.configure('3842', { G: '2468' });
+  await service.unlock('R', '0123', 'shared-account');
+  await migratePinSettings(models, { ADMIN_PIN_R_HASH: bcrypt.hashSync('9999', 4) });
+  assert.equal(await bcrypt.compare('0123', profiles.get('R')), true);
+  settings.clear();
+  await assert.rejects(service.configure('3842', { G: '2468' }), { status: 503 });
 });
 
 test('concurrent deposits for the same client cannot create two owners', async () => {
-  const { service, owners } = fixture();
+  const { service, phoneOwners } = fixture();
   const results = await Promise.allSettled([service.claim(101, 'R', 1), service.claim(102, 'G', 1)]);
   assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
-  assert.equal(owners.get(7).owner_tag, 'R');
+  assert.equal(phoneOwners.get('254712345678').owner_tag, 'R');
 });
 
 test('legacy completed deposit claims apply in support and cannot be stolen through a new deposit', async () => {

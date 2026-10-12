@@ -564,7 +564,7 @@ describe('Admin dashboard live account management', () => {
     http.expectOne(request => request.url.includes('/api/admin/transactions?')).flush({ transactions: component.transactionsList });
   });
 
-  it('requires the correct PIN to claim and prevents superadmin from reclaiming another initial', () => {
+  it('claims without a PIN and prevents superadmin from reclaiming another initial', () => {
     const tx: any = {
       id: 501,
       user_id: 7,
@@ -578,27 +578,19 @@ describe('Admin dashboard live account management', () => {
     component.transactionsList = [tx];
 
     component.claimTransactionTag(tx, 'S');
-    expect(tx.admin_tag).toBeNull();
-    expect(component.pinDialogOpen).toBe(true);
-    expect(component.pinInitial).toBe('S');
-    http.expectNone(r => r.url.endsWith('/api/admin/transactions/501/claim-tag'));
-    component.pinInput = '3690';
-    component.unlockAdminPin();
-    const unlock = http.expectOne(r => r.url.endsWith('/api/admin/pin/unlock'));
-    expect(unlock.request.body).toEqual({ tag: 'S', pin: '3690' });
-    unlock.flush({ tag: 'S', pinToken: 'a'.repeat(64), expiresAt: new Date(Date.now() + 900000).toISOString() });
+    expect(component.pinDialogOpen).toBe(false);
+    http.expectNone(r => r.url.endsWith('/api/admin/pin/unlock'));
     const flushPhoneRefresh = () => {
       http.expectOne(r => r.url.endsWith('/api/admin/overview')).flush({ users: [], stats: {}, logs: [] });
       http.expectOne(r => r.url.endsWith('/api/admin/support/tickets')).flush({ tickets: [] });
       http.expectOne(r => r.url.endsWith('/api/admin/online-players/summary')).flush({ onlineUsers: 0, connectedPlayers: 0, topPlayers: [], version: 0 });
     };
-    flushPhoneRefresh();
     expect(tx.admin_tag).toBe('S');
 
     const req = http.expectOne(r => r.url.endsWith('/api/admin/transactions/501/claim-tag'));
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ tag: 'S' });
-    expect(req.request.headers.get('X-Admin-Pin')).toBe('a'.repeat(64));
+    expect(req.request.headers.has('X-Admin-Pin')).toBe(false);
     req.flush({ message: 'Claimed', transaction: { id: 501, admin_tag: 'S' } });
     flushPhoneRefresh();
 

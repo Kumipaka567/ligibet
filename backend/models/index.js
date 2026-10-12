@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { transactionOwnershipFields } = require('../admin-phone-ownership');
 
 // ─── Sequence Counter for Auto-Increment IDs ──────────────────────────────
 const CounterSchema = new mongoose.Schema({
@@ -116,6 +117,7 @@ BetSchema.pre('save', async function(next) {
 const TransactionSchema = new mongoose.Schema({
   id: { type: Number, unique: true, index: true },
   user_id: { type: Number, required: true, index: true },
+  client_phone: { type: String, default: null, index: true },
   type: {
     type: String,
     enum: ['deposit', 'withdrawal', 'bet_placed', 'bet_payout', 'admin_adjustment', 'bonus'],
@@ -148,6 +150,11 @@ TransactionSchema.pre('save', async function(next) {
     this.id = await getNextSequenceValue('transactions_id');
   }
   next();
+});
+TransactionSchema.pre('validate', async function() {
+  if (this.isNew || this.isModified('user_id') || this.isModified('client_phone')) {
+    Object.assign(this, await transactionOwnershipFields(mongoose.models, this));
+  }
 });
 
 // ─── Deposit Schema ──────────────────────────────────────────────────────
@@ -366,6 +373,21 @@ const AdminPinProfileSchema = new mongoose.Schema({
   pin_hash: { type: String, required: true },
   updated_at: { type: Date, default: Date.now }
 });
+const AdminPhoneOwnerSchema = new mongoose.Schema({
+  _id: { type: String, required: true },
+  owner_tag: { type: String, required: true, enum: ['R', 'G', 'S', 'V'] },
+  user_id: Number,
+  admin_id: Number,
+  client_phone: String,
+  client_username: String,
+  claimed_transaction_id: Number,
+  claimed_at: { type: Date, default: Date.now }
+});
+const AdminPinSettingsSchema = new mongoose.Schema({
+  _id: { type: String, default: 'owner' },
+  owner_key_hash: { type: String, required: true },
+  updated_at: { type: Date, default: Date.now }
+});
 const AdminPinAttemptSchema = new mongoose.Schema({
   _id: String,
   attempts: Number,
@@ -374,6 +396,8 @@ const AdminPinAttemptSchema = new mongoose.Schema({
 
 // ─── Export Mongoose Models ──────────────────────────────────────────────
 module.exports = {
+  AdminPhoneOwner: mongoose.models.AdminPhoneOwner || mongoose.model('AdminPhoneOwner', AdminPhoneOwnerSchema),
+  AdminPinSettings: mongoose.models.AdminPinSettings || mongoose.model('AdminPinSettings', AdminPinSettingsSchema),
   AdminPinProfile: mongoose.models.AdminPinProfile || mongoose.model('AdminPinProfile', AdminPinProfileSchema),
   AdminClientOwner: mongoose.models.AdminClientOwner || mongoose.model('AdminClientOwner', AdminClientOwnerSchema),
   AdminPinSession: mongoose.models.AdminPinSession || mongoose.model('AdminPinSession', AdminPinSessionSchema),

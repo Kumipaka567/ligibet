@@ -21,6 +21,7 @@ const { createOnlinePlayers } = require('./online-players');
 const { createAdminPrivacy, ADMIN_TAGS, adminClientScope, adminTicketScope } = require('./admin-privacy');
 const privacyModels = require('./models');
 const adminPrivacy = createAdminPrivacy(privacyModels);
+const { migratePinSettings } = require('./admin-pin-database');
 
 function escapeRegExp(string) {
   return String(string || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -2471,7 +2472,7 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
   try {
     const [users, transactions, betAgg, depAgg, wdAgg, totalUsers, logs] = await Promise.all([
       User.find(adminClientScope(req, 'id')).select('-password_hash -__v -_id').sort({ created_at: -1, id: -1 }).limit(100).lean(),
-      Transaction.find(adminClientScope(req, 'user_id')).select('id user_id type amount status reference created_at admin_tag').sort({ created_at: -1 }).limit(100).lean(),
+      Transaction.find(adminClientScope(req, 'user_id')).select('id user_id client_phone type amount status reference created_at admin_tag').sort({ created_at: -1 }).limit(100).lean(),
       Bet.aggregate([{ $group: { _id: null, totalBets: { $sum: 1 }, totalVolume: { $sum: '$bet_amount' }, totalPayout: { $sum: '$payout_amount' } } }]),
       Deposit.aggregate([{ $match: { status: 'completed', provider: 'payhero' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
       Withdrawal.aggregate([{ $match: { status: 'completed' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
@@ -2508,7 +2509,9 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
           id: t.id,
           user_id: t.user_id,
           username: u.username || 'Unknown',
-          phone_number: u.phone_number || '',
+          phone_number: t.client_phone || u.phone_number || '',
+          client_phone: t.client_phone || null,
+          admin_tag: t.admin_tag || null,
           type: t.type,
           amount: t.amount,
           status: t.status,
@@ -2746,7 +2749,7 @@ app.get('/api/admin/transactions', authenticateAdminToken, async (req, res) => {
     if (statusFilter !== 'all') filter.status = statusFilter;
 
     const transactions = await Transaction.find(filter)
-      .select('id user_id type amount status reference created_at admin_tag admin_tagged_by admin_tagged_at')
+      .select('id user_id client_phone type amount status reference created_at admin_tag admin_tagged_by admin_tagged_at')
       .sort({ created_at: -1 })
       .limit(100)
       .lean();
@@ -2761,7 +2764,8 @@ app.get('/api/admin/transactions', authenticateAdminToken, async (req, res) => {
         id: t.id,
         user_id: t.user_id,
         username: u.username || 'Unknown',
-        phone_number: u.phone_number || '',
+        phone_number: t.client_phone || u.phone_number || '',
+        client_phone: t.client_phone || null,
         type: t.type,
         amount: t.amount,
         status: t.status,
@@ -2779,13 +2783,12 @@ app.get('/api/admin/transactions', authenticateAdminToken, async (req, res) => {
   }
 });
 
-// Claiming and visibility use the PIN identity, including for shared superadmin accounts.
+// Claims use the selected initial. PIN verification is only needed to reveal client phones.
 app.post('/api/admin/transactions/:id/claim-tag', authenticateAdminToken, async (req, res) => {
   try {
     const txId = Number(req.params.id);
     const tag = String(req.body.tag || '').toUpperCase();
     if (!Number.isSafeInteger(txId) || txId <= 0 || !ADMIN_TAGS.includes(tag)) return res.status(400).json({ error: 'Invalid transaction or admin initial.' });
-    if (!req.pinIdentity || req.pinIdentity.tag !== tag) return res.status(403).json({ error: 'Unlock this admin initial with its PIN before claiming.' });
     const tx = await adminPrivacy.claim(txId, tag, req.user.id);
     await AdminLog.create({ admin_id: req.user.id, action: 'CLAIM_TRANSACTION', target_user_id: tx.user_id,
       details: 'Admin [' + tag + '] claimed completed deposit #' + txId }).catch(() => {});
@@ -5024,6 +5027,8 @@ async function startServer() {
     await Promise.all([
       User.createIndexes(),
       privacyModels.AdminClientOwner.createIndexes(),
+      privacyModels.AdminPhoneOwner.createIndexes(),
+      privacyModels.AdminPinSettings.createIndexes(),
       privacyModels.AdminPinSession.createIndexes(),
       privacyModels.AdminPinAttempt.createIndexes(),
       Transaction.createIndexes(),
@@ -5036,6 +5041,13 @@ async function startServer() {
     // The service can still operate with existing indexes; preserve the error
     // in deployment logs so Atlas permissions or malformed indexes are visible.
     console.error(`Database index setup failed: ${err.message}`);
+  }
+
+  try {
+    await migratePinSettings(privacyModels, process.env);
+    await adminPrivacy.directory();
+  } catch (err) {
+    console.error('Admin PIN/ownership migration failed. Private access remains protected until database setup succeeds.');
   }
 
   // Before anything is served: a restart must not hand suspended players a

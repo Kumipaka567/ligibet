@@ -1,16 +1,11 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const { normalizePhone, isStaff, phoneFor, staffPhones } = require('./admin-phone-ownership');
 
 const ADMIN_TAGS = ['R', 'G', 'S', 'V'];
 const PIN_SESSION_MS = 15 * 60 * 1000;
 const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const digest = value => crypto.createHash('sha256').update(String(value || '')).digest('hex');
-const normalizePhone = value => {
-  const digits = String(value || '').replace(/\D/g, '');
-  if (/^0[17]\d{8}$/.test(digits)) return '254' + digits.slice(1);
-  if (/^[17]\d{8}$/.test(digits)) return '254' + digits;
-  return digits;
-};
 function maskPhone(value) {
   const text = String(value || '');
   const digits = text.replace(/\D/g, '');
@@ -51,29 +46,34 @@ function protectPayload(payload, directory, tag = null, search = '') {
       const key = normalizePhone(phone);
       if (key.length < 9) continue;
       const existing = byPhone.get(key);
-      byPhone.set(key, existing && existing.owner_tag !== user.owner_tag
+      byPhone.set(key, user.exempt ? user : existing?.exempt ? existing : existing && existing.owner_tag !== user.owner_tag
         ? { owner_tag: null } : user);
     }
   }
   function ownerOf(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    if (isStaff(value)) return { exempt: true };
+    const snapshotOwner = value.client_phone ? byPhone.get(normalizePhone(value.client_phone)) : null;
     const phoneOwner = byPhone.get(normalizePhone(value.phone_number || value.phoneNumber || value.payer_phone));
     const userId = value.user_id ?? value.userId ?? value.target_user_id
       ?? (('balance' in value || 'role' in value || 'is_online' in value) ? value.id : null);
-    return byId.get(Number(userId)) || phoneOwner || byName.get(value.username) || (value.admin_tag ? { owner_tag: value.admin_tag } : null);
+    return snapshotOwner || byId.get(Number(userId)) || phoneOwner || byName.get(value.username) || (value.admin_tag ? { owner_tag: value.admin_tag } : null);
   }
   function visit(value, restricted = false, field = '') {
     if (typeof value === 'number') {
       const owner = byPhone.get(normalizePhone(value));
+      if (owner?.exempt) return value;
       if ((restricted && /phone/i.test(field)) || (owner && (!tag || owner.owner_tag !== tag))) return maskPhone(value);
       return value;
     }
     if (typeof value === 'string') {
+      if (byPhone.get(normalizePhone(value))?.exempt) return value;
       if (restricted && (/phone/i.test(field) || field === 'account_details') && /\d{7}/.test(value.replace(/\D/g, ''))) {
         return value.replace(phonePattern, match => maskPhone(match)) === value ? maskPhone(value) : value.replace(phonePattern, match => maskPhone(match));
       }
       return value.replace(phonePattern, match => {
         const owner = byPhone.get(normalizePhone(match));
+        if (owner?.exempt) return match;
         return restricted || (owner && (!tag || owner.owner_tag !== tag)) ? maskPhone(match) : match;
       });
     }
@@ -83,7 +83,7 @@ function protectPayload(payload, directory, tag = null, search = '') {
     if (Array.isArray(value)) {
       const rows = value.filter(item => {
         const owner = ownerOf(item);
-        return !tag || !owner || owner.owner_tag === tag;
+        return !tag || !owner || owner.exempt || owner.owner_tag === tag;
       }).map(item => visit(item, restricted, field));
       if (!search || !['users', 'transactions', 'activeUsers', 'players'].includes(field)) return rows;
       const query = String(search).trim().toLowerCase();
@@ -99,18 +99,27 @@ function protectPayload(payload, directory, tag = null, search = '') {
     }
     // A support ticket's id is a ticket ID, so use its phone to resolve ownership.
     const owner = ownerOf(value);
-    const ownerTag = owner?.owner_tag || value.admin_tag;
-    const hidden = restricted || Boolean(owner && (!tag || owner.owner_tag !== tag))
-      || Boolean(ownerTag && ownerTag !== tag);
+    const ownerTag = owner?.exempt ? null : owner?.owner_tag || value.admin_tag;
+    const failedHidden = value.status === 'failed' && value.user_id !== undefined && (!ownerTag || ownerTag !== tag);
+    const hidden = !owner?.exempt && (restricted || failedHidden || Boolean(owner && (!tag || owner.owner_tag !== tag))
+      || Boolean(ownerTag && ownerTag !== tag));
     const result = {};
     for (const [key, child] of Object.entries(value)) {
-      if (['password_hash', 'pin_hash', 'token_hash', 'account_hash'].includes(key)) continue;
+      if (['password_hash', 'pin_hash', 'owner_key_hash', 'token_hash', 'account_hash'].includes(key)) continue;
       const callbackPhone = /phone/i.test(String(value.Name || value.name || '')) && /^(value)$/i.test(key);
       result[key] = visit(child, hidden, callbackPhone ? 'phone' : key);
     }
-    if (ownerTag && ('phone_number' in value || 'phoneNumber' in value)) {
-      result.client_admin_tag = ownerTag;
+    if ((ownerTag || failedHidden) && ('phone_number' in value || 'phoneNumber' in value)) {
+      if (ownerTag) result.client_admin_tag = ownerTag;
       result.phone_hidden = hidden;
+    }
+    if (value.user_id !== undefined && value.type) {
+      result.ownership_exempt = Boolean(owner?.exempt);
+      result.admin_tag = ownerTag || null;
+      if (ownerTag && owner?.claimed_at) {
+        result.admin_tagged_by = owner.admin_id || null;
+        result.admin_tagged_at = owner.claimed_at;
+      }
     }
     if (search && Array.isArray(value.players) && result.players.length !== value.players.length) {
       result.total = result.players.length;
@@ -126,52 +135,70 @@ function fail(status, message) {
   return Object.assign(new Error(message), { status });
 }
 
-function createAdminPrivacy(models, env = process.env) {
-  const { User, Transaction, Deposit, AdminClientOwner, AdminPinSession, AdminPinAttempt, AdminPinProfile } = models;
-  const configuredHash = async tag => (await AdminPinProfile.findById(tag).lean())?.pin_hash || env[`ADMIN_PIN_${tag}_HASH`] || '';
+function createAdminPrivacy(models) {
+  const { User, Transaction, Deposit, AdminClientOwner, AdminPhoneOwner, AdminPinSettings, AdminPinSession, AdminPinAttempt, AdminPinProfile } = models;
+  const configuredHash = async tag => (await AdminPinProfile.findById(tag).lean())?.pin_hash || '';
 
   async function directory() {
-    // Existing completed deposit claims take effect immediately, including after a restart.
-    // Earliest claim wins if legacy transactions contain conflicting initials.
-    const legacy = await Transaction.aggregate([
+    const [users, persisted, legacy] = await Promise.all([
+      User.find({}).select('id username phone_number role').lean(),
+      AdminClientOwner.find({}).lean(),
+      Transaction.aggregate([
       { $match: { type: 'deposit', status: 'completed', admin_tag: { $in: ADMIN_TAGS } } },
       { $sort: { admin_tagged_at: 1, created_at: 1, id: 1 } },
-      { $group: { _id: '$user_id', owner_tag: { $first: '$admin_tag' }, transaction_id: { $first: '$id' }, claimed_at: { $first: '$admin_tagged_at' } } }
+      { $group: { _id: '$user_id', owner_tag: { $first: '$admin_tag' }, transaction_id: { $first: '$id' },
+        claimed_at: { $first: '$admin_tagged_at' }, admin_id: { $first: '$admin_tagged_by' } } }
+      ])
     ]);
-    const owners = new Map(legacy.map(row => [Number(row._id), row.owner_tag]));
-    const persisted = await AdminClientOwner.find({}).lean();
-    for (const row of persisted) owners.set(Number(row.user_id), row.owner_tag);
-    if (!owners.size) return [];
-    const ids = [...owners.keys()];
-    const [users, deposits] = await Promise.all([
-      User.find({ id: { $in: ids } }).select('id username phone_number').lean(),
-      Deposit.find({ user_id: { $in: ids }, payer_phone: { $ne: null } }).select('user_id payer_phone').lean()
-    ]);
+    const userMap = new Map(users.map(user => [Number(user.id), user]));
+    const exemptPhones = staffPhones(users);
+    // Import previous claims into the phone ledger once; the unique phone key makes ownership durable.
+    const snapshots = new Map(persisted.map(row => [Number(row.user_id), row]));
+    const candidates = [...persisted, ...legacy.filter(row => !snapshots.has(Number(row._id))).map(row => ({
+      user_id: row._id, owner_tag: row.owner_tag, claimed_transaction_id: row.transaction_id,
+      claimed_at: row.claimed_at, admin_id: row.admin_id
+    }))].sort((a, b) => (new Date(a.claimed_at || 0) - new Date(b.claimed_at || 0))
+      || (a.claimed_transaction_id || 0) - (b.claimed_transaction_id || 0));
+    const existing = await AdminPhoneOwner.find({}).lean();
+    const owners = new Map(existing.map(row => [row._id, row]));
+    const writes = [];
+    for (const row of candidates) {
+      const client = userMap.get(Number(row.user_id));
+      const phone = normalizePhone(row.client_phone || phoneFor(client));
+      if (phone.length < 9 || isStaff(client) || exemptPhones.has(phone) || owners.has(phone)) continue;
+      const owner = { ...row, _id: phone, client_phone: phone, client_username: row.client_username || client?.username,
+        claimed_at: row.claimed_at || new Date() };
+      owners.set(phone, owner);
+      writes.push({ updateOne: { filter: { _id: phone }, update: { $setOnInsert: owner }, upsert: true } });
+    }
+    if (writes.length) {
+      await AdminPhoneOwner.init();
+      await AdminPhoneOwner.bulkWrite(writes);
+      // Read the winner if another request imported or claimed this phone concurrently.
+      owners.clear();
+      for (const row of await AdminPhoneOwner.find({}).lean()) owners.set(row._id, row);
+    }
+    const ownedUsers = users.filter(user => !isStaff(user) && !exemptPhones.has(phoneFor(user)) && owners.has(phoneFor(user)));
+    const ids = [...new Set([...ownedUsers.map(user => user.id), ...[...owners.values()].map(owner => owner.user_id)])];
+    const deposits = ids.length ? await Deposit.find({ user_id: { $in: ids }, payer_phone: { $ne: null } }).select('user_id payer_phone').lean() : [];
     const payerPhones = new Map();
     for (const deposit of deposits) {
+      if (exemptPhones.has(normalizePhone(deposit.payer_phone))) continue;
       const phones = payerPhones.get(Number(deposit.user_id)) || [];
       phones.push(deposit.payer_phone);
       payerPhones.set(Number(deposit.user_id), phones);
     }
-    const userMap = new Map(users.map(user => [Number(user.id), user]));
-    const snapshots = new Map(persisted.map(owner => [Number(owner.user_id), owner]));
-    const missingOwners = legacy.filter(row => !snapshots.has(Number(row._id)));
-    if (missingOwners.length) {
-      await AdminClientOwner.init();
-      const writes = missingOwners.map(row => {
-        const client = userMap.get(Number(row._id));
-        const owner = { user_id: row._id, owner_tag: row.owner_tag, claimed_transaction_id: row.transaction_id,
-          claimed_at: row.claimed_at || new Date(), client_phone: client?.phone_number || payerPhones.get(Number(row._id))?.[0], client_username: client?.username };
-        snapshots.set(Number(row._id), owner);
-        return { updateOne: { filter: { user_id: row._id }, update: { $setOnInsert: owner }, upsert: true } };
-      });
-      // Persist historical ownership before any admin mutation can delete the original deposit ledger.
-      await AdminClientOwner.bulkWrite(writes);
+    const result = ownedUsers.map(user => {
+      const owner = owners.get(phoneFor(user));
+      return { ...user, ...owner, id: user.id, username: user.username, phone_number: user.phone_number || phoneFor(user),
+        payer_phones: [...new Set([...(payerPhones.get(Number(user.id)) || []), ...(payerPhones.get(Number(owner.user_id)) || [])])] };
+    });
+    for (const owner of owners.values()) {
+      if (exemptPhones.has(owner._id)) continue;
+      if (!result.some(user => phoneFor(user) === owner._id)) result.push({ ...owner, id: owner.user_id,
+        username: owner.client_username, phone_number: owner._id, payer_phones: payerPhones.get(Number(owner.user_id)) || [] });
     }
-    return ids.map(id => ({
-      id, username: snapshots.get(id)?.client_username, phone_number: snapshots.get(id)?.client_phone,
-      ...userMap.get(id), owner_tag: owners.get(id), payer_phones: [...(payerPhones.get(id) || []), snapshots.get(id)?.client_phone].filter(Boolean)
-    }));
+    return [...result, ...users.filter(user => isStaff(user) || exemptPhones.has(phoneFor(user))).map(user => ({ ...user, exempt: true }))];
   }
 
   async function identity(pinToken, accountToken) {
@@ -211,8 +238,8 @@ function createAdminPrivacy(models, env = process.env) {
   }
 
   async function configure(ownerKey, pins) {
-    const hash = env.ADMIN_PIN_SETUP_KEY_HASH || '';
-    if (!/^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(hash)) throw fail(503, 'The private owner key has not been configured on the server.');
+    const hash = (await AdminPinSettings.findById('owner').lean())?.owner_key_hash || '';
+    if (!/^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(hash)) throw fail(503, 'The private owner key has not been initialized in the database. Run the database owner-key setup.');
     if (typeof ownerKey !== 'string' || ownerKey.length < 4 || Buffer.byteLength(ownerKey, 'utf8') > 72) throw fail(403, 'Incorrect private owner key.');
     const now = new Date();
     const attempts = await AdminPinAttempt.findOneAndUpdate({ _id: 'owner-setup' }, [
@@ -244,7 +271,9 @@ function createAdminPrivacy(models, env = process.env) {
   }
 
   async function claim(txId, tag, adminId) {
-    await AdminClientOwner.init();
+    if (!ADMIN_TAGS.includes(tag)) throw fail(400, 'Invalid admin initial.');
+    await directory();
+    await AdminPhoneOwner.init();
     const session = await Transaction.startSession();
     let result;
     try {
@@ -252,17 +281,25 @@ function createAdminPrivacy(models, env = process.env) {
         const tx = await Transaction.findOne({ id: txId }).session(session);
         if (!tx) throw fail(404, 'Transaction not found.');
         if (tx.type !== 'deposit' || tx.status !== 'completed') throw fail(400, 'Only completed deposits can be claimed.');
-        const client = await User.findOne({ id: tx.user_id }).select('id username phone_number').session(session);
+        const client = await User.findOne({ id: tx.user_id }).select('id username phone_number role').session(session);
         if (!client) throw fail(404, 'Client account not found.');
+        const users = await User.find({}).select('id username phone_number role').session(session);
+        const phone = normalizePhone(tx.client_phone || phoneFor(client));
+        if (isStaff(client) || staffPhones(users).has(phone)) throw fail(400, 'Admin and superadmin numbers are excluded from client ownership.');
+        if (phone.length < 9) throw fail(400, 'Client needs a valid phone number before claiming.');
         if (tx.admin_tag && tx.admin_tag !== tag) throw fail(403, `Transaction belongs to admin ${tx.admin_tag}.`);
-        const legacy = await Transaction.findOne({ user_id: tx.user_id, type: 'deposit', status: 'completed', admin_tag: { $in: ADMIN_TAGS } })
-          .sort({ admin_tagged_at: 1, created_at: 1, id: 1 }).session(session);
-        const owner = await AdminClientOwner.findOneAndUpdate({ user_id: tx.user_id }, {
-          $setOnInsert: { owner_tag: legacy?.admin_tag || tag, claimed_transaction_id: legacy?.id || tx.id, claimed_at: new Date(), client_phone: client.phone_number, client_username: client.username }
+        const owner = await AdminPhoneOwner.findOneAndUpdate({ _id: phone }, {
+          $setOnInsert: { owner_tag: tag, user_id: client.id, admin_id: adminId, claimed_transaction_id: tx.id,
+            claimed_at: new Date(), client_phone: phone, client_username: client.username }
         }, { upsert: true, new: true, session });
         if (owner.owner_tag !== tag) throw fail(403, `Client already belongs to admin ${owner.owner_tag}.`);
+        const relatedIds = users.filter(user => !isStaff(user) && phoneFor(user) === phone).map(user => user.id);
+        await Transaction.updateMany({ $or: [{ client_phone: phone }, { client_phone: null, user_id: { $in: relatedIds } }],
+          user_id: { $nin: users.filter(isStaff).map(user => user.id) } }, {
+          $set: { client_phone: phone, admin_tag: tag, admin_tagged_by: owner.admin_id, admin_tagged_at: owner.claimed_at }
+        }, { session });
         result = await Transaction.findOneAndUpdate({ id: txId, type: 'deposit', status: 'completed', admin_tag: { $in: [null, tag] } }, {
-          $set: { admin_tag: tag, admin_tagged_by: adminId, admin_tagged_at: tx.admin_tagged_at || new Date() }
+          $set: { client_phone: phone, admin_tag: tag, admin_tagged_by: owner.admin_id, admin_tagged_at: owner.claimed_at }
         }, { new: true, session });
         if (!result) throw fail(409, 'Transaction changed. Refresh and try again.');
       });
@@ -280,7 +317,7 @@ function createAdminPrivacy(models, env = process.env) {
     identity(req.headers['x-admin-pin'], accountToken).then(async pinIdentity => {
       req.pinIdentity = pinIdentity;
       const clients = pinIdentity || req.method !== 'GET' ? await directory() : [];
-      req.blockedClients = pinIdentity ? clients.filter(client => client.owner_tag !== pinIdentity.tag) : [];
+      req.blockedClients = pinIdentity ? clients.filter(client => !client.exempt && client.owner_tag !== pinIdentity.tag) : [];
       req.blockedClientIds = req.blockedClients.map(client => client.id);
       res.json = payload => {
         // Serialize immediately so concurrent mutations cannot alter an outbound snapshot.
