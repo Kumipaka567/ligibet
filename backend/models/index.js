@@ -345,8 +345,39 @@ SupportTicketSchema.pre('save', async function(next) {
   next();
 });
 
+// PIN identity is separate from the account used to open the dashboard.
+const AdminClientOwnerSchema = new mongoose.Schema({
+  user_id: { type: Number, required: true, unique: true },
+  owner_tag: { type: String, required: true, enum: ['R', 'G', 'S', 'V'] },
+  claimed_transaction_id: { type: Number, required: true },
+  client_phone: String,
+  client_username: String,
+  claimed_at: { type: Date, required: true }
+}, { autoIndex: true });
+const AdminPinSessionSchema = new mongoose.Schema({
+  token_hash: { type: String, required: true, unique: true },
+  account_hash: { type: String, required: true },
+  tag: { type: String, required: true, enum: ['R', 'G', 'S', 'V'] },
+  profile_hash: { type: String, required: true },
+  expires_at: { type: Date, required: true, expires: 0 }
+});
+const AdminPinProfileSchema = new mongoose.Schema({
+  _id: { type: String, enum: ['R', 'G', 'S', 'V'] },
+  pin_hash: { type: String, required: true },
+  updated_at: { type: Date, default: Date.now }
+});
+const AdminPinAttemptSchema = new mongoose.Schema({
+  _id: String,
+  attempts: Number,
+  expires_at: { type: Date, expires: 0 }
+});
+
 // ─── Export Mongoose Models ──────────────────────────────────────────────
 module.exports = {
+  AdminPinProfile: mongoose.models.AdminPinProfile || mongoose.model('AdminPinProfile', AdminPinProfileSchema),
+  AdminClientOwner: mongoose.models.AdminClientOwner || mongoose.model('AdminClientOwner', AdminClientOwnerSchema),
+  AdminPinSession: mongoose.models.AdminPinSession || mongoose.model('AdminPinSession', AdminPinSessionSchema),
+  AdminPinAttempt: mongoose.models.AdminPinAttempt || mongoose.model('AdminPinAttempt', AdminPinAttemptSchema),
   Counter,
   getNextSequenceValue,
   User: mongoose.models.User || mongoose.model('User', UserSchema),

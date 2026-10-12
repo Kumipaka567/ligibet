@@ -3437,3 +3437,6 @@
 
 
 
+.admin-pin-backdrop { z-index: 1200; }
+.admin-pin-card { max-height: 90dvh; overflow-y: auto; }
+.admin-pin-button { white-space: nowrap; }

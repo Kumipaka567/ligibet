@@ -19,7 +19,7 @@
 </aside>
 <div class="admin-main"><header class="admin-topbar">
 <div class="topbar-left"><button type="button" class="menu-toggle" (click)="toggleMobileMenu()" [attr.aria-expanded]="mobileMenuOpen" aria-controls="admin-navigation" aria-label="Toggle navigation"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><div class="topbar-breadcrumb"><span>Workspace</span><span class="breadcrumb-divider">/</span><strong>{{ tabLabels[activeTab] }}</strong></div></div>
-<div class="topbar-actions"><span class="connection-pill" [class.connected]="isConnected$ | async" role="status"><span class="indicator-dot"></span>{{ (isConnected$ | async) ? 'Live sync' : 'Reconnecting' }}</span><button type="button" class="sanitized-toggle-btn" [class.is-sanitized]="sanitizedMode.isSanitizedMode()" (click)="toggleSanitizedMode()" [attr.aria-pressed]="sanitizedMode.isSanitizedMode()" title="Toggle sanitized view"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m8 12 3 3 5-6"/></svg><span class="view-mode-label">Sanitized view</span><span class="sanitized-pill-indicator"></span></button><button type="button" class="topbar-logout" (click)="logout()" aria-label="Sign out" title="Sign out"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 2 5 5-5 5m5-5H9"/></svg></button></div>
+<div class="topbar-actions"><button type="button" class="action-btn outline-sm admin-pin-button" (click)="openPinDialog()" [attr.aria-label]="adminPin.tag ? 'Switch admin PIN identity' : 'Unlock admin with PIN'">{{ adminPin.tag ? 'Admin ' + adminPin.tag : 'Admin PIN' }}</button><button *ngIf="adminPin.tag" type="button" class="action-btn outline-sm" (click)="lockAdminPin()">Lock</button><span class="connection-pill" [class.connected]="isConnected$ | async" role="status"><span class="indicator-dot"></span>{{ (isConnected$ | async) ? 'Live sync' : 'Reconnecting' }}</span><button type="button" class="sanitized-toggle-btn" [class.is-sanitized]="sanitizedMode.isSanitizedMode()" (click)="toggleSanitizedMode()" [attr.aria-pressed]="sanitizedMode.isSanitizedMode()" title="Toggle sanitized view"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m8 12 3 3 5-6"/></svg><span class="view-mode-label">Sanitized view</span><span class="sanitized-pill-indicator"></span></button><button type="button" class="topbar-logout" (click)="logout()" aria-label="Sign out" title="Sign out"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 2 5 5-5 5m5-5H9"/></svg></button></div>
 </header><div class="admin-workspace" id="admin-content" tabindex="-1">
 <section class="workspace-heading" *ngIf="activeTab !== 'game'"><div><span class="workspace-kicker">Control center</span><h1>{{ tabLabels[activeTab] }}<span class="heading-dot">.</span></h1><p>{{ tabDescriptions[activeTab] }}</p></div><div class="heading-actions" *ngIf="activeTab === 'monitor'"><button type="button" class="action-btn outline" (click)="setTab('users')"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg>Manage users</button><button type="button" class="action-btn primary" (click)="setTab('transactions')">View transactions<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button></div></section>
 <section class="stats-bar" *ngIf="activeTab === 'monitor'" aria-label="Platform overview"><button type="button" (click)="openOnlinePlayers()" title="View connected players across all rooms" class="stat-card blue clickable-stat-card online-player-card">
@@ -1064,22 +1064,22 @@
                 </span>
               </td>
               <td data-label="Admin Tag" class="admin-tag-td">
-                <ng-container *ngIf="tx.status === 'completed'; else notCompletedTx">
-                  <ng-container *ngIf="tx.admin_tag && !isSuperAdmin; else superOrUnclaimed">
+                <ng-container *ngIf="tx.status === 'completed' && tx.type === 'deposit'; else notCompletedTx">
+                  <ng-container *ngIf="tx.admin_tag; else superOrUnclaimed">
                     <span class="admin-claimed-tag"
                           [ngClass]="'tag-' + tx.admin_tag.toLowerCase()"
                           [attr.title]="'Claimed by Admin ' + tx.admin_tag">{{ tx.admin_tag }}</span>
                   </ng-container>
                   <ng-template #superOrUnclaimed>
-                    <div class="admin-tag-options" role="group" aria-label="Claim or change transaction tag">
+                    <div class="admin-tag-options" role="group" aria-label="Claim completed deposit using your PIN">
                       <button type="button"
                               *ngFor="let tag of allowedAdminTags"
                               class="admin-tag-btn"
                               [ngClass]="'tag-' + tag.toLowerCase()"
                               [class.active-tag]="tx.admin_tag === tag"
-                              [disabled]="claimingTagTxId === tx.id"
+                              [disabled]="claimingTagTxId === tx.id || (!!tx.client_admin_tag && tx.client_admin_tag !== tag)"
                               (click)="claimTransactionTag(tx, tag)"
-                              [title]="isSuperAdmin ? (tx.admin_tag === tag ? 'Active tag [' + tag + '] - Click another to change' : 'Reassign to Admin ' + tag) : 'Claim transaction as Admin ' + tag">
+                              [title]="'Claim transaction as Admin ' + tag + ' using your PIN'">
                         {{ tag }}
                       </button>
                     </div>
@@ -1205,7 +1205,7 @@
           <h2>Staff & Administrator Accounts</h2>
           <p class="panel-desc">Manage administrative roles with elevated console permissions.</p>
         </div>
-        <button class="action-btn primary" (click)="showCreateAdminModal = true">+ Create Admin Account</button>
+        <div class="heading-actions"><button type="button" class="action-btn outline" (click)="closePinDialogs(); pinSetupOpen = true">Private PIN setup</button><button class="action-btn primary" (click)="showCreateAdminModal = true">+ Create Admin Account</button></div>
       </div>
 
       <div class="table-responsive margin-top" tabindex="0" aria-label="Scrollable account data">
@@ -1792,3 +1792,21 @@
   </div>
 </div></div>
 </main>
+
+<div *ngIf="pinDialogOpen || pinSetupOpen" class="modal-backdrop admin-pin-backdrop" (click)="!pinBusy && closePinDialogs()">
+  <form class="modal-card admin-pin-card" role="dialog" aria-modal="true" [attr.aria-label]="pinSetupOpen ? 'Private admin PIN setup' : 'Unlock admin PIN'" (click)="$event.stopPropagation()" (ngSubmit)="pinSetupOpen ? saveAdminPins() : unlockAdminPin()" autocomplete="off">
+    <div class="modal-header-row"><h3>{{ pinSetupOpen ? 'Private PIN setup' : 'Admin PIN' }}</h3><button type="button" class="modal-close" (click)="closePinDialogs()" [disabled]="pinBusy" aria-label="Close PIN dialog">&#215;</button></div>
+    <ng-container *ngIf="!pinSetupOpen">
+      <p class="panel-desc margin-top">Unlock your claimed clients and unclaimed clients. Access locks after 15 minutes.</p>
+      <div class="form-group margin-top"><label for="admin-pin-initial">Your initial</label><select id="admin-pin-initial" name="pinInitial" class="styled-input" [(ngModel)]="pinInitial" [disabled]="pinBusy"><option *ngFor="let tag of allowedAdminTags" [value]="tag">{{ tag }}</option></select></div>
+      <div class="form-group margin-top"><label for="admin-pin-input">Your PIN</label><input id="admin-pin-input" name="adminPin" type="password" inputmode="numeric" pattern="[0-9]{6,8}" minlength="6" maxlength="8" class="styled-input" [(ngModel)]="pinInput" required autocomplete="off" [disabled]="pinBusy" /></div>
+    </ng-container>
+    <ng-container *ngIf="pinSetupOpen">
+      <p class="panel-desc margin-top">Enter your private owner key to set or change the four PINs. Leave a PIN blank to keep it. Saved PINs cannot be displayed.</p>
+      <div class="form-group margin-top"><label for="pin-owner-key">Private owner key</label><input id="pin-owner-key" name="ownerKey" type="password" class="styled-input" [(ngModel)]="ownerKeyInput" minlength="12" maxlength="72" required autocomplete="off" [disabled]="pinBusy" /></div>
+      <div class="form-group margin-top" *ngFor="let tag of allowedAdminTags"><label [for]="'setup-pin-' + tag">New PIN for {{ tag }}</label><input [id]="'setup-pin-' + tag" [name]="'setupPin' + tag" type="password" inputmode="numeric" pattern="[0-9]{6,8}" minlength="6" maxlength="8" class="styled-input" [(ngModel)]="setupPins[tag]" autocomplete="new-password" [disabled]="pinBusy" /></div>
+    </ng-container>
+    <p *ngIf="pinError" class="text-red margin-top" role="alert">{{ pinError }}</p>
+    <button type="submit" class="action-btn primary margin-top full-width" [disabled]="pinBusy">{{ pinBusy ? 'Please wait...' : (pinSetupOpen ? 'Save private PINs' : 'Unlock my clients') }}</button>
+  </form>
+</div>

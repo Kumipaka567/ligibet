@@ -5,6 +5,14 @@ const vm = require('node:vm');
 const path = require('node:path');
 const { createOnlinePlayers } = require('../online-players');
 const user = (id, patch = {}) => ({ id, username: `player_${id}`, phone_number: '07' + String(id).padStart(8, '0'), role: 'user', balance: id, created_at: '2026-10-05T07:40:25Z', ...patch });
+test('PIN-scoped online-player pagination includes eligible clients beyond the first global page', () => {
+  const presence = createOnlinePlayers();
+  for (let id = 1; id <= 100; id++) presence.connect('socket-' + id, user(id));
+  const result = presence.list({}, player => player.id <= 5);
+  assert.deepEqual(result.players.map(player => player.id), [5, 4, 3, 2, 1]);
+  assert.equal(result.total, 5);
+  assert.equal(result.totalPages, 1);
+});
 
 test('counts each connected player once across sockets and never counts guest/admin/suspended accounts', () => {
   const presence = createOnlinePlayers();

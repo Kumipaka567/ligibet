@@ -230,8 +230,10 @@ export class AdminSocketService {
   public accessRevoked$ = new BehaviorSubject<{ userId: number; reason: string } | null>(null);
   public predatorTextUpdate$ = new BehaviorSubject<string | null>(null);
   public supportTicketUpdated$ = new BehaviorSubject<{ ticket: any } | null>(null);
+  public clientClaimed$ = new BehaviorSubject<{ userId: number; tag: string } | null>(null);
+  public pinChanged$ = new BehaviorSubject<{ tags: string[] } | null>(null);
 
-  public connect(token: string): void {
+  public connect(token: string, pinToken: string | null = null): void {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
@@ -240,7 +242,7 @@ export class AdminSocketService {
     this.clearRealtimeEvents();
 
     this.socket = io(this.serverUrl, {
-      auth: { token },
+      auth: { token, pinToken },
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: Infinity,
@@ -261,6 +263,10 @@ export class AdminSocketService {
     this.listen('admin_snapshot', (snapshot: AdminSnapshot) => {
       this.applySnapshot(snapshot);
     });
+    this.listen('admin_client_claimed', (data: { userId: number; tag: string }) => {
+      this.clientClaimed$.next(data);
+    });
+    this.listen('admin_pin_changed', (data: { tags: string[] }) => this.pinChanged$.next(data));
 
     this.listen('admin_round_generated', (snapshot: AdminSnapshot) => {
       this.applySnapshot(snapshot);
@@ -401,6 +407,10 @@ export class AdminSocketService {
       this.socket = null;
     }
     this.isConnected$.next(false);
+    this.clearRealtimeEvents();
+    this.previousRound$.next(EMPTY_PREVIOUS_ROUND);
+    this.currentRound$.next(EMPTY_CURRENT_ROUND);
+    this.history$.next([]);
   }
 
   private listen<T>(event: string, handler: (payload: T) => void): void {
@@ -420,6 +430,8 @@ export class AdminSocketService {
     this.onlinePlayers$.next(null);
     this.accessRevoked$.next(null);
     this.supportTicketUpdated$.next(null);
+    this.clientClaimed$.next(null);
+    this.pinChanged$.next(null);
   }
 
   private applySnapshot(snapshot: AdminSnapshot): void {

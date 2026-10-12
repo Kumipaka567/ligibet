@@ -18,6 +18,9 @@ const { createRealtimeEmitter, adminSocketAccessError, revokeAdminSockets } = re
 const { userSearchConditions } = require('./user-search');
 const { createPayHeroBalanceFetcher } = require('./payhero-balance');
 const { createOnlinePlayers } = require('./online-players');
+const { createAdminPrivacy, ADMIN_TAGS, adminClientScope, adminTicketScope } = require('./admin-privacy');
+const privacyModels = require('./models');
+const adminPrivacy = createAdminPrivacy(privacyModels);
 
 function escapeRegExp(string) {
   return String(string || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -170,7 +173,7 @@ app.use(cors({
   origin: (origin, callback) => callback(null, isAllowedCorsOrigin(origin)),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'X-Admin-Pin']
 }));
 
 app.get('/healthz', (req, res) => {
@@ -287,6 +290,7 @@ const io = new Server(server, {
   }
 });
 const adminNamespace = io.of('/admin');
+adminPrivacy.protectNamespace(adminNamespace);
 
 // ---------- REAL-TIME EMIT HELPERS ----------
 function realtimeLog(message, details = null) {
@@ -2374,6 +2378,27 @@ app.post('/api/chat/like/:id', async (req, res) => {
 // ---------- ADMIN REST APIS ----------
 
 // Admin Overview Stats
+app.use('/api/admin', authenticateAdminToken, adminPrivacy.middleware);
+app.post('/api/admin/pin/unlock', async (req, res) => {
+  try {
+    return res.json(await adminPrivacy.unlock(String(req.body.tag || '').toUpperCase(), req.body.pin, req.adminAccountToken));
+  } catch (err) { return res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to verify PIN.' }); }
+});
+app.post('/api/admin/pin/lock', async (req, res) => {
+  try {
+    await adminPrivacy.lock(req.headers['x-admin-pin'], req.adminAccountToken);
+    return res.json({ message: 'Admin PIN access locked.' });
+  } catch (err) { return res.status(503).json({ error: 'Failed to lock PIN access. Please retry.' }); }
+});
+app.post('/api/admin/pin/configure', authenticateSuperAdminToken, async (req, res) => {
+  try {
+    const result = await adminPrivacy.configure(req.body.ownerKey, req.body.pins);
+    adminNamespace.emit('admin_pin_changed', { tags: result.configuredTags });
+    return res.json(result);
+  }
+  catch (err) { return res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to save admin PINs.' }); }
+});
+
 app.get('/api/admin/stats', authenticateAdminToken, async (req, res) => {
   try {
     // Aggregate inside MongoDB rather than loading the entire bets collection
@@ -2430,7 +2455,7 @@ app.get('/api/admin/online-players/summary', authenticateAdminToken, (req, res) 
 });
 app.get('/api/admin/online-players', authenticateAdminToken, (req, res) => {
   res.set('Cache-Control', 'no-store');
-  return res.json(onlinePlayers.list(req.query));
+  return res.json(onlinePlayers.list(req.query, player => !req.blockedClientIds.includes(player.id)));
 });
 
 // Admin Users List
@@ -2445,8 +2470,8 @@ app.get('/api/admin/online-players', authenticateAdminToken, (req, res) => {
 app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
   try {
     const [users, transactions, betAgg, depAgg, wdAgg, totalUsers, logs] = await Promise.all([
-      User.find({}).select('-password_hash -__v -_id').sort({ created_at: -1, id: -1 }).limit(100).lean(),
-      Transaction.find({}).select('id user_id type amount status reference created_at').sort({ created_at: -1 }).limit(100).lean(),
+      User.find(adminClientScope(req, 'id')).select('-password_hash -__v -_id').sort({ created_at: -1, id: -1 }).limit(100).lean(),
+      Transaction.find(adminClientScope(req, 'user_id')).select('id user_id type amount status reference created_at admin_tag').sort({ created_at: -1 }).limit(100).lean(),
       Bet.aggregate([{ $group: { _id: null, totalBets: { $sum: 1 }, totalVolume: { $sum: '$bet_amount' }, totalPayout: { $sum: '$payout_amount' } } }]),
       Deposit.aggregate([{ $match: { status: 'completed', provider: 'payhero' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
       Withdrawal.aggregate([{ $match: { status: 'completed' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
@@ -2504,7 +2529,7 @@ app.get('/api/admin/users', authenticateAdminToken, async (req, res) => {
     const search = req.query.search ? String(req.query.search).trim() : '';
     const role = req.query.role || 'all';
 
-    const filter = {};
+    const filter = { ...adminClientScope(req, 'id') };
     if (search) {
       filter.$or = userSearchConditions(search);
     }
@@ -2715,8 +2740,8 @@ app.get('/api/admin/transactions', authenticateAdminToken, async (req, res) => {
       userIds = users.map(u => u.id);
     }
 
-    const filter = {};
-    if (userIds !== null) filter.user_id = { $in: userIds };
+    const filter = { ...adminClientScope(req, 'user_id') };
+    if (userIds !== null) filter.user_id = { $in: userIds.filter(id => !req.blockedClientIds.includes(id)) };
     if (typeFilter !== 'all') filter.type = typeFilter;
     if (statusFilter !== 'all') filter.status = statusFilter;
 
@@ -2754,96 +2779,21 @@ app.get('/api/admin/transactions', authenticateAdminToken, async (req, res) => {
   }
 });
 
-// Admin Claim Transaction Tag (Immutable S, G, R, V)
+// Claiming and visibility use the PIN identity, including for shared superadmin accounts.
 app.post('/api/admin/transactions/:id/claim-tag', authenticateAdminToken, async (req, res) => {
   try {
-    const txId = parseInt(req.params.id, 10);
-    if (isNaN(txId)) {
-      return res.status(400).json({ error: 'Invalid transaction ID' });
-    }
-
-    const { tag } = req.body;
-    const ALLOWED_TAGS = ['S', 'G', 'R', 'V'];
-    if (!tag || !ALLOWED_TAGS.includes(String(tag).toUpperCase())) {
-      return res.status(400).json({ error: 'Invalid admin tag. Allowed initials: S, G, R, V' });
-    }
-    const cleanTag = String(tag).toUpperCase();
-
-    // Check if transaction exists
-    const existingTx = await Transaction.findOne({ id: txId });
-    if (!existingTx) {
-      return res.status(404).json({ error: 'Transaction not found' });
-    }
-
-    // ONLY COMPLETED transactions can be claimed with an admin tag
-    if (existingTx.status !== 'completed') {
-      return res.status(400).json({
-        error: 'Only completed transactions can be claimed with an admin tag.'
-      });
-    }
-
-    // IMMUTABLE RULE: regular admins cannot change once claimed, but superadmin can change/reassign tags
-    if (existingTx.admin_tag && !isSuperAdmin(req.user.role)) {
-      return res.status(403).json({
-        error: `Transaction has already been claimed by admin [${existingTx.admin_tag}] and cannot be changed.`
-      });
-    }
-
-    const query = isSuperAdmin(req.user.role)
-      ? { id: txId, status: 'completed' }
-      : { id: txId, status: 'completed', admin_tag: null };
-
-    // Atomic update
-    const updatedTx = await Transaction.findOneAndUpdate(
-      query,
-      {
-        $set: {
-          admin_tag: cleanTag,
-          admin_tagged_by: req.user.id,
-          admin_tagged_at: new Date()
-        }
-      },
-      { new: true }
-    );
-
-    if (!updatedTx) {
-      return res.status(400).json({
-        error: 'Transaction was already claimed and cannot be changed.'
-      });
-    }
-
-    const isReassignment = Boolean(existingTx.admin_tag);
-    await AdminLog.create({
-      admin_id: req.user.id,
-      action: isReassignment ? 'REASSIGN_TRANSACTION_TAG' : 'CLAIM_TRANSACTION',
-      details: isReassignment
-        ? `Superadmin ${req.user.username} changed tag on transaction #${txId} from [${existingTx.admin_tag}] to [${cleanTag}]`
-        : `Admin ${req.user.username} claimed transaction #${txId} with tag [${cleanTag}]`,
-      target_user_id: updatedTx.user_id
-    }).catch(err => console.warn('AdminLog error:', err.message));
-
-    emitRealtimeMutation({
-      action: 'transaction_tag_claimed',
-      transaction: {
-        id: updatedTx.id,
-        admin_tag: updatedTx.admin_tag,
-        admin_tagged_by: updatedTx.admin_tagged_by,
-        admin_tagged_at: updatedTx.admin_tagged_at
-      }
-    });
-
-    return res.json({
-      message: `Transaction #${txId} claimed with tag [${cleanTag}]`,
-      transaction: {
-        id: updatedTx.id,
-        admin_tag: updatedTx.admin_tag,
-        admin_tagged_by: updatedTx.admin_tagged_by,
-        admin_tagged_at: updatedTx.admin_tagged_at
-      }
-    });
+    const txId = Number(req.params.id);
+    const tag = String(req.body.tag || '').toUpperCase();
+    if (!Number.isSafeInteger(txId) || txId <= 0 || !ADMIN_TAGS.includes(tag)) return res.status(400).json({ error: 'Invalid transaction or admin initial.' });
+    if (!req.pinIdentity || req.pinIdentity.tag !== tag) return res.status(403).json({ error: 'Unlock this admin initial with its PIN before claiming.' });
+    const tx = await adminPrivacy.claim(txId, tag, req.user.id);
+    await AdminLog.create({ admin_id: req.user.id, action: 'CLAIM_TRANSACTION', target_user_id: tx.user_id,
+      details: 'Admin [' + tag + '] claimed completed deposit #' + txId }).catch(() => {});
+    adminNamespace.emit('admin_client_claimed', { userId: tx.user_id, tag });
+    emitRealtimeMutation({ action: 'transaction_tag_claimed', userId: tx.user_id, transaction: tx, user: true });
+    return res.json({ message: 'Client claimed by admin ' + tag, transaction: tx });
   } catch (err) {
-    console.error('Error claiming transaction tag:', err);
-    return res.status(500).json({ error: 'Failed to claim transaction tag' });
+    return res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to claim client. Please retry.' });
   }
 });
 
@@ -3177,7 +3127,7 @@ app.get('/api/admin/active-users', authenticateAdminToken, async (req, res) => {
     // Retrieve all registered accounts (including admin accounts so admin can test popups)
     const search = req.query.search ? String(req.query.search).trim() : '';
     const conditions = userSearchConditions(search);
-    const users = await User.find(conditions.length ? { $or: conditions } : {})
+    const users = await User.find({ ...adminClientScope(req, 'id'), ...(conditions.length ? { $or: conditions } : {}) })
       .select('-password_hash -__v -_id')
       .sort({ balance: -1, id: 1 })
       .lean();
@@ -3208,7 +3158,7 @@ app.get('/api/admin/active-users', authenticateAdminToken, async (req, res) => {
       is_online: onlineSet.has(Number(u.id))
     })).sort((a, b) => (b.is_online ? 1 : 0) - (a.is_online ? 1 : 0) || b.balance - a.balance);
 
-    const pendingWds = await Withdrawal.find({ status: 'pending', ...(conditions.length ? { user_id: { $in: userIds } } : {}) })
+    const pendingWds = await Withdrawal.find({ status: 'pending', ...adminClientScope(req, 'user_id'), ...(conditions.length ? { user_id: { $in: userIds } } : {}) })
       .sort({ created_at: -1 })
       .lean();
 
@@ -3305,7 +3255,7 @@ app.post('/api/admin/users/:id/withdrawal-popup', authenticateAdminToken, async 
 // Admin Deposits List
 app.get('/api/admin/deposits', authenticateAdminToken, async (req, res) => {
   try {
-    const deposits = await Deposit.find({})
+    const deposits = await Deposit.find(adminClientScope(req, 'user_id'))
       .sort({ created_at: -1 })
       .limit(100)
       .lean();
@@ -3799,7 +3749,7 @@ app.get('/api/admin/support/tickets', authenticateAdminToken, async (req, res) =
   try {
     const isMongoConnected = mongoose.connection.readyState === 1;
     if (isMongoConnected) {
-      const tickets = await SupportTicket.find().sort({ updated_at: -1 }).limit(100).lean();
+      const tickets = await SupportTicket.find(adminTicketScope(req)).sort({ updated_at: -1 }).limit(100).lean();
       return res.json({ tickets });
     } else {
       return res.json({ tickets: localDevSupportTickets.slice().reverse() });
@@ -4873,6 +4823,7 @@ adminNamespace.use((socket, next) => {
 });
 
 adminNamespace.on('connection', (socket) => {
+  adminPrivacy.protectSocket(socket);
   socket.emit('admin_online_players', onlinePlayers.summary());
   socket.emit('admin_snapshot', getAdminSnapshot());
   socket.emit('admin_current_round', getCurrentRoundAdminStats());
@@ -5072,6 +5023,9 @@ async function startServer() {
   try {
     await Promise.all([
       User.createIndexes(),
+      privacyModels.AdminClientOwner.createIndexes(),
+      privacyModels.AdminPinSession.createIndexes(),
+      privacyModels.AdminPinAttempt.createIndexes(),
       Transaction.createIndexes(),
       Deposit.createIndexes(),
       Withdrawal.createIndexes(),

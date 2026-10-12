@@ -20,6 +20,7 @@ import { getBackendOrigin } from '../../../core/config/backend-url';
 import { AuthService } from '../../../core/services/auth.service';
 import { AviatorGameComponent } from '../../game/aviator/aviator-game.component';
 import { SanitizedModeService } from '../../../core/services/sanitized-mode.service';
+import { AdminInitial, AdminPinService } from '../../../core/services/admin-pin.service';
 
 export interface AdminUser {
   id: number;
@@ -40,6 +41,7 @@ export interface AdminTransaction {
   user_id: number;
   username: string;
   phone_number?: string;
+  client_admin_tag?: AdminInitial;
   type: 'deposit' | 'withdrawal';
   amount: number;
   status: 'completed' | 'failed' | 'pending';
@@ -110,6 +112,121 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   private http = inject(HttpClient);
   private router = inject(Router);
   private cdr = inject(ChangeDetectorRef);
+  public adminPin = inject(AdminPinService);
+  public pinDialogOpen = false;
+  public pinSetupOpen = false;
+  public pinInitial: AdminInitial = 'R';
+  public pinInput = '';
+  public pinError = '';
+  public pinBusy = false;
+  public ownerKeyInput = '';
+  public setupPins: Record<AdminInitial, string> = { R: '', G: '', S: '', V: '' };
+  private pendingPinClaim: AdminTransaction | null = null;
+
+  public openPinDialog(tag?: AdminInitial): void {
+    this.pinInitial = tag || this.adminPin.tag || 'R';
+    this.pinInput = '';
+    this.pinError = '';
+    this.pinDialogOpen = true;
+  }
+
+  public closePinDialogs(): void {
+    this.pinDialogOpen = false;
+    this.pinSetupOpen = false;
+    this.pinInput = '';
+    this.ownerKeyInput = '';
+    this.setupPins = { R: '', G: '', S: '', V: '' };
+    this.pinError = '';
+    this.pendingPinClaim = null;
+  }
+
+  public unlockAdminPin(): void {
+    const token = this.authService.getToken();
+    if (!token || this.pinBusy) return;
+    this.pinBusy = true;
+    this.pinError = '';
+    this.http.post<{ tag: AdminInitial; pinToken: string; expiresAt: string }>(`${this.baseUrl}/api/admin/pin/unlock`,
+      { tag: this.pinInitial, pin: this.pinInput }, { headers: { Authorization: `Bearer ${token}` } })
+      .pipe(finalize(() => { this.pinBusy = false; this.cdr.markForCheck(); })).subscribe({
+        next: session => {
+          const transaction = this.pendingPinClaim;
+          this.closePinDialogs();
+          this.adminPin.unlock(session);
+          this.showAdminToast(`Admin ${session.tag} unlocked. Showing your clients and unclaimed clients.`, 'success');
+          if (transaction) this.claimTransactionTag(transaction, session.tag);
+        },
+        error: error => { this.pinInput = ''; this.pinError = error?.error?.error || 'Unable to verify PIN.'; }
+      });
+  }
+
+  public lockAdminPin(): void {
+    const token = this.authService.getToken();
+    if (token && this.adminPin.token) this.http.post(`${this.baseUrl}/api/admin/pin/lock`, {},
+      { headers: { Authorization: `Bearer ${token}` } }).subscribe({ error: () => {} });
+    this.adminPin.clear();
+  }
+
+  public saveAdminPins(): void {
+    const token = this.authService.getToken();
+    if (!token || this.pinBusy) return;
+    this.pinBusy = true;
+    this.pinError = '';
+    this.http.post<{ message: string }>(`${this.baseUrl}/api/admin/pin/configure`,
+      { ownerKey: this.ownerKeyInput, pins: this.setupPins }, { headers: { Authorization: `Bearer ${token}` } })
+      .pipe(finalize(() => { this.pinBusy = false; this.cdr.markForCheck(); })).subscribe({
+        next: result => { this.closePinDialogs(); this.lockAdminPin(); this.showAdminToast(result.message, 'success'); },
+        error: error => { this.ownerKeyInput = ''; this.pinError = error?.error?.error || 'Unable to save PINs.'; }
+      });
+  }
+
+  private refreshPhoneAccess(): void {
+    this.userRequest?.unsubscribe();
+    this.activeUserRequest?.unsubscribe();
+    this.onlinePlayerRequest?.unsubscribe();
+    this.onlineSummaryRequest?.unsubscribe();
+    this.userRequestVersion++;
+    this.transactionRequestVersion++;
+    this.logRequestVersion++;
+    this.adminRequestVersion++;
+    this.activeUserRequestVersion++;
+    this.latestUserUpdates.clear();
+    this.latestTransactionUpdates.clear();
+    this.userList = [];
+    this.adminsList = [];
+    this.transactionsList = [];
+    this.activeUsersList = [];
+    this.pendingWithdrawalsList = [];
+    this.onlinePlayerRows = [];
+    this.onlinePlayersSummary = null;
+    this.adminLogs = [];
+    this.supportTickets = [];
+    this.selectedTicket = null;
+    this.selectedUserForNotif = null;
+    this.selectedWithdrawalId = null;
+    this.showNotifyModal = false;
+    this.supportReplyText = '';
+    this.adminToast = null;
+    this.confirmModal.isOpen = false;
+    this.confirmModal.message = '';
+    this.promptModal.isOpen = false;
+    this.promptModal.message = '';
+    this.promptModal.value = '';
+    this.adminSocket.disconnect();
+    const token = this.authService.getToken();
+    if (token && !this.destroyed) {
+      this.adminSocket.connect(token, this.adminPin.token);
+      this.fetchOverview();
+      this.fetchSupportTickets(true);
+      this.fetchOnlinePlayersSummary();
+      if (this.activeTab === 'transactions') this.fetchTransactions();
+      if (this.activeTab === 'users') this.fetchUsers();
+      if (this.activeTab === 'active-users') this.fetchActiveUsers();
+      if (this.activeTab === 'online-users') this.fetchOnlinePlayers(true);
+      if (this.activeTab === 'admins') this.fetchAdmins();
+      if (this.activeTab === 'logs') this.fetchLogs();
+    }
+    this.cdr.markForCheck();
+  }
 
   public toggleSanitizedMode(): void {
     this.sanitizedMode.toggleSanitizedMode();
@@ -226,11 +343,17 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown.escape')
   public onEscapeKey(): void {
+    if (!this.pinBusy) this.closePinDialogs();
     this.mobileMenuOpen = false;
     this.cdr.markForCheck();
     if (this.isPredatorPreviewFullscreen) {
       this.closePredatorPreviewFullscreen();
     }
+  }
+
+  @HostListener('window:focus')
+  public checkPinExpiry(): void {
+    if (this.adminPin.token && this.adminPin.expiresAt <= Date.now()) this.adminPin.clear();
   }
 
   public openPredator(): void {
@@ -869,7 +992,22 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     }
 
     this.subscribeToRealtimeUpdates();
-    this.adminSocket.connect(token);
+    let initialPinState = true;
+    this.realtimeSubscriptions.push(this.adminPin.changed$.subscribe(() => {
+      if (initialPinState) { initialPinState = false; return; }
+      this.refreshPhoneAccess();
+    }));
+    if (this.adminSocket.clientClaimed$) this.realtimeSubscriptions.push(this.adminSocket.clientClaimed$.subscribe(event => {
+      if (event) this.adminPin.refresh();
+    }));
+    if (this.adminSocket.pinChanged$) this.realtimeSubscriptions.push(this.adminSocket.pinChanged$.subscribe(event => {
+      if (event && this.adminPin.tag && event.tags.includes(this.adminPin.tag)) {
+        this.closePinDialogs();
+        this.adminPin.clear();
+        this.showAdminToast('Your PIN changed. Enter your new PIN to unlock your clients.', 'info');
+      }
+    }));
+    this.adminSocket.connect(token, this.adminPin.token);
     this.fetchOverview();
     this.fetchPayHeroBalance();
     this.fetchOnlinePlayersSummary();
@@ -906,6 +1044,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       this.audioCtx.close().catch(() => {});
     }
     this.adminSocket.disconnect();
+    this.adminPin.clear();
+    this.closePinDialogs();
   }
 
   private subscribeToRealtimeUpdates(): void {
@@ -1025,6 +1165,12 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       this.adminSocket.supportTicketUpdated$.subscribe(data => {
         if (!data || !data.ticket) return;
         const updatedTicket = data.ticket;
+        if (this.adminPin.tag && updatedTicket.client_admin_tag && updatedTicket.client_admin_tag !== this.adminPin.tag) {
+          this.supportTickets = this.supportTickets.filter(ticket => ticket.id !== updatedTicket.id);
+          if (this.selectedTicket?.id === updatedTicket.id) this.selectedTicket = null;
+          this.cdr.markForCheck();
+          return;
+        }
         const existingIdx = this.supportTickets.findIndex(t => t.id === updatedTicket.id);
         if (existingIdx !== -1) {
           this.supportTickets[existingIdx] = updatedTicket;
@@ -1942,9 +2088,13 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public readonly allowedAdminTags: ('S' | 'G' | 'R' | 'V')[] = ['S', 'G', 'R', 'V'];
 
   public claimTransactionTag(tx: AdminTransaction, tag: 'S' | 'G' | 'R' | 'V'): void {
-    if (tx.status !== 'completed') return; // Only completed transactions can be claimed
-    if (tx.admin_tag && !this.isSuperAdmin) return; // Immutable for regular admins; superadmin can change
-    if (tx.admin_tag === tag) return; // Already set to this tag
+    if (tx.type !== 'deposit' || tx.status !== 'completed') return;
+    if (tx.admin_tag) return;
+    if (this.adminPin.tag !== tag) {
+      this.pendingPinClaim = tx;
+      this.openPinDialog(tag);
+      return;
+    }
     if (this.claimingTagTxId === tx.id) return; // Prevent double submit
     const token = this.authService.getToken();
     if (!token) return;
@@ -1967,6 +2117,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         }
         const actionLabel = previousTag ? 're-assigned' : 'claimed';
         this.showAdminToast(`Transaction #${tx.id} ${actionLabel} with tag [${tag}]`, 'success');
+        this.adminPin.refresh();
         this.cdr.markForCheck();
       },
       error: (err) => {

@@ -1,6 +1,6 @@
 import { ChangeDetectorRef } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
@@ -9,6 +9,7 @@ import { AdminDashboardComponent, AdminUser, ActiveUser, PendingWithdrawal } fro
 import { AdminSocketService } from '../../../core/services/admin-socket.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { SanitizedModeService } from '../../../core/services/sanitized-mode.service';
+import { adminPinInterceptor } from '../../../core/services/admin-pin.service';
 
 const user = (patch: Partial<AdminUser> = {}): AdminUser => ({
   id: 7, username: 'player', phone_number: '0712345678', balance: 100,
@@ -33,7 +34,7 @@ describe('Admin dashboard live account management', () => {
       ...Object.fromEntries([
         'transactionUpdate$', 'dashboardStatsUpdated$', 'walletUpdated$',
         'transactionsUpdated$', 'depositsUpdated$', 'withdrawalsUpdated$',
-        'userUpdated$', 'activityUpdated$', 'predatorTextUpdate$', 'accessRevoked$', 'depositInitiated$', 'onlinePlayers$'
+        'userUpdated$', 'activityUpdated$', 'predatorTextUpdate$', 'accessRevoked$', 'depositInitiated$', 'onlinePlayers$', 'supportTicketUpdated$', 'clientClaimed$', 'pinChanged$'
       ].map(key => [key, new BehaviorSubject(null)]))
     };
     auth = {
@@ -44,7 +45,7 @@ describe('Admin dashboard live account management', () => {
     await TestBed.configureTestingModule({
       imports: [AdminDashboardComponent],
       providers: [
-        provideHttpClient(), provideHttpClientTesting(),
+        provideHttpClient(withInterceptors([adminPinInterceptor])), provideHttpClientTesting(),
         { provide: AdminSocketService, useValue: socket },
         { provide: AuthService, useValue: auth },
         { provide: Router, useValue: { navigate: vi.fn() } },
@@ -68,6 +69,7 @@ describe('Admin dashboard live account management', () => {
     http.expectOne(request => request.url.endsWith('/api/admin/online-players/summary')).flush({
       onlineUsers: 0, connectedPlayers: 0, topPlayers: [], version: 0, updatedAt: '2026-10-05T12:00:00Z'
     });
+    http.expectOne(request => request.url.endsWith('/api/admin/support/tickets')).flush({ tickets: [] });
   });
 
   afterEach(() => {
@@ -304,7 +306,7 @@ describe('Admin dashboard live account management', () => {
   });
 
   it('periodically checks service tokens and cancels pending checks on destruction', () => {
-    vi.advanceTimersByTime(30000);
+    vi.advanceTimersByTime(12000);
     const request = http.expectOne(request => request.url.includes('/api/admin/payhero/balance'));
     fixture.destroy();
     expect(request.cancelled).toBe(true);
@@ -559,9 +561,10 @@ describe('Admin dashboard live account management', () => {
     expect(component.activeTab).toBe('users');
     component.setTab('transactions');
     expect(component.activeTab).toBe('transactions');
+    http.expectOne(request => request.url.includes('/api/admin/transactions?')).flush({ transactions: component.transactionsList });
   });
 
-  it('claims an admin tag on an unclaimed transaction and prevents reclaiming', () => {
+  it('requires the correct PIN to claim and prevents superadmin from reclaiming another initial', () => {
     const tx: any = {
       id: 501,
       user_id: 7,
@@ -574,14 +577,30 @@ describe('Admin dashboard live account management', () => {
     };
     component.transactionsList = [tx];
 
-    // Claim as 'S'
     component.claimTransactionTag(tx, 'S');
+    expect(tx.admin_tag).toBeNull();
+    expect(component.pinDialogOpen).toBe(true);
+    expect(component.pinInitial).toBe('S');
+    http.expectNone(r => r.url.endsWith('/api/admin/transactions/501/claim-tag'));
+    component.pinInput = '369012';
+    component.unlockAdminPin();
+    const unlock = http.expectOne(r => r.url.endsWith('/api/admin/pin/unlock'));
+    expect(unlock.request.body).toEqual({ tag: 'S', pin: '369012' });
+    unlock.flush({ tag: 'S', pinToken: 'a'.repeat(64), expiresAt: new Date(Date.now() + 900000).toISOString() });
+    const flushPhoneRefresh = () => {
+      http.expectOne(r => r.url.endsWith('/api/admin/overview')).flush({ users: [], stats: {}, logs: [] });
+      http.expectOne(r => r.url.endsWith('/api/admin/support/tickets')).flush({ tickets: [] });
+      http.expectOne(r => r.url.endsWith('/api/admin/online-players/summary')).flush({ onlineUsers: 0, connectedPlayers: 0, topPlayers: [], version: 0 });
+    };
+    flushPhoneRefresh();
     expect(tx.admin_tag).toBe('S');
 
     const req = http.expectOne(r => r.url.endsWith('/api/admin/transactions/501/claim-tag'));
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ tag: 'S' });
+    expect(req.request.headers.get('X-Admin-Pin')).toBe('a'.repeat(64));
     req.flush({ message: 'Claimed', transaction: { id: 501, admin_tag: 'S' } });
+    flushPhoneRefresh();
 
     expect(tx.admin_tag).toBe('S');
 

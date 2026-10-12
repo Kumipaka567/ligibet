@@ -67,12 +67,13 @@ function createOnlinePlayers({ onChange = () => {}, now = () => new Date() } = {
       publish();
     },
     summary: () => summary,
-    list({ search = '', page = 1, pageSize = 25 } = {}) {
+    list({ search = '', page = 1, pageSize = 25 } = {}, canSee = () => true) {
       const conditions = userSearchConditions(search);
-      const matches = conditions.length ? players.filter(user => conditions.some(condition => {
+      const visiblePlayers = players.filter(canSee);
+      const matches = conditions.length ? visiblePlayers.filter(user => conditions.some(condition => {
         const [field, pattern] = Object.entries(condition)[0];
         return pattern.test(user[field] || '');
-      })) : players;
+      })) : visiblePlayers;
       const size = Math.max(1, Math.min(25, Math.floor(Number(pageSize)) || 25));
       const pages = Math.max(1, Math.ceil(matches.length / size));
       const currentPage = Math.max(1, Math.min(pages, Math.floor(Number(page)) || 1));
