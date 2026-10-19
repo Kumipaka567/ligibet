@@ -1149,6 +1149,8 @@ app.post(['/api/wallet/withdraw', '/api/payments/withdraw'], authenticateToken, 
     const user = await User.findOne({ id: req.user.id }).lean();
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    const clientPhone = req.body.phone || user.phone_number || null;
+
     if (user.balance < amount) {
       const failedTx = await Transaction.create({
         user_id: req.user.id,
@@ -3367,6 +3369,16 @@ app.post('/api/admin/users/:id/withdrawal-popup', authenticateAdminToken, async 
     }).catch(logErr => console.warn('AdminLog error:', logErr.message));
 
     setImmediate(() => emitRealtimeMutation({ action: 'user_withdrawal_popup_updated', userId, user: true, dashboard: true }));
+
+    if (user.has_custom_withdrawal_popup && (user.custom_withdrawal_title || user.custom_withdrawal_message)) {
+      io.to(`user_${user.id}`).emit('withdrawal_notification', {
+        id: Date.now(),
+        title: user.custom_withdrawal_title || 'Withdrawal Notice',
+        message: user.custom_withdrawal_message || '',
+        type: 'pending',
+        createdAt: new Date().toISOString()
+      });
+    }
 
     return res.json({
       success: true,

@@ -1668,19 +1668,23 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.withdrawalNotif.set({
       id: payload.id,
-      title: payload.title || 'Ligibet Notification',
+      title: payload.title || 'Withdrawal Notice',
       message: payload.message,
       type: payload.type || 'info',
       timestamp
     });
-    // Auto-dismiss after 6 seconds so the player can read the admin-edited message
+    // Auto-dismiss after 20 seconds so the player has ample time to read the message, or dismiss via OK
     this.withdrawalNotifTimeout = setTimeout(() => {
       this.withdrawalNotif.set(null);
-    }, 6000);
+      this.withdrawalNotifTimeout = null;
+    }, 20000);
   }
 
   public dismissWithdrawalNotification() {
-    if (this.withdrawalNotifTimeout) clearTimeout(this.withdrawalNotifTimeout);
+    if (this.withdrawalNotifTimeout) {
+      clearTimeout(this.withdrawalNotifTimeout);
+      this.withdrawalNotifTimeout = null;
+    }
     this.withdrawalNotif.set(null);
   }
 
@@ -2877,18 +2881,16 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
           });
           this.showToast('Withdrawal submitted successfully!', false);
         } else {
-          const notification = typeof res.notification === 'string'
-            ? {
-                id: Date.now(),
-                title: 'Withdrawal Notice',
-                message: res.notification,
-                type: res.status === 'completed' ? 'completed' : 'pending',
-                createdAt: new Date().toISOString()
-              }
-            : res.notification;
-          this.walletTab.set('withdraw');
+          const popupData = res.popup || (typeof res.notification === 'object' && res.notification !== null ? res.notification : null);
+          const notification = {
+            id: Date.now(),
+            title: popupData?.title || 'Withdrawal Notice',
+            message: popupData?.message || (typeof res.notification === 'string' ? res.notification : res.message) || 'Withdrawal submitted and awaiting admin review.',
+            type: popupData?.type || (res.status === 'completed' ? 'completed' : 'pending'),
+            createdAt: new Date().toISOString()
+          };
+          this.showWalletModal.set(false);
           this.showWithdrawalNotification(notification);
-          setTimeout(() => this.showWalletModal.set(false), 6000);
         }
         this.loadTransactionsHistory();
         this.isSubmittingWithdrawal.set(false);

@@ -1081,6 +1081,31 @@
     <button (click)="toastMessage.set(null)" class="toast-close" aria-label="Close notification">&times;</button>
   </div>
 
+  <!-- WITHDRAWAL POPUP MODAL (ADMIN CONFIGURED NOTICE) -->
+  <div class="modal-backdrop withdrawal-popup-backdrop" *ngIf="withdrawalNotif() as notif" (click)="dismissWithdrawalNotification()">
+    <section class="lb-popup aviator-withdrawal-modal"
+             [class.rejected]="notif.type === 'rejected'"
+             [class.completed]="notif.type === 'completed'"
+             role="alertdialog"
+             aria-modal="true"
+             (click)="$event.stopPropagation()">
+      <div class="lb-popup-icon">
+        <svg *ngIf="notif.type === 'completed'" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/>
+        </svg>
+        <svg *ngIf="notif.type === 'rejected'" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round">
+          <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+        <svg *ngIf="notif.type !== 'completed' && notif.type !== 'rejected'" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <h2 class="lb-popup-title">{{ notif.title }}</h2>
+      <p class="lb-popup-desc">{{ notif.message }}</p>
+      <button type="button" class="lb-popup-btn" (click)="dismissWithdrawalNotification()">OK</button>
+    </section>
+  </div>
+
   <!-- WALLET / DEPOSIT / WITHDRAWAL MODAL -->
   <div *ngIf="showWalletModal()" class="modal-backdrop">
     <div class="modal-card glass-card custom-screenshot-wallet-modal">
