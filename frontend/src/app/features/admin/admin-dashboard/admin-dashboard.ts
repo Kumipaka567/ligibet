@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, ChangeDetectorRef, inject, HostListener } from '@angular/core';
+import { Component, OnDestroy, OnInit, ChangeDetectorRef, inject, HostListener, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -104,7 +104,8 @@ export interface PendingWithdrawal {
   standalone: true,
   imports: [CommonModule, FormsModule, AviatorGameComponent],
   templateUrl: './admin-dashboard.html',
-  styleUrl: './admin-dashboard.css'
+  styleUrl: './admin-dashboard.css',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AdminDashboardComponent implements OnInit, OnDestroy {
   private adminSocket = inject(AdminSocketService);
@@ -806,7 +807,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.userSearchTimer = setTimeout(() => {
       this.userSearchTimer = null;
       this.fetchUsers();
-    }, 150);
+    }, 250);
     this.cdr.markForCheck();
   }
 
@@ -1276,8 +1277,25 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       this.transactionsList = this.transactionsList.filter(row => row.id !== event.id);
     } else if (existing) {
       this.transactionsList = this.transactionsList.map(row => row.id === event.id ? { ...row, ...event } as AdminTransaction : row);
-    } else if (event.created_at && event.username) {
-      this.transactionsList = [event as AdminTransaction, ...this.transactionsList];
+    } else {
+      const username = event.username || (event.user_id ? ('Player #' + event.user_id) : 'Player');
+      const phone_number = event.phone_number || '';
+      const created_at = event.created_at || new Date().toISOString();
+      const newTx: AdminTransaction = {
+        id: event.id,
+        user_id: event.user_id,
+        username,
+        phone_number,
+        type: event.type as 'deposit' | 'withdrawal',
+        amount: event.amount,
+        status: event.status as 'completed' | 'failed' | 'pending',
+        reference: event.reference || '',
+        created_at,
+        admin_tag: event.admin_tag,
+        admin_tagged_by: event.admin_tagged_by,
+        admin_tagged_at: event.admin_tagged_at
+      };
+      this.transactionsList = [newTx, ...this.transactionsList];
     }
     this.cdr.markForCheck();
   }
@@ -2068,8 +2086,16 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           if (update.version <= realtimeVersion || update.transaction.type !== requestedType) continue;
           const event = update.transaction;
           const existing = rows.find(row => row.id === event.id);
-          if (existing) rows = rows.map(row => row.id === event.id ? { ...row, ...event } as AdminTransaction : row);
-          else if (event.created_at && event.username) rows = [event as AdminTransaction, ...rows];
+          if (existing) {
+            rows = rows.map(row => row.id === event.id ? { ...row, ...event } as AdminTransaction : row);
+          } else {
+            rows = [{
+              ...event,
+              username: event.username || (event.user_id ? ('Player #' + event.user_id) : 'Player'),
+              phone_number: event.phone_number || '',
+              created_at: event.created_at || new Date().toISOString()
+            } as AdminTransaction, ...rows];
+          }
         }
         this.transactionsList = rows.filter(transaction => requestedStatus === 'all' || transaction.status === requestedStatus);
         this.markLoaded('transactions');
@@ -2157,7 +2183,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     const url = this.baseUrl + '/api/admin/users?search=' + encodeURIComponent(requestedSearch) +
       '&role=' + encodeURIComponent(requestedRole);
     this.userRequest = this.http.get<{ users: AdminUser[] }>(url, { headers: { Authorization: 'Bearer ' + token } }).pipe(
-      timeout(15000),
+      timeout(8000),
       finalize(() => {
         if (requestVersion === this.userRequestVersion) {
           this.isLoadingUsers = false;

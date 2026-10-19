@@ -32,6 +32,11 @@ function createRealtimeEmitter(io, adminNamespace) {
     }
 
     if (transaction) {
+      if (typeof transaction === 'object' && transaction !== null) {
+        if (!transaction.created_at) transaction.created_at = new Date().toISOString();
+        if (!transaction.username && user && typeof user === 'object' && user.username) transaction.username = user.username;
+        if (!transaction.phone_number && user && typeof user === 'object' && user.phone_number) transaction.phone_number = user.phone_number;
+      }
       adminNamespace.emit('admin_transaction_update', transaction);
       adminNamespace.emit('transactions_updated', payload);
     }

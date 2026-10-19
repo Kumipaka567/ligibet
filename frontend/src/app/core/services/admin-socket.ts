@@ -279,13 +279,13 @@ export class AdminSocketService {
 
     this.listen('admin_betting_countdown', (data: Pick<AdminNextRound, 'roundId' | 'countdownMs' | 'bettingClosesAt'>) => {
       const current = this.nextRound$.getValue();
-      if (current.roundId === data.roundId) {
-        this.nextRound$.next({
-          ...current,
-          countdownMs: data.countdownMs,
-          bettingClosesAt: data.bettingClosesAt
-        });
-      }
+      this.nextRound$.next({
+        ...current,
+        roundId: data.roundId || current.roundId,
+        nextRoundId: data.roundId || current.nextRoundId,
+        countdownMs: data.countdownMs,
+        bettingClosesAt: data.bettingClosesAt
+      });
     });
 
     this.listen('admin_round_status', (data: {
@@ -297,13 +297,13 @@ export class AdminSocketService {
       history: AdminHistoryRow[];
     }) => {
       const nextRound = this.nextRound$.getValue();
-      if (nextRound.roundId === data.roundId) {
-        this.nextRound$.next({
-          ...nextRound,
-          status: data.status,
-          countdownMs: data.status === 'Waiting' ? nextRound.countdownMs : 0
-        });
-      }
+      this.nextRound$.next({
+        ...nextRound,
+        roundId: data.roundId || nextRound.roundId,
+        nextRoundId: data.roundId || nextRound.nextRoundId,
+        status: data.status,
+        countdownMs: data.status === 'Waiting' ? nextRound.countdownMs : 0
+      });
 
       const currentRound = this.currentRound$.getValue();
       this.currentRound$.next({

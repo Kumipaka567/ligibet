@@ -140,6 +140,13 @@ function createAdminPrivacy(models) {
   const configuredHash = async tag => (await AdminPinProfile.findById(tag).lean())?.pin_hash || '';
   let migrationPromise;
 
+  const identityCache = new Map();
+  const IDENTITY_CACHE_TTL_MS = 15000;
+
+  function invalidateCaches() {
+    identityCache.clear();
+  }
+
   function ensureOwnershipMigration() {
     if (!migrationPromise) migrationPromise = migrateLegacyOwnership().catch(error => {
       migrationPromise = null;
@@ -221,10 +228,21 @@ function createAdminPrivacy(models) {
 
   async function identity(pinToken, accountToken) {
     if (!pinToken || !accountToken || !/^[a-f0-9]{64}$/.test(String(pinToken))) return null;
+    const cacheKey = `${pinToken}:${accountToken}`;
+    const cached = identityCache.get(cacheKey);
+    const now = Date.now();
+    if (cached && now < cached.expiresAt) {
+      return cached.session;
+    }
     const session = await AdminPinSession.findOne({
       token_hash: digest(pinToken), account_hash: digest(accountToken), expires_at: { $gt: new Date() }
     }).lean();
-    if (!session || session.profile_hash !== digest(await configuredHash(session.tag))) return null;
+    if (!session || session.profile_hash !== digest(await configuredHash(session.tag))) {
+      identityCache.set(cacheKey, { session: null, expiresAt: now + 5000 });
+      return null;
+    }
+    const sessionExpiresAt = new Date(session.expires_at).getTime();
+    identityCache.set(cacheKey, { session, expiresAt: Math.min(now + IDENTITY_CACHE_TTL_MS, sessionExpiresAt) });
     return session;
   }
 
@@ -248,10 +266,12 @@ function createAdminPrivacy(models) {
       token_hash: digest(pinToken), account_hash: digest(accountToken), tag,
       profile_hash: digest(hash), expires_at: expiresAt
     });
+    invalidateCaches();
     return { pinToken, tag, expiresAt: expiresAt.toISOString() };
   }
 
   async function lock(pinToken, accountToken) {
+    invalidateCaches();
     await AdminPinSession.deleteOne({ token_hash: digest(pinToken), account_hash: digest(accountToken) });
   }
 
@@ -285,6 +305,7 @@ function createAdminPrivacy(models) {
       filter: { _id: tag }, update: { $set: { pin_hash: nextHashes.get(tag), updated_at: now } }, upsert: true
     } })));
     await AdminPinSession.deleteMany({ tag: { $in: tags } });
+    invalidateCaches();
     return { message: `PINs saved for ${tags.join(', ')}.`, configuredTags: tags };
   }
 
@@ -326,6 +347,7 @@ function createAdminPrivacy(models) {
         }, { new: true, session });
         if (!result) throw fail(409, 'Transaction changed. Refresh and try again.');
       });
+      invalidateCaches();
       return result;
     } finally {
       await session.endSession();
@@ -348,7 +370,11 @@ function createAdminPrivacy(models) {
         // Serialize immediately so concurrent mutations cannot alter an outbound snapshot.
         const snapshot = JSON.parse(JSON.stringify(payload));
         const privateData = needsPrivacy(snapshot);
-        Promise.all([privateData ? directory() : [], privateData ? identity(req.headers['x-admin-pin'], accountToken) : null])
+        if (!privateData) {
+          sendJson(snapshot);
+          return res;
+        }
+        Promise.all([directory(), identity(req.headers['x-admin-pin'], accountToken)])
           .then(([users, currentIdentity]) => sendJson(protectPayload(snapshot, users, currentIdentity?.tag, req.query?.search)))
           .catch(() => { if (!res.headersSent) { res.status(503); sendJson({ error: 'Phone privacy verification unavailable. Please retry.' }); } });
         return res;
@@ -360,19 +386,31 @@ function createAdminPrivacy(models) {
   function protectSocket(socket) {
     const send = socket.emit.bind(socket);
     let queue = Promise.resolve();
+    let currentRoundInFlight = false;
     socket.emit = (event, payload, sharedDirectory = null) => {
       const snapshot = payload === undefined ? undefined : JSON.parse(JSON.stringify(payload));
+      // Countdown and wallet amounts contain no client identity; keep them immediate and cheap.
+      if (!needsPrivacy(snapshot)) {
+        if (socket.connected) send(event, snapshot);
+        return socket;
+      }
+      if (event === 'admin_current_round') {
+        if (currentRoundInFlight) return socket;
+        currentRoundInFlight = true;
+      }
       queue = queue.then(async () => {
-        // Countdown and wallet amounts contain no client identity; keep them immediate and cheap.
-        if (!needsPrivacy(snapshot)) {
-          if (socket.connected) send(event, snapshot);
-          return;
+        try {
+          const [users, pinIdentity] = await Promise.all([
+            sharedDirectory || directory(), identity(socket.handshake.auth?.pinToken, socket.handshake.auth?.token)
+          ]);
+          if (socket.connected) send(event, protectPayload(snapshot, users, pinIdentity?.tag));
+        } finally {
+          if (event === 'admin_current_round') currentRoundInFlight = false;
         }
-        const [users, pinIdentity] = await Promise.all([
-          sharedDirectory || directory(), identity(socket.handshake.auth?.pinToken, socket.handshake.auth?.token)
-        ]);
-        if (socket.connected) send(event, protectPayload(snapshot, users, pinIdentity?.tag));
-      }).catch(() => { if (socket.connected) send('admin_privacy_unavailable', { message: 'Phone privacy verification unavailable.' }); });
+      }).catch(() => {
+        if (event === 'admin_current_round') currentRoundInFlight = false;
+        if (socket.connected) send('admin_privacy_unavailable', { message: 'Phone privacy verification unavailable.' });
+      });
       return socket;
     };
   }

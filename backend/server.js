@@ -1467,11 +1467,17 @@ async function completePendingMpesaDeposit(externalRef, amount, receiptNumber, c
       mpesa_receipt_number: receiptNumber
     });
 
+    const txObj = tx.toObject ? tx.toObject() : { ...tx };
+    txObj.username = user?.username || ('Player #' + deposit.user_id);
+    txObj.phone_number = user?.phone_number || deposit.payer_phone || '';
+    txObj.created_at = tx.created_at ? tx.created_at.toISOString() : new Date().toISOString();
+
     emitRealtimeMutation({
       action: 'mpesa_deposit_completed',
       userId: deposit.user_id,
       balance: user?.balance,
-      transaction: tx,
+      transaction: txObj,
+      user,
       deposits: true
     });
 
@@ -2443,10 +2449,25 @@ app.get('/api/admin/stats', authenticateAdminToken, async (req, res) => {
 // ---------- PAYHERO SERVICE WALLET BALANCE ----------
 // Every request reads the provider; failed reads never masquerade as a current balance.
 const fetchPayHeroBalance = createPayHeroBalanceFetcher();
+let cachedPayHeroBalance = null;
+let cachedPayHeroTime = 0;
+const PAYHERO_CACHE_TTL_MS = 15000;
 
 app.get('/api/admin/payhero/balance', authenticateAdminToken, async (req, res) => {
   res.set('Cache-Control', 'no-store');
-  return res.json(await fetchPayHeroBalance());
+  const force = req.query.force === 'true';
+  const now = Date.now();
+  if (!force && cachedPayHeroBalance && (now - cachedPayHeroTime < PAYHERO_CACHE_TTL_MS) && !cachedPayHeroBalance.error) {
+    return res.json(cachedPayHeroBalance);
+  }
+  const result = await fetchPayHeroBalance();
+  if (result && !result.error && typeof result.balance === 'number') {
+    cachedPayHeroBalance = result;
+    cachedPayHeroTime = now;
+  } else {
+    cachedPayHeroBalance = null;
+  }
+  return res.json(result);
 });
 
 // Lightweight presence endpoints: no withdrawal queries or transaction aggregation.
@@ -3133,20 +3154,21 @@ app.get('/api/admin/active-users', authenticateAdminToken, async (req, res) => {
     const users = await User.find({ ...adminClientScope(req, 'id'), ...(conditions.length ? { $or: conditions } : {}) })
       .select('-password_hash -__v -_id')
       .sort({ balance: -1, id: 1 })
+      .limit(100)
       .lean();
 
     const userIds = users.map(u => u.id);
 
-    const depTotals = await Deposit.aggregate([
+    const depTotals = userIds.length ? await Deposit.aggregate([
       { $match: { user_id: { $in: userIds }, status: 'completed' } },
       { $group: { _id: '$user_id', total: { $sum: '$amount' } } }
-    ]);
+    ]) : [];
     const depMap = new Map(depTotals.map(d => [d._id, d.total]));
 
-    const betTotals = await Bet.aggregate([
+    const betTotals = userIds.length ? await Bet.aggregate([
       { $match: { user_id: { $in: userIds } } },
       { $group: { _id: '$user_id', total: { $sum: '$bet_amount' } } }
-    ]);
+    ]) : [];
     const betMap = new Map(betTotals.map(b => [b._id, b.total]));
 
     // Map active users and sort online players to the top
@@ -3163,6 +3185,7 @@ app.get('/api/admin/active-users', authenticateAdminToken, async (req, res) => {
 
     const pendingWds = await Withdrawal.find({ status: 'pending', ...adminClientScope(req, 'user_id'), ...(conditions.length ? { user_id: { $in: userIds } } : {}) })
       .sort({ created_at: -1 })
+      .limit(100)
       .lean();
 
     const userMap = new Map(users.map(u => [u.id, u]));
@@ -3358,6 +3381,7 @@ app.post('/api/admin/withdrawals/:id/action', authenticateAdminToken, async (req
         userId: wd.user_id,
         balance: user.balance,
         transaction: tx,
+        user,
         withdrawals: true
       });
 
@@ -3395,6 +3419,7 @@ app.post('/api/admin/withdrawals/:id/action', authenticateAdminToken, async (req
         userId: wd.user_id,
         balance: user.balance,
         transaction: tx,
+        user,
         withdrawals: true
       });
 
@@ -3464,6 +3489,7 @@ app.post('/api/admin/withdrawals/process', authenticateAdminToken, async (req, r
         userId: wd.user_id,
         balance: user.balance,
         transaction: tx,
+        user,
         withdrawals: true
       });
 
@@ -3501,6 +3527,7 @@ app.post('/api/admin/withdrawals/process', authenticateAdminToken, async (req, r
         userId: wd.user_id,
         balance: user.balance,
         transaction: tx,
+        user,
         withdrawals: true
       });
 
@@ -4212,6 +4239,7 @@ async function launchFlight() {
     crashPoint: null,
     history: adminRoundHistory
   });
+  adminNamespace.emit('admin_next_round', getAdminNextRoundPayload());
   emitAdminCurrentRound();
 
   const startTime = Date.now();
@@ -4287,6 +4315,7 @@ async function handleCrash() {
     crashPoint: currentRound.crashPoint,
     history: adminRoundHistory
   });
+  adminNamespace.emit('admin_next_round', getAdminNextRoundPayload());
 
   loadPreviousRoundSummary();
   emitAdminCurrentRound();
