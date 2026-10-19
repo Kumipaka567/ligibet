@@ -157,6 +157,8 @@ export interface AdminDepositInitiatedEvent {
   phone: string;
   amount: number;
   depositId?: number;
+  transactionId?: number;
+  transaction?: AdminTransactionUpdate;
   timestamp: string;
 }
 

@@ -1045,6 +1045,7 @@
               <th scope="col">Status</th>
               <th scope="col" class="admin-tag-th">Admin Tag</th>
               <th scope="col">Timestamp</th>
+              <th scope="col">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1089,9 +1090,19 @@
                 </ng-template>
               </td>
               <td class="mono text-xs" data-label="Timestamp">{{ tx.created_at | date:'medium' }}</td>
+              <td data-label="Actions" class="action-cell">
+                <div *ngIf="tx.type === 'withdrawal' && tx.status === 'pending'" class="btn-group-row">
+                  <button class="sm-btn success" (click)="openWithdrawalModalFromTx(tx, 'complete')" title="Approve Withdrawal">Approve</button>
+                  <button class="sm-btn danger" (click)="openWithdrawalModalFromTx(tx, 'reject')" title="Decline Withdrawal">Decline</button>
+                </div>
+                <span *ngIf="tx.type !== 'withdrawal' || tx.status !== 'pending'" class="text-muted text-xs">--</span>
+              </td>
             </tr>
             <tr *ngIf="transactionsList.length === 0">
-              <td colspan="8" class="text-center padding-lg text-muted">No records found matching query.</td>
+              <td colspan="9" class="text-center padding-lg text-muted">
+                <span *ngIf="isLoadingTransactions">Loading transactions...</span>
+                <span *ngIf="!isLoadingTransactions">No records found matching query.</span>
+              </td>
             </tr>
           </tbody>
         </table>

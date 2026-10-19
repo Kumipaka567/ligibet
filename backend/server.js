@@ -1324,6 +1324,7 @@ app.post(['/api/wallet/withdraw', '/api/payments/withdraw'], authenticateToken, 
 
     const tx = await Transaction.create({
       user_id: req.user.id,
+      client_phone: clientPhone || user.phone_number || null,
       type: 'withdrawal',
       amount,
       status: withdrawalStatus,
@@ -1342,6 +1343,7 @@ app.post(['/api/wallet/withdraw', '/api/payments/withdraw'], authenticateToken, 
       userId: req.user.id,
       balance: user.balance,
       transaction: tx,
+      user,
       withdrawals: true
     });
 
@@ -1458,25 +1460,42 @@ async function completePendingMpesaDeposit(externalRef, amount, receiptNumber, c
       { new: true }
     );
 
-    const tx = await Transaction.create({
-      user_id: deposit.user_id,
-      type: 'deposit',
-      amount: deposit.amount,
-      status: 'completed',
-      reference: `MPESA-${receiptNumber || deposit.external_reference}`,
-      mpesa_receipt_number: receiptNumber
-    });
-
-    const txObj = tx.toObject ? tx.toObject() : { ...tx };
-    txObj.username = user?.username || ('Player #' + deposit.user_id);
-    txObj.phone_number = user?.phone_number || deposit.payer_phone || '';
-    txObj.created_at = tx.created_at ? tx.created_at.toISOString() : new Date().toISOString();
+    let tx = await Transaction.findOneAndUpdate(
+      {
+        user_id: deposit.user_id,
+        $or: [
+          { reference: `MPESA-${deposit.external_reference}` },
+          { reference: deposit.external_reference },
+          { reference: `MPESA-${deposit.mpesa_checkout_request_id}` }
+        ]
+      },
+      {
+        $set: {
+          status: 'completed',
+          reference: `MPESA-${receiptNumber || deposit.external_reference}`,
+          mpesa_receipt_number: receiptNumber,
+          client_phone: deposit.payer_phone || undefined
+        }
+      },
+      { new: true }
+    );
+    if (!tx) {
+      tx = await Transaction.create({
+        user_id: deposit.user_id,
+        client_phone: deposit.payer_phone || null,
+        type: 'deposit',
+        amount: deposit.amount,
+        status: 'completed',
+        reference: `MPESA-${receiptNumber || deposit.external_reference}`,
+        mpesa_receipt_number: receiptNumber
+      });
+    }
 
     emitRealtimeMutation({
       action: 'mpesa_deposit_completed',
       userId: deposit.user_id,
       balance: user?.balance,
-      transaction: txObj,
+      transaction: tx,
       user,
       deposits: true
     });
@@ -1506,19 +1525,44 @@ async function failPendingMpesaDeposit(externalRef, failureReason, callbackPaylo
     deposit.updated_at = new Date();
     await deposit.save();
 
-    const tx = await Transaction.create({
-      user_id: deposit.user_id,
-      type: 'deposit',
-      amount: deposit.amount,
-      status: 'failed',
-      reference: deposit.external_reference || `DEP-${deposit.id}`,
-      failure_reason: deposit.failure_reason
-    });
+    let tx = await Transaction.findOneAndUpdate(
+      {
+        user_id: deposit.user_id,
+        $or: [
+          { reference: `MPESA-${deposit.external_reference}` },
+          { reference: deposit.external_reference },
+          { reference: `MPESA-${deposit.mpesa_checkout_request_id}` },
+          ...(secondaryRef ? [{ reference: `MPESA-${secondaryRef}` }, { reference: secondaryRef }] : [])
+        ]
+      },
+      {
+        $set: {
+          status: 'failed',
+          failure_reason: deposit.failure_reason,
+          client_phone: deposit.payer_phone || undefined
+        }
+      },
+      { new: true }
+    );
+    if (!tx) {
+      tx = await Transaction.create({
+        user_id: deposit.user_id,
+        client_phone: deposit.payer_phone || null,
+        type: 'deposit',
+        amount: deposit.amount,
+        status: 'failed',
+        reference: deposit.external_reference || `DEP-${deposit.id}`,
+        failure_reason: deposit.failure_reason
+      });
+    }
+
+    const user = await User.findOne({ id: deposit.user_id }).lean();
 
     emitRealtimeMutation({
       action: 'mpesa_deposit_failed',
       userId: deposit.user_id,
       transaction: tx,
+      user,
       deposits: true,
       dashboard: true
     });
@@ -1556,19 +1600,43 @@ async function reconcilePendingMpesaDeposits() {
       dep.updated_at = new Date();
       await dep.save();
 
-      const tx = await Transaction.create({
-        user_id: dep.user_id,
-        type: 'deposit',
-        amount: dep.amount,
-        status: 'failed',
-        reference: dep.external_reference || `DEP-${dep.id}`,
-        failure_reason: 'STK prompt timed out or cancelled on phone'
-      });
+      let tx = await Transaction.findOneAndUpdate(
+        {
+          user_id: dep.user_id,
+          $or: [
+            { reference: `MPESA-${dep.external_reference}` },
+            { reference: dep.external_reference },
+            { reference: `MPESA-${dep.mpesa_checkout_request_id}` }
+          ]
+        },
+        {
+          $set: {
+            status: 'failed',
+            failure_reason: dep.failure_reason,
+            client_phone: dep.payer_phone || undefined
+          }
+        },
+        { new: true }
+      );
+      if (!tx) {
+        tx = await Transaction.create({
+          user_id: dep.user_id,
+          client_phone: dep.payer_phone || null,
+          type: 'deposit',
+          amount: dep.amount,
+          status: 'failed',
+          reference: dep.external_reference || `DEP-${dep.id}`,
+          failure_reason: dep.failure_reason
+        });
+      }
+
+      const depUser = await User.findOne({ id: dep.user_id }).lean();
 
       emitRealtimeMutation({
         action: 'mpesa_deposit_failed',
         userId: dep.user_id,
         transaction: tx,
+        user: depUser,
         deposits: true,
         dashboard: true
       });
@@ -1613,13 +1681,31 @@ app.post([
       payer_phone: formattedPhone,
       provider: 'payhero'
     });
-    emitRealtimeMutation({ action: 'mpesa_deposit_pending', userId: req.user.id, deposits: true });
+
+    const tx = await Transaction.create({
+      user_id: req.user.id,
+      client_phone: formattedPhone,
+      type: 'deposit',
+      amount: numAmount,
+      status: 'pending',
+      reference: `MPESA-${checkoutRequestId}`
+    });
+
+    emitRealtimeMutation({
+      action: 'mpesa_deposit_pending',
+      userId: req.user.id,
+      transaction: tx,
+      user: req.user,
+      deposits: true
+    });
     adminNamespace.emit('admin_deposit_initiated', {
       userId: req.user.id,
       username: req.user.username || `Player_${req.user.id}`,
       phone: formattedPhone,
       amount: numAmount,
       depositId: deposit.id,
+      transactionId: tx.id,
+      transaction: tx,
       timestamp: new Date().toISOString()
     });
 
@@ -1864,18 +1950,40 @@ app.post(['/api/payhero/cancel-pending', '/api/mpesa/cancel-pending'], authentic
         { new: true }
       );
       if (deposit) {
-        const tx = await Transaction.create({
-          user_id: deposit.user_id,
-          type: 'deposit',
-          amount: deposit.amount,
-          status: 'failed',
-          reference: deposit.external_reference || `DEP-${deposit.id}`,
-          failure_reason: 'Cancelled by user'
-        });
+        let tx = await Transaction.findOneAndUpdate(
+          {
+            user_id: deposit.user_id,
+            $or: [
+              { reference: `MPESA-${deposit.external_reference}` },
+              { reference: deposit.external_reference },
+              { reference: `MPESA-${deposit.mpesa_checkout_request_id}` }
+            ]
+          },
+          {
+            $set: {
+              status: 'failed',
+              failure_reason: 'Cancelled by user',
+              client_phone: deposit.payer_phone || undefined
+            }
+          },
+          { new: true }
+        );
+        if (!tx) {
+          tx = await Transaction.create({
+            user_id: deposit.user_id,
+            client_phone: deposit.payer_phone || null,
+            type: 'deposit',
+            amount: deposit.amount,
+            status: 'failed',
+            reference: deposit.external_reference || `DEP-${deposit.id}`,
+            failure_reason: 'Cancelled by user'
+          });
+        }
         emitRealtimeMutation({
           action: 'mpesa_deposit_failed',
           userId: deposit.user_id,
           transaction: tx,
+          user: req.user,
           deposits: true,
           dashboard: true
         });

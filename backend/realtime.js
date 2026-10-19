@@ -32,12 +32,20 @@ function createRealtimeEmitter(io, adminNamespace) {
     }
 
     if (transaction) {
-      if (typeof transaction === 'object' && transaction !== null) {
-        if (!transaction.created_at) transaction.created_at = new Date().toISOString();
-        if (!transaction.username && user && typeof user === 'object' && user.username) transaction.username = user.username;
-        if (!transaction.phone_number && user && typeof user === 'object' && user.phone_number) transaction.phone_number = user.phone_number;
+      const txObj = (typeof transaction?.toObject === 'function')
+        ? transaction.toObject()
+        : transaction;
+
+      if (typeof txObj === 'object' && txObj !== null) {
+        if (!txObj.username && user && typeof user === 'object' && user.username) txObj.username = user.username;
+        if (!txObj.phone_number && user && typeof user === 'object' && (user.phone_number || user.phone)) {
+          txObj.phone_number = user.phone_number || user.phone;
+        }
+        if (!txObj.phone_number && txObj.client_phone) {
+          txObj.phone_number = txObj.client_phone;
+        }
       }
-      adminNamespace.emit('admin_transaction_update', transaction);
+      adminNamespace.emit('admin_transaction_update', txObj);
       adminNamespace.emit('transactions_updated', payload);
     }
     if (walletPayload) adminNamespace.emit('wallet_updated', walletPayload);

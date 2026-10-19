@@ -1084,6 +1084,20 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         const amountFormatted = Number(event.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         this.showAdminToast(`User ${username} has initiated a deposit of KES ${amountFormatted}.`, 'info', 'Deposit Initiated');
         this.playDepositInitiatedSound();
+        if (event.transaction) {
+          this.applyTransactionUpdate(event.transaction);
+        } else if (event.depositId || event.transactionId) {
+          this.applyTransactionUpdate({
+            id: event.transactionId || event.depositId,
+            user_id: event.userId,
+            username: event.username,
+            phone_number: event.phone,
+            type: 'deposit',
+            amount: event.amount,
+            status: 'pending',
+            created_at: event.timestamp || new Date().toISOString()
+          });
+        }
         this.queueRealtimeRefresh({ transactions: true, activeUsers: true, dashboard: true });
         this.fetchPayHeroBalance(true);
       }),
@@ -1374,7 +1388,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       this.fetchWithdrawalSettings();
     }
     if (tab === 'online-users') this.fetchOnlinePlayers();
-    if (tab === 'transactions' && (this.isStale('transactions') || this.pendingRealtimeRefresh.transactions)) {
+    if (tab === 'transactions' && (!this.transactionsList.length || this.isStale('transactions') || this.pendingRealtimeRefresh.transactions)) {
       this.pendingRealtimeRefresh.transactions = false;
       this.fetchTransactions();
     }
@@ -1692,6 +1706,21 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  public openWithdrawalModalFromTx(tx: AdminTransaction, action: 'complete' | 'reject'): void {
+    const rawRef = tx.reference || '';
+    const match = rawRef.match(/WITHDRAW-(\d+)/i);
+    const wdId = match ? parseInt(match[1], 10) : tx.id;
+    if (!wdId || isNaN(wdId)) return;
+    const isReject = action === 'reject';
+    this.openConfirmDialog({
+      title: isReject ? 'Reject Withdrawal' : 'Complete Withdrawal',
+      message: `Are you sure you want to ${action} withdrawal #${wdId} for player "${tx.username}" (${tx.amount} KES)?`,
+      confirmText: isReject ? 'Reject Withdrawal' : 'Complete Withdrawal',
+      type: isReject ? 'danger' : 'primary',
+      onConfirm: () => this.processWithdrawal(wdId, action)
+    });
+  }
+
   private processWithdrawal(withdrawalId: number, action: 'complete' | 'reject'): void {
     const token = this.authService.getToken();
     if (!token || this.isSendingNotif) return;
@@ -1712,6 +1741,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.showAdminToast(res.message, 'success');
         this.fetchActiveUsers();
         this.fetchOverviewStats();
+        this.fetchTransactions();
         this.invalidate('logs');
         this.cdr.markForCheck();
       },
@@ -2015,6 +2045,13 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           if (Array.isArray(res?.logs) && logVersion === this.logRequestVersion) {
             this.adminLogs = res.logs;
             this.markLoaded('logs');
+          }
+          if (Array.isArray(res?.transactions) && !this.txSearchQuery && this.txStatusFilter === 'all') {
+            const initialTxs = res.transactions.filter((t: any) => t.type === this.txTypeFilter);
+            if (!this.transactionsList.length || this.isStale('transactions')) {
+              this.transactionsList = initialTxs;
+              this.markLoaded('transactions');
+            }
           }
           this.cdr.markForCheck();
         },
