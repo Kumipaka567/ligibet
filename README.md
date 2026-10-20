@@ -172,3 +172,9 @@ Confirm what the running service actually connected to before opening it up —
 ```bash
 curl https://api.ligibet.site/healthz
 ```
+
+## PayHero callback domain
+
+Use `https://www.fevaafrica.com/api/callbacks/ligitok` with the published Feva CDN
+forwarding route. See [activation and rollback instructions](deployment/README.md).
+Keep the frontend at `ligibet.site` and the API at `api.ligibet.site`.

@@ -1,0 +1,23 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/callbacks/betpesa",
+      "destination": "https://api.betpesa.site/api/mpesa/callback"
+    },
+    {
+      "source": "/api/callbacks/ligitok",
+      "destination": "https://api.ligibet.site/api/mpesa/callback"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/callbacks/:app",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    }
+  ]
+}
