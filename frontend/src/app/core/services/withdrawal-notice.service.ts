@@ -9,6 +9,7 @@ export interface WithdrawalNotice {
   at: Date;
   codePrefix?: string;
   appName?: string;
+  message?: string;
 }
 
 /**

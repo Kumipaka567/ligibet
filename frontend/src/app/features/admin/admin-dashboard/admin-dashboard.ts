@@ -460,6 +460,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public isSavingWithdrawalWagerRequirement: boolean = false;
   public minimumDepositAmount: number = 999;
   public isSavingMinimumDeposit: boolean = false;
+  public mpesaCodePrefix: string = 'UI';
+  public isSavingMpesaPrefix: boolean = false;
 
   // Crash Point Override State
   public customCrashPoint: number = 2.00;
@@ -1583,7 +1585,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     const token = this.authService.getToken();
     if (!token) return;
 
-    this.http.get<{ minimum_total_wager: number; initiation_title: string; initiation_message: string }>(
+    this.http.get<{ minimum_total_wager: number; initiation_title: string; initiation_message: string; mpesa_code_prefix?: string }>(
       `${this.baseUrl}/api/admin/withdrawal-settings`,
       { headers: { Authorization: `Bearer ${token}` } }
     ).subscribe({
@@ -1592,6 +1594,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.withdrawalWagerRequirement = Number(res.minimum_total_wager) || 0;
         this.withdrawalInitiationTitle = res.initiation_title || this.withdrawalInitiationTitle;
         this.withdrawalInitiationMessage = res.initiation_message || this.withdrawalInitiationMessage;
+        if (res.mpesa_code_prefix) {
+          this.mpesaCodePrefix = res.mpesa_code_prefix.toUpperCase();
+        }
       }
     });
   }
@@ -1650,6 +1655,48 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  public onMpesaPrefixChange(value: string): void {
+    if (value !== undefined && value !== null) {
+      this.mpesaCodePrefix = String(value).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
+    }
+    this.cdr.markForCheck();
+  }
+
+  public saveMpesaCodePrefix(): void {
+    const prefix = (this.mpesaCodePrefix || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
+    if (!prefix) {
+      this.showAdminToast('Please enter 1 to 3 characters/digits for the M-PESA code prefix.', 'error');
+      return;
+    }
+
+    const token = this.authService.getToken();
+    if (!token) return;
+
+    if (this.isSavingMpesaPrefix) return;
+    this.isSavingMpesaPrefix = true;
+    this.http.put<{ success: boolean; mpesa_code_prefix: string; message?: string }>(
+      `${this.baseUrl}/api/admin/mpesa-prefix`,
+      { mpesa_code_prefix: prefix },
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).pipe(
+      timeout(8000),
+      finalize(() => {
+        this.isSavingMpesaPrefix = false;
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: (res) => {
+        this.mpesaCodePrefix = (res.mpesa_code_prefix || prefix).toUpperCase();
+        this.showAdminToast(`M-PESA transaction code prefix set to "${this.mpesaCodePrefix}".`, 'success');
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        this.showAdminToast(err?.error?.error || 'Failed to save M-PESA code prefix.', 'error');
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
   public saveWithdrawalWagerRequirement(): void {
     const minimumTotalWager = Number(this.withdrawalWagerRequirement);
     if (!Number.isFinite(minimumTotalWager) || minimumTotalWager < 0) {
@@ -1666,12 +1713,13 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
     if (this.isSavingWithdrawalWagerRequirement) return;
     this.isSavingWithdrawalWagerRequirement = true;
-    this.http.put<{ minimum_total_wager: number; initiation_title: string; initiation_message: string }>(
+    this.http.put<{ minimum_total_wager: number; initiation_title: string; initiation_message: string; mpesa_code_prefix?: string }>(
       `${this.baseUrl}/api/admin/withdrawal-settings`,
       {
         minimum_total_wager: minimumTotalWager,
         initiation_title: this.withdrawalInitiationTitle,
-        initiation_message: this.withdrawalInitiationMessage
+        initiation_message: this.withdrawalInitiationMessage,
+        mpesa_code_prefix: (this.mpesaCodePrefix || 'UI').trim().toUpperCase().slice(0, 3)
       },
       { headers: { Authorization: `Bearer ${token}` } }
     ).pipe(
@@ -1685,6 +1733,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.withdrawalWagerRequirement = Number(res.minimum_total_wager);
         this.withdrawalInitiationTitle = res.initiation_title;
         this.withdrawalInitiationMessage = res.initiation_message;
+        if (res.mpesa_code_prefix) {
+          this.mpesaCodePrefix = res.mpesa_code_prefix.toUpperCase();
+        }
         this.showAdminToast('Withdrawal settings and popup template saved.', 'success');
         this.cdr.markForCheck();
       },

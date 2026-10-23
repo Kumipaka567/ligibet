@@ -417,7 +417,8 @@ export class AuthService {
               balance: liveMpesaBal,
               at: new Date(),
               codePrefix: mpesaCodePrefix || 'UI',
-              appName: 'LIGIBET'
+              appName: 'LIGIBET B2C',
+              message: res.mpesaMessage || undefined
             });
           }, 3500);
         }

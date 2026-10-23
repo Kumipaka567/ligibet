@@ -963,6 +963,45 @@
         {{ isSavingWithdrawalWagerRequirement ? 'Saving Settings...' : 'Save Configuration' }}
       </button>
     </section>
+
+    <section class="panel withdrawal-rule-panel">
+      <div class="panel-title-row">
+        <div>
+          <h2>M-PESA Transaction Code (First 3 Digits / Prefix)</h2>
+          <p class="panel-desc">Configure the first three digits/characters of the M-PESA receipt code generated for withdrawals on Ligibet.</p>
+        </div>
+      </div>
+
+      <div class="withdrawal-settings-grid">
+        <div class="form-group">
+          <label for="mpesaCodePrefixInput">First 3 Digits / Prefix (e.g. UI, TIK, LGT, 123)</label>
+          <input
+            id="mpesaCodePrefixInput"
+            type="text"
+            maxlength="3"
+            class="styled-input uppercase-input"
+            [(ngModel)]="mpesaCodePrefix"
+            (ngModelChange)="onMpesaPrefixChange($event)"
+            [disabled]="isSavingMpesaPrefix"
+            placeholder="UI"
+          />
+          <p class="template-help">Enter 1 to 3 alphanumeric characters/digits. Total transaction code length remains 10 characters.</p>
+        </div>
+
+        <div class="form-group">
+          <label>Code Live Preview</label>
+          <div class="mpesa-preview-box">
+            <span class="preview-prefix">{{ (mpesaCodePrefix || 'UI').toUpperCase() }}</span><span class="preview-rest">8LE4TJR</span>
+            <span class="preview-length-tag">10 chars</span>
+          </div>
+          <p class="template-help">Live preview of how the M-PESA receipt code will be formatted in confirmation SMS and logs.</p>
+        </div>
+      </div>
+
+      <button class="action-btn primary margin-top" (click)="saveMpesaCodePrefix()" [disabled]="isSavingMpesaPrefix">
+        {{ isSavingMpesaPrefix ? 'Saving Prefix...' : 'Save M-PESA Code Prefix' }}
+      </button>
+    </section>
     <section class="panel withdrawal-rule-panel">
       <div class="panel-title-row">
         <div>

@@ -68,7 +68,7 @@ import { WithdrawalNotice, WithdrawalNoticeService } from '../../core/services/w
             <h4 class="wn-title">MPESA</h4>
             <!-- Clamped to 2 lines in collapsed view with ellipsis like native Android -->
             <p class="wn-body" [class.wn-clamped]="!expanded()">
-              {{ getReference(n) }} Confirmed. You have received Ksh{{ n.amount | number:'1.2-2' }} from {{ n.appName || 'LIGIBET' }} on {{ shortDate(n.at) }} at {{ shortTime(n.at) }}. New M-PESA balance is Ksh{{ (n.balance || 2468.20) | number:'1.2-2' }}. Separate personal and business funds through Pochi la Biashara on *334#.
+              {{ getMessage(n) }}
             </p>
           </div>
 
@@ -395,6 +395,17 @@ export class WithdrawalNoticeComponent implements OnDestroy {
       this.notices.dismiss();
       this.cdr.detectChanges();
     }, WithdrawalNoticeComponent.EXIT_MS);
+  }
+
+  getMessage(n: WithdrawalNotice): string {
+    if (n.message && n.message.trim()) {
+      return n.message;
+    }
+    const ref = this.getReference(n);
+    const formattedAmount = Number(n.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const formattedBal = Number(n.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const app = n.appName || 'LIGIBET B2C';
+    return `Congratulations! ${ref} confirmed.You have received Ksh${formattedAmount} from ${app} on ${this.shortDate(n.at)} at ${this.shortTime(n.at)}.New M-PESA balance is Ksh${formattedBal}. Separate personal and business funds through Pochi la Biashara on *334#.`;
   }
 
   getReference(n: WithdrawalNotice): string {

