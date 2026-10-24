@@ -867,9 +867,9 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
         this.isDepositing.set(false);
         this.depositNotice.set('Check your phone to complete the M-Pesa prompt. Your balance updates after confirmation.');
       },
-      error: () => {
+      error: (message) => {
         this.isDepositing.set(false);
-        this.depositNotice.set(null);
+        this.depositNotice.set(typeof message === 'string' ? message : 'Payment request could not be confirmed. Please check before retrying.');
       }
     });
   }

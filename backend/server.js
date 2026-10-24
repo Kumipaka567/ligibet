@@ -17,6 +17,7 @@ const axios = require('axios');
 const { createRealtimeEmitter, adminSocketAccessError, revokeAdminSockets } = require('./realtime');
 const { userSearchConditions } = require('./user-search');
 const { createPayHeroBalanceFetcher } = require('./payhero-balance');
+const { createPaymentService } = require('./payment-service');
 const { createOnlinePlayers } = require('./online-players');
 const { createAdminPrivacy, ADMIN_TAGS, adminClientScope, adminTicketScope } = require('./admin-privacy');
 const privacyModels = require('./models');
@@ -73,14 +74,6 @@ if (!JWT_SECRET) {
 const PORT = process.env.PORT || 3000;
 const PROVABLY_FAIR_CLIENT_SEED = '00000000000000000004d93766699d799042bd8f4f2203798cfe3e9d89280d0d';
 
-// ---------- PAYHERO STK CONFIG (.env) ----------
-const PAYHERO_BASE_URL    = process.env.PAYHERO_BASE_URL    || 'https://backend.payhero.co.ke/api/v2';
-const PAYHERO_AUTH_TOKEN  = process.env.PAYHERO_AUTH_TOKEN;
-const PAYHERO_API_USERNAME = process.env.PAYHERO_API_USERNAME;
-const PAYHERO_API_PASSWORD = process.env.PAYHERO_API_PASSWORD;
-const PAYHERO_CHANNEL_ID = process.env.PAYHERO_CHANNEL_ID;
-const PAYHERO_CALLBACK_URL = process.env.PAYHERO_CALLBACK_URL;
-const PAYHERO_CALLBACK_TOKEN = process.env.PAYHERO_CALLBACK_TOKEN;
 
 // ---------- MONGODB CONNECTION ----------
 let observedUserCount = null;
@@ -1560,567 +1553,9 @@ app.get('/api/user/sessions', authenticateToken, async (req, res) => {
   }
 });
 
-// ---------- PAYHERO M-PESA & DEPOSIT HELPERS ----------
-async function completePendingMpesaDeposit(externalRef, amount, receiptNumber, callbackPayload, secondaryRef = null) {
-  try {
-    const deposit = await Deposit.findOne({
-      $or: [
-        { external_reference: externalRef },
-        { mpesa_checkout_request_id: externalRef },
-        ...(secondaryRef ? [{ external_reference: secondaryRef }, { mpesa_checkout_request_id: secondaryRef }] : [])
-      ]
-    });
-
-    if (!deposit) return null;
-    if (deposit.status === 'completed') return deposit;
-
-    deposit.status = 'completed';
-    deposit.amount = amount || deposit.amount;
-    deposit.mpesa_receipt_number = receiptNumber || deposit.mpesa_receipt_number;
-    deposit.callback_payload = callbackPayload;
-    deposit.updated_at = new Date();
-    await deposit.save();
-
-    const user = await User.findOneAndUpdate(
-      { id: deposit.user_id },
-      { $inc: { balance: deposit.amount } },
-      { new: true }
-    );
-
-    let tx = await Transaction.findOneAndUpdate(
-      {
-        user_id: deposit.user_id,
-        $or: [
-          { reference: `MPESA-${deposit.external_reference}` },
-          { reference: deposit.external_reference },
-          { reference: `MPESA-${deposit.mpesa_checkout_request_id}` }
-        ]
-      },
-      {
-        $set: {
-          status: 'completed',
-          reference: `MPESA-${receiptNumber || deposit.external_reference}`,
-          mpesa_receipt_number: receiptNumber,
-          client_phone: deposit.payer_phone || undefined
-        }
-      },
-      { new: true }
-    );
-    if (!tx) {
-      tx = await Transaction.create({
-        user_id: deposit.user_id,
-        client_phone: deposit.payer_phone || null,
-        type: 'deposit',
-        amount: deposit.amount,
-        status: 'completed',
-        reference: `MPESA-${receiptNumber || deposit.external_reference}`,
-        mpesa_receipt_number: receiptNumber
-      });
-    }
-
-    emitRealtimeMutation({
-      action: 'mpesa_deposit_completed',
-      userId: deposit.user_id,
-      balance: user?.balance,
-      transaction: tx,
-      user,
-      deposits: true
-    });
-
-    return deposit;
-  } catch (err) {
-    console.error('completePendingMpesaDeposit error:', err.message);
-    return null;
-  }
-}
-
-async function failPendingMpesaDeposit(externalRef, failureReason, callbackPayload, secondaryRef = null) {
-  try {
-    const deposit = await Deposit.findOne({
-      $or: [
-        { external_reference: externalRef },
-        { mpesa_checkout_request_id: externalRef },
-        ...(secondaryRef ? [{ external_reference: secondaryRef }, { mpesa_checkout_request_id: secondaryRef }] : [])
-      ]
-    });
-
-    if (!deposit || deposit.status === 'completed') return deposit;
-
-    deposit.status = 'failed';
-    deposit.failure_reason = failureReason || 'Transaction cancelled or failed';
-    deposit.callback_payload = callbackPayload;
-    deposit.updated_at = new Date();
-    await deposit.save();
-
-    let tx = await Transaction.findOneAndUpdate(
-      {
-        user_id: deposit.user_id,
-        $or: [
-          { reference: `MPESA-${deposit.external_reference}` },
-          { reference: deposit.external_reference },
-          { reference: `MPESA-${deposit.mpesa_checkout_request_id}` },
-          ...(secondaryRef ? [{ reference: `MPESA-${secondaryRef}` }, { reference: secondaryRef }] : [])
-        ]
-      },
-      {
-        $set: {
-          status: 'failed',
-          failure_reason: deposit.failure_reason,
-          client_phone: deposit.payer_phone || undefined
-        }
-      },
-      { new: true }
-    );
-    if (!tx) {
-      tx = await Transaction.create({
-        user_id: deposit.user_id,
-        client_phone: deposit.payer_phone || null,
-        type: 'deposit',
-        amount: deposit.amount,
-        status: 'failed',
-        reference: deposit.external_reference || `DEP-${deposit.id}`,
-        failure_reason: deposit.failure_reason
-      });
-    }
-
-    const user = await User.findOne({ id: deposit.user_id }).lean();
-
-    emitRealtimeMutation({
-      action: 'mpesa_deposit_failed',
-      userId: deposit.user_id,
-      transaction: tx,
-      user,
-      deposits: true,
-      dashboard: true
-    });
-
-    return deposit;
-  } catch (err) {
-    console.error('failPendingMpesaDeposit error:', err.message);
-    return null;
-  }
-}
-
-async function reopenProcessingMpesaDeposits() {
-  try {
-    await Deposit.updateMany(
-      { status: 'processing' },
-      { $set: { status: 'pending', updated_at: new Date() } }
-    );
-  } catch (err) {
-    console.warn('reopenProcessingMpesaDeposits error:', err.message);
-  }
-}
-
-async function reconcilePendingMpesaDeposits() {
-  try {
-    // Safaricom STK Push prompts expire on the handset after 30 seconds
-    const thirtyFiveSecAgo = new Date(Date.now() - 35 * 1000);
-    const timedOutDeposits = await Deposit.find({
-      status: 'pending',
-      created_at: { $lt: thirtyFiveSecAgo }
-    });
-
-    for (const dep of timedOutDeposits) {
-      dep.status = 'failed';
-      dep.failure_reason = 'STK prompt timed out or cancelled on phone';
-      dep.updated_at = new Date();
-      await dep.save();
-
-      let tx = await Transaction.findOneAndUpdate(
-        {
-          user_id: dep.user_id,
-          $or: [
-            { reference: `MPESA-${dep.external_reference}` },
-            { reference: dep.external_reference },
-            { reference: `MPESA-${dep.mpesa_checkout_request_id}` }
-          ]
-        },
-        {
-          $set: {
-            status: 'failed',
-            failure_reason: dep.failure_reason,
-            client_phone: dep.payer_phone || undefined
-          }
-        },
-        { new: true }
-      );
-      if (!tx) {
-        tx = await Transaction.create({
-          user_id: dep.user_id,
-          client_phone: dep.payer_phone || null,
-          type: 'deposit',
-          amount: dep.amount,
-          status: 'failed',
-          reference: dep.external_reference || `DEP-${dep.id}`,
-          failure_reason: dep.failure_reason
-        });
-      }
-
-      const depUser = await User.findOne({ id: dep.user_id }).lean();
-
-      emitRealtimeMutation({
-        action: 'mpesa_deposit_failed',
-        userId: dep.user_id,
-        transaction: tx,
-        user: depUser,
-        deposits: true,
-        dashboard: true
-      });
-    }
-  } catch (err) {
-    console.warn('reconcilePendingMpesaDeposits error:', err.message);
-  }
-}
-
-// PayHero & M-Pesa STK Push
-app.post([
-  '/api/payhero/stkpush',
-  '/api/payhero/stk-push',
-  '/api/mpesa/stkpush',
-  '/api/mpesa/stk-push',
-  '/api/wallet/mpesa/stkpush',
-  '/api/wallet/mpesa/stk-push'
-], authenticateToken, async (req, res) => {
-  try {
-    const { amount, phone } = req.body;
-    const numAmount = Math.round(parseFloat(amount));
-    const minimumDeposit = getMinimumDeposit();
-    if (isNaN(numAmount) || numAmount < minimumDeposit) {
-      return res.status(400).json({ error: `Minimum deposit amount is KES ${minimumDeposit.toFixed(2)}` });
-    }
-    if (!phone) return res.status(400).json({ error: 'Phone number is required' });
-
-    const cleanPhone = phone.replace(/[^\d+]/g, '');
-    const formattedPhone = cleanPhone.startsWith('+') 
-      ? cleanPhone.slice(1) 
-      : (cleanPhone.startsWith('0') ? `254${cleanPhone.slice(1)}` : (cleanPhone.startsWith('254') ? cleanPhone : `254${cleanPhone}`));
-
-    const checkoutRequestId = `LIGI-DEP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-    const deposit = await Deposit.create({
-      user_id: req.user.id,
-      amount: numAmount,
-      payment_method: 'M-Pesa STK Push',
-      status: 'pending',
-      mpesa_checkout_request_id: checkoutRequestId,
-      external_reference: checkoutRequestId,
-      payer_phone: formattedPhone,
-      provider: 'payhero'
-    });
-
-    const tx = await Transaction.create({
-      user_id: req.user.id,
-      client_phone: formattedPhone,
-      type: 'deposit',
-      amount: numAmount,
-      status: 'pending',
-      reference: `MPESA-${checkoutRequestId}`
-    });
-
-    emitRealtimeMutation({
-      action: 'mpesa_deposit_pending',
-      userId: req.user.id,
-      transaction: tx,
-      user: req.user,
-      deposits: true
-    });
-    adminNamespace.emit('admin_deposit_initiated', {
-      userId: req.user.id,
-      username: req.user.username || `Player_${req.user.id}`,
-      phone: formattedPhone,
-      amount: numAmount,
-      depositId: deposit.id,
-      transactionId: tx.id,
-      transaction: tx,
-      timestamp: new Date().toISOString()
-    });
-
-    const channelId = parseInt(process.env.PAYHERO_CHANNEL_ID || PAYHERO_CHANNEL_ID, 10);
-    const authToken = process.env.PAYHERO_AUTH_TOKEN || PAYHERO_AUTH_TOKEN;
-    const apiUser = process.env.PAYHERO_API_USERNAME || PAYHERO_API_USERNAME;
-    const apiPass = process.env.PAYHERO_API_PASSWORD || PAYHERO_API_PASSWORD;
-
-    let authHeader = null;
-    if (authToken && authToken.trim()) {
-      const cleanToken = authToken.trim();
-      authHeader = (cleanToken.startsWith('Basic ') || cleanToken.startsWith('Bearer '))
-        ? cleanToken
-        : `Basic ${cleanToken}`;
-    } else if (apiUser && apiPass) {
-      authHeader = `Basic ${Buffer.from(`${apiUser.trim()}:${apiPass.trim()}`).toString('base64')}`;
-    }
-
-    if (authHeader && !isNaN(channelId)) {
-      try {
-        const payheroRes = await axios.post(`${PAYHERO_BASE_URL}/payments`, {
-          amount: numAmount,
-          phone_number: formattedPhone,
-          channel_id: channelId,
-          provider: 'm-pesa',
-          external_reference: checkoutRequestId,
-          customer_name: req.user?.username || 'LigiBet Customer',
-          callback_url: process.env.PAYHERO_CALLBACK_URL || PAYHERO_CALLBACK_URL
-        }, {
-          headers: { 
-            Authorization: authHeader,
-            'Content-Type': 'application/json'
-          },
-          timeout: 10000
-        });
-
-        if (payheroRes.data?.CheckoutRequestID) {
-          deposit.mpesa_checkout_request_id = payheroRes.data.CheckoutRequestID;
-          await deposit.save();
-        }
-
-        return res.json({
-          success: true,
-          message: 'STK push prompt sent to your phone. Enter your M-Pesa PIN to complete payment.',
-          checkoutRequestId,
-          providerResponse: payheroRes.data
-        });
-      } catch (apiErr) {
-        console.warn('PayHero API call response:', apiErr.response?.data || apiErr.message);
-      } finally {
-        // The provider may deduct service tokens while processing an STK request.
-        // Notify admins after the call finishes, rather than only before it starts.
-        adminNamespace.emit('dashboard_stats_updated', {
-          action: 'payhero_service_wallet_changed',
-          userId: null,
-          occurredAt: new Date().toISOString()
-        });
-      }
-    }
-
-    return res.json({
-      success: true,
-      message: 'STK push prompt initialized. Enter PIN on your phone.',
-      checkoutRequestId
-    });
-  } catch (err) {
-    return res.status(500).json({ error: 'Failed to initiate M-Pesa deposit' });
-  }
-});
-
-// Anyone on the internet can POST to the callback route below, and that route
-// credits wallets — a forged "Success" payload is free money. PAYHERO_CALLBACK_TOKEN
-// is the shared secret that separates PayHero's callbacks from everyone else's.
-//
-// It is only enforced when set, so configuring it is a deliberate step rather
-// than something that silently starts rejecting a working integration. Set it
-// here and append "?token=<value>" to PAYHERO_CALLBACK_URL, or have PayHero send
-// it as a bearer token.
-function isAuthenticPayHeroCallback(req) {
-  if (!PAYHERO_CALLBACK_TOKEN) return true;
-
-  const header = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
-  const supplied = header || String(req.query.token || '').trim();
-  if (!supplied) return false;
-
-  // Compare in constant time: a plain === leaks the token one character at a
-  // time to anyone willing to measure the response.
-  const expected = Buffer.from(PAYHERO_CALLBACK_TOKEN);
-  const actual = Buffer.from(supplied);
-  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
-}
-
-// PayHero STK Callback (Handles exact PayHero nested response format)
-app.post(['/api/payhero/callback', '/api/mpesa/callback'], async (req, res) => {
-  try {
-    if (!isAuthenticPayHeroCallback(req)) {
-      console.warn(`Rejected M-Pesa callback with a missing or wrong token from ${req.ip}.`);
-      return res.status(401).json({ status: false, message: 'Unauthorized' });
-    }
-
-    const payload = req.body || {};
-    const resp = payload.response || payload;
-    const ref = resp.ExternalReference || resp.external_reference || resp.CheckoutRequestID || resp.checkout_request_id || resp.MerchantRequestID || payload.external_reference || payload.CheckoutRequestID;
-    const isSuccess = (resp.Status === 'Success' || resp.Status === 'SUCCESS' || resp.status === 'Success' || resp.status === 'SUCCESS' || resp.ResultCode === 0 || resp.ResultCode === '0') && (payload.status !== false);
-    const amount = parseFloat(resp.Amount || resp.amount || payload.Amount || payload.amount || 0);
-    const receipt = resp.MpesaReceiptNumber || resp.mpesa_reference || resp.receipt || payload.MpesaReceiptNumber || payload.mpesa_reference;
-    const failureReason = resp.ResultDesc || resp.status_reason || resp.Status || 'Payment failed or was cancelled';
-
-    if (ref) {
-      if (isSuccess) {
-        await completePendingMpesaDeposit(ref, amount, receipt, payload);
-      } else {
-        await failPendingMpesaDeposit(ref, failureReason, payload);
-      }
-    }
-    return res.status(200).json({ status: true, message: 'Callback processed' });
-  } catch (err) {
-    return res.status(500).json({ status: false, message: 'Callback error' });
-  }
-});
-
-async function queryPayHeroTransactionStatus(deposit) {
-  const authToken = process.env.PAYHERO_AUTH_TOKEN || PAYHERO_AUTH_TOKEN;
-  const apiUser = process.env.PAYHERO_API_USERNAME || PAYHERO_API_USERNAME;
-  const apiPass = process.env.PAYHERO_API_PASSWORD || PAYHERO_API_PASSWORD;
-
-  let authHeader = null;
-  if (authToken && authToken.trim()) {
-    const cleanToken = authToken.trim();
-    authHeader = (cleanToken.startsWith('Basic ') || cleanToken.startsWith('Bearer ')) ? cleanToken : `Basic ${cleanToken}`;
-  } else if (apiUser && apiPass) {
-    authHeader = `Basic ${Buffer.from(`${apiUser.trim()}:${apiPass.trim()}`).toString('base64')}`;
-  }
-
-  if (!authHeader) return null;
-
-  const externalRef = deposit.external_reference || deposit.mpesa_checkout_request_id;
-  const checkoutRequestId = deposit.mpesa_checkout_request_id;
-  const phoneSuffix = deposit.payer_phone ? deposit.payer_phone.slice(-9) : '';
-  const depCreatedTime = new Date(deposit.created_at).getTime();
-
-  try {
-    const res = await axios.get(`${PAYHERO_BASE_URL}/transactions`, {
-      headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
-      timeout: 5000
-    });
-
-    const list = res.data?.response || res.data?.transactions || (Array.isArray(res.data) ? res.data : []);
-    if (Array.isArray(list) && list.length > 0) {
-      for (const t of list) {
-        // Strict match on external reference or checkout request ID
-        const refMatch = (
-          (t.external_reference && (t.external_reference === externalRef || t.external_reference === checkoutRequestId)) ||
-          (t.ExternalReference && (t.ExternalReference === externalRef || t.ExternalReference === checkoutRequestId)) ||
-          (t.CheckoutRequestID && (t.CheckoutRequestID === checkoutRequestId || t.CheckoutRequestID === externalRef)) ||
-          (t.checkout_request_id && (t.checkout_request_id === checkoutRequestId || t.checkout_request_id === externalRef))
-        );
-
-        if (refMatch) return t;
-
-        // Or fresh inbound payment created strictly AFTER this deposit was requested
-        if (t.transaction_type === 'inbound_payment' && Math.abs(parseFloat(t.amount) - deposit.amount) < 0.01) {
-          const txTime = t.created_at ? new Date(t.created_at).getTime() : 0;
-          if (txTime >= (depCreatedTime - 2000)) {
-            const phoneMatches = phoneSuffix && t.description && t.description.includes(phoneSuffix);
-            if (phoneMatches) {
-              const receipt = t.provider_reference || t.mpesa_reference;
-              if (receipt) {
-                const existing = await Deposit.findOne({ mpesa_receipt_number: receipt, status: 'completed' });
-                if (!existing) return t;
-              } else {
-                return t;
-              }
-            }
-          }
-        }
-      }
-    }
-    return null;
-  } catch (err) {
-    return null;
-  }
-}
-
-// STK Status Check with Instant PayHero Verification & 35s Handset Timeout
-app.post(['/api/payhero/stk-status', '/api/mpesa/stk-status'], authenticateToken, async (req, res) => {
-  try {
-    const { checkoutRequestId } = req.body;
-    if (!checkoutRequestId) return res.status(400).json({ error: 'checkoutRequestId required' });
-
-    let deposit = await Deposit.findOne({
-      user_id: req.user.id,
-      $or: [{ mpesa_checkout_request_id: checkoutRequestId }, { external_reference: checkoutRequestId }]
-    });
-
-    if (!deposit) return res.status(404).json({ error: 'Deposit not found' });
-
-    // Instant status inquiry to PayHero if still pending
-    if (deposit.status === 'pending') {
-      const payheroData = await queryPayHeroTransactionStatus(deposit);
-      if (payheroData) {
-        const pStatus = String(payheroData.status || payheroData.Status || payheroData.transaction_type || '').toLowerCase();
-        const isSuccess = pStatus === 'success' || pStatus === 'completed' || pStatus === 'complete' || pStatus === 'inbound_payment' || payheroData.ResultCode === 0;
-        const isFailed = pStatus === 'failed' || pStatus === 'cancelled' || pStatus === 'canceled' || pStatus === 'rejected' || (payheroData.ResultCode && payheroData.ResultCode !== 0);
-        const receipt = payheroData.provider_reference || payheroData.mpesa_reference || payheroData.MpesaReceiptNumber || payheroData.receipt || null;
-        const amount = parseFloat(payheroData.amount || payheroData.Amount || deposit.amount);
-
-        if (isSuccess) {
-          deposit = await completePendingMpesaDeposit(checkoutRequestId, amount, receipt, payheroData);
-        } else if (isFailed) {
-          deposit = await failPendingMpesaDeposit(checkoutRequestId, payheroData.status_reason || payheroData.ResultDesc || 'Payment failed or was cancelled on phone', payheroData);
-        }
-      } else {
-        // If 35 seconds elapsed since STK was sent and no payment made, fail immediately (Safaricom STK timeout)
-        const elapsedMs = Date.now() - new Date(deposit.created_at).getTime();
-        if (elapsedMs > 35000) {
-          deposit = await failPendingMpesaDeposit(checkoutRequestId, 'STK prompt timed out or was cancelled on phone');
-        }
-      }
-    }
-
-    const user = await User.findOne({ id: req.user.id }, 'balance').lean();
-    return res.json({
-      status: deposit.status,
-      receiptNumber: deposit.mpesa_receipt_number || null,
-      balance: deposit.status === 'completed' ? user?.balance : undefined,
-      failure_reason: deposit.failure_reason || null
-    });
-  } catch (err) {
-    return res.status(500).json({ error: 'Failed to check status' });
-  }
-});
-
-// Cancel Pending STK
-app.post(['/api/payhero/cancel-pending', '/api/mpesa/cancel-pending'], authenticateToken, async (req, res) => {
-  try {
-    const { checkoutRequestId } = req.body;
-    if (checkoutRequestId) {
-      const deposit = await Deposit.findOneAndUpdate(
-        { user_id: req.user.id, $or: [{ mpesa_checkout_request_id: checkoutRequestId }, { external_reference: checkoutRequestId }], status: 'pending' },
-        { $set: { status: 'failed', failure_reason: 'Cancelled by user', updated_at: new Date() } },
-        { new: true }
-      );
-      if (deposit) {
-        let tx = await Transaction.findOneAndUpdate(
-          {
-            user_id: deposit.user_id,
-            $or: [
-              { reference: `MPESA-${deposit.external_reference}` },
-              { reference: deposit.external_reference },
-              { reference: `MPESA-${deposit.mpesa_checkout_request_id}` }
-            ]
-          },
-          {
-            $set: {
-              status: 'failed',
-              failure_reason: 'Cancelled by user',
-              client_phone: deposit.payer_phone || undefined
-            }
-          },
-          { new: true }
-        );
-        if (!tx) {
-          tx = await Transaction.create({
-            user_id: deposit.user_id,
-            client_phone: deposit.payer_phone || null,
-            type: 'deposit',
-            amount: deposit.amount,
-            status: 'failed',
-            reference: deposit.external_reference || `DEP-${deposit.id}`,
-            failure_reason: 'Cancelled by user'
-          });
-        }
-        emitRealtimeMutation({
-          action: 'mpesa_deposit_failed',
-          userId: deposit.user_id,
-          transaction: tx,
-          user: req.user,
-          deposits: true,
-          dashboard: true
-        });
-      }
-    }
-    return res.json({ success: true, message: 'Pending STK request cancelled' });
-  } catch (err) {
-    return res.status(500).json({ error: 'Failed to cancel STK' });
-  }
-});
+// A single admin-selected gateway handles new deposits. Each deposit keeps its provider.
+const paymentService = createPaymentService({ models: privacyModels, emitRealtimeMutation,
+  adminNamespace, getMinimumDeposit, brand: 'LIGI' });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CHAT SERVICE & SIMULATOR ENGINE (SPRIBE / BETIKA REAL-TIME CHAT)
@@ -2621,6 +2056,7 @@ app.post('/api/chat/like/:id', async (req, res) => {
 
 // Admin Overview Stats
 app.use('/api/admin', authenticateAdminToken, adminPrivacy.middleware);
+paymentService.mount(app, { authenticateToken, authenticateAdminToken });
 app.post('/api/admin/pin/unlock', async (req, res) => {
   try {
     return res.json(await adminPrivacy.unlock(String(req.body.tag || '').toUpperCase(), req.body.pin, req.adminAccountToken));
@@ -2656,7 +2092,7 @@ app.get('/api/admin/stats', authenticateAdminToken, async (req, res) => {
         } }
       ]),
       Deposit.aggregate([
-        { $match: { status: 'completed', provider: 'payhero' } },
+        { $match: { status: 'completed', provider: { $in: ['payhero', 'nexuspay'] } } },
         { $group: { _id: null, total: { $sum: '$amount' } } }
       ]),
       Withdrawal.aggregate([
@@ -2730,7 +2166,7 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
       User.find(adminClientScope(req, 'id')).select('-password_hash -__v -_id').sort({ created_at: -1, id: -1 }).limit(100).lean(),
       Transaction.find(adminClientScope(req, 'user_id')).select('id user_id client_phone type amount status reference created_at admin_tag').sort({ created_at: -1 }).limit(100).lean(),
       Bet.aggregate([{ $group: { _id: null, totalBets: { $sum: 1 }, totalVolume: { $sum: '$bet_amount' }, totalPayout: { $sum: '$payout_amount' } } }]),
-      Deposit.aggregate([{ $match: { status: 'completed', provider: 'payhero' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+      Deposit.aggregate([{ $match: { status: 'completed', provider: { $in: ['payhero', 'nexuspay'] } } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
       Withdrawal.aggregate([{ $match: { status: 'completed' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
       User.countDocuments(),
       AdminLog.find({}).sort({ created_at: -1 }).limit(50).lean()
@@ -5451,6 +4887,8 @@ async function startServer() {
       privacyModels.AdminPinAttempt.createIndexes(),
       Transaction.createIndexes(),
       Deposit.createIndexes(),
+      privacyModels.PaymentGatewaySetting.createIndexes(),
+      privacyModels.PaymentReceipt.createIndexes(),
       Withdrawal.createIndexes(),
       LoginHistory.createIndexes()
     ]);
@@ -5478,14 +4916,14 @@ async function startServer() {
 
   try {
     await seedInitialChat();
-    await reopenProcessingMpesaDeposits();
+    await paymentService.reconcilePending();
     await loadRoundHistory();
     await loadSecondaryRoomHistories();
     await loadAdminRoundHistory();
     await loadPreviousRoundSummary();
   } catch (e) {}
 
-  setInterval(reconcilePendingMpesaDeposits, 10000).unref();
+  setInterval(() => paymentService.reconcilePending(), 5000).unref();
 
   startBettingPhase();
   startSecondaryBettingPhase(2, 3600);

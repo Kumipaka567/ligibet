@@ -359,7 +359,7 @@ function createAdminPrivacy(models) {
     res.set('Cache-Control', 'no-store');
     const accountToken = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
     req.adminAccountToken = accountToken;
-    const controlRequest = req.method === 'POST' && /^\/api\/admin\/(?:pin\/(?:unlock|lock|configure)|transactions\/\d+\/claim-tag)$/.test((req.originalUrl || '').split('?')[0]);
+    const controlRequest = req.method === 'POST' && /^\/api\/admin\/(?:pin\/(?:unlock|lock|configure)|transactions\/\d+\/claim-tag)$/.test((req.originalUrl || '').split('?')[0]) || (['GET', 'PUT'].includes(req.method) && (req.originalUrl || '').split('?')[0] === '/api/admin/payment-gateway');
     (controlRequest ? Promise.resolve(null) : identity(req.headers['x-admin-pin'], accountToken)).then(async pinIdentity => {
       req.pinIdentity = pinIdentity;
       if (!controlRequest && req.method !== 'GET') await ensureOwnershipMigration();

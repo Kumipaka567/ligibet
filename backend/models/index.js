@@ -170,6 +170,13 @@ const DepositSchema = new mongoose.Schema({
   provider: { type: String, default: 'daraja' },
   external_reference: { type: String, default: null, sparse: true },
   provider_reference: { type: String, default: null },
+  account_reference: { type: String, default: null },
+  transaction_id: { type: Number, default: null },
+  initiation_status: { type: String, enum: ['submitting', 'accepted', 'unknown', 'rejected', null], default: null },
+  provider_status: { type: String, default: null },
+  credited_at: { type: Date, default: null },
+  next_poll_at: { type: Date, default: null },
+  client_dismissed_at: { type: Date, default: null },
   payer_phone: { type: String, default: null },
   callback_payload: { type: mongoose.Schema.Types.Mixed, default: null },
   failure_reason: { type: String, default: null },
@@ -182,6 +189,7 @@ const DepositSchema = new mongoose.Schema({
 
 DepositSchema.index({ user_id: 1, created_at: -1 });
 DepositSchema.index({ status: 1, created_at: -1 });
+DepositSchema.index({ status: 1, next_poll_at: 1, created_at: 1 });
 
 DepositSchema.pre('save', async function(next) {
   if (this.isNew && (this.id === undefined || this.id === null)) {
@@ -230,6 +238,20 @@ const WithdrawalSettingSchema = new mongoose.Schema({
 });
 
 // ─── DepositSettings Schema ──────────────────────────────
+const PaymentGatewaySettingSchema = new mongoose.Schema({
+  _id: { type: String, default: 'global_settings' },
+  active_gateway: { type: String, enum: ['payhero', 'nexuspay'], default: 'payhero', required: true },
+  updated_by: Number,
+  updated_at: { type: Date, default: Date.now }
+});
+const PaymentReceiptSchema = new mongoose.Schema({
+  _id: { type: String, required: true },
+  deposit_id: { type: Number, required: true },
+  deposit_key: { type: String, required: true },
+  provider: { type: String, enum: ['payhero', 'nexuspay'], required: true },
+  created_at: { type: Date, default: Date.now }
+});
+
 const DepositSettingSchema = new mongoose.Schema({
   _id: { type: String, default: 'global_settings' },
   minimum_deposit: { type: Number, default: 999, min: 1 },
@@ -398,6 +420,8 @@ const AdminPinAttemptSchema = new mongoose.Schema({
 
 // ─── Export Mongoose Models ──────────────────────────────────────────────
 module.exports = {
+  PaymentGatewaySetting: mongoose.models.PaymentGatewaySetting || mongoose.model('PaymentGatewaySetting', PaymentGatewaySettingSchema),
+  PaymentReceipt: mongoose.models.PaymentReceipt || mongoose.model('PaymentReceipt', PaymentReceiptSchema),
   AdminPhoneOwner: mongoose.models.AdminPhoneOwner || mongoose.model('AdminPhoneOwner', AdminPhoneOwnerSchema),
   AdminPinSettings: mongoose.models.AdminPinSettings || mongoose.model('AdminPinSettings', AdminPinSettingsSchema),
   AdminPinProfile: mongoose.models.AdminPinProfile || mongoose.model('AdminPinProfile', AdminPinProfileSchema),

@@ -66,7 +66,8 @@ export const adminPinInterceptor: HttpInterceptorFn = (request, next) => {
   const epoch = pin.epoch;
   const claim = request.method === 'POST' && /^\/api\/admin\/transactions\/\d+\/claim-tag$/.test(target.pathname);
   const setup = request.method === 'POST' && target.pathname === '/api/admin/pin/configure';
-  const acknowledgement = claim || setup;
+  const gatewaySettings = ['GET', 'PUT'].includes(request.method) && target.pathname === '/api/admin/payment-gateway';
+  const acknowledgement = claim || setup || gatewaySettings;
   const protectedRequest = claim ? request.clone({ headers: request.headers.delete('X-Admin-Pin') })
     : pin.token ? request.clone({ setHeaders: { 'X-Admin-Pin': pin.token } }) : request;
   // A response started under a previous PIN must never refill the dashboard after a switch or lock.
@@ -75,6 +76,12 @@ export const adminPinInterceptor: HttpInterceptorFn = (request, next) => {
       if (!(event instanceof HttpResponse) || !acknowledgement) return event;
       // Live invalidation can arrive before the HTTP result. Pass only non-sensitive acknowledgement fields.
       const body = event.body as any;
+      if (gatewaySettings) return event.clone({ body: {
+        activeGateway: ['payhero', 'nexuspay'].includes(body?.activeGateway) ? body.activeGateway : null,
+        gateways: Array.isArray(body?.gateways) ? body.gateways.filter((item: any) => ['payhero', 'nexuspay'].includes(item?.id))
+          .map((item: any) => ({ id: item.id, name: item.id === 'payhero' ? 'PayHero' : 'Nexus Pay', configured: item.configured === true })) : [],
+        updatedAt: typeof body?.updatedAt === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(body.updatedAt) ? body.updatedAt : null
+      } });
       if (claim) return event.clone({ body: {
         message: 'Client claimed.', transactionId: Number(body?.transactionId ?? body?.transaction?.id),
         tag: ['R', 'G', 'S', 'V'].includes(body?.tag ?? body?.transaction?.admin_tag) ? body.tag ?? body.transaction.admin_tag : undefined

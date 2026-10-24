@@ -4,6 +4,7 @@
     "src/**/*.d.ts",
     "src/app/features/admin/admin-dashboard/admin-dashboard.spec.ts",
     "src/app/core/services/admin-socket.spec.ts",
-    "src/app/core/services/admin-pin.spec.ts"
+    "src/app/core/services/admin-pin.spec.ts",
+    "src/app/features/admin/payment-gateway-settings.component.spec.ts"
   ]
 }

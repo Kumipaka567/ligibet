@@ -141,7 +141,7 @@ describe('Admin dashboard live account management', () => {
     component.searchUsers();
     expect(component.displayedUsers.map(row => row.id)).toEqual([7]);
     expect(earlierRequest.cancelled).toBe(true);
-    vi.advanceTimersByTime(150);
+    vi.advanceTimersByTime(300);
     const latestRequest = http.expectOne(request => request.url.includes('search=%2B254%20712%20345%20678'));
     latestRequest.flush({ users: [user()] });
     expect(component.isLoadingUsers).toBe(false);

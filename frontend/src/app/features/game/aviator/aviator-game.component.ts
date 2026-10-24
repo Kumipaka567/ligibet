@@ -2755,8 +2755,9 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
         this.loadTransactionsHistory();
         this.startMpesaStatusPolling();
       },
-      error: () => {
+      error: (message) => {
         this.resetMpesaState();
+        this.showToast(typeof message === 'string' ? message : 'Payment request could not be confirmed. Please check before retrying.', true);
       }
     });
   }
@@ -2767,21 +2768,26 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     const reqId = this.mpesaCheckoutRequestId;
-    let pollCount = 0;
+    const deadline = Date.now() + 60000;
+    let checking = false;
     this.mpesaPollingInterval = setInterval(() => {
-      pollCount++;
-      if (this.mpesaStatus() !== 'waiting' || pollCount > 25) {
+      if (checking) return;
+      if (this.mpesaStatus() !== 'waiting' || Date.now() >= deadline) {
         clearInterval(this.mpesaPollingInterval);
         this.mpesaPollingInterval = null;
-        if (pollCount > 25 && this.mpesaStatus() === 'waiting') {
-          this.resetMpesaState();
+        if (Date.now() >= deadline && this.mpesaStatus() === 'waiting') {
+          this.mpesaStatusMsg.set('Payment confirmation is taking longer. Your balance will update after confirmation. Check your transactions before retrying.');
+          this.loadTransactionsHistory();
         }
         return;
       }
 
       if (reqId) {
+        checking = true;
         this.authService.checkMpesaStatus(reqId).subscribe({
           next: (res) => {
+            checking = false;
+            if (reqId !== this.mpesaCheckoutRequestId || this.mpesaStatus() !== 'waiting') return;
             if (res.status === 'completed' && this.mpesaStatus() === 'waiting') {
               this.mpesaStatus.set('success');
               if (res.balance !== undefined) {
@@ -2800,10 +2806,10 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
               this.loadTransactionsHistory();
             }
           },
-          error: () => {}
+          error: () => { checking = false; }
         });
       }
-    }, 1500);
+    }, 4000);
   }
 
   public cancelPendingStk() {
