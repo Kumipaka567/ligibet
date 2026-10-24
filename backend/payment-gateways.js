@@ -95,7 +95,10 @@ function createPaymentGateways({ http = axios, env = process.env } = {}) {
       const { data } = await http.get(`${baseURL}/payments/status/${encodeURIComponent(deposit.mpesa_checkout_request_id)}`, {
         headers: { 'X-API-Key': env.NEXUSPAY_API_KEY.trim() }, timeout: 8000
       });
-      if (data?.checkoutRequestId !== deposit.mpesa_checkout_request_id) throw error('Payment request identity could not be verified.');
+      // The live API can omit the checkout ID despite the documented example.
+      // The authenticated, request-specific URL identifies the payment; any
+      // ID explicitly returned by the provider must still match that request.
+      if (data?.checkoutRequestId !== undefined && data.checkoutRequestId !== deposit.mpesa_checkout_request_id) throw error('Payment request identity could not be verified.');
       if (!['pending', 'completed', 'failed', 'cancelled'].includes(data.status)) throw error('Payment status could not be verified.');
       if (data.status === 'completed' && !data.phoneNumber) throw error('Payment phone could not be verified.');
       return verified(deposit, { status: data.status, amount: data.amount, phone: data.phoneNumber,

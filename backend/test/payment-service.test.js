@@ -157,6 +157,45 @@ test('a switch cannot interrupt an older payment; both providers confirm through
   assert.equal(f.stores.users.get(7).balance, 448);
 });
 
+test('Nexus failed and cancelled results finish the deposit and transaction without crediting a balance', async () => {
+  for (const status of ['failed', 'cancelled']) {
+    const f = fixture();
+    await f.service.switchGateway('nexuspay', 1);
+    const started = await f.start();
+    const id = f.latest().id;
+    f.results.set(id, { status, reason: `Payment ${status} on the phone.` });
+    const response = await f.request('post', '/api/mpesa/stk-status', { checkoutRequestId: started.checkoutRequestId });
+    assert.equal(response.body.status, 'failed');
+    assert.equal(f.stores.deposits.get(id).status, 'failed');
+    assert.equal(f.stores.deposits.get(id).provider_status, status);
+    assert.equal([...f.stores.transactions.values()][0].status, 'failed');
+    assert.equal(f.stores.users.get(7).balance, 50);
+    assert.equal(f.stores.receipts.size, 0);
+    f.tick(5000);
+    await f.service.reconcilePending();
+    assert.equal(f.calls.check.length, 1);
+  }
+});
+
+test('Nexus completed status updates the existing transaction, returns the credited balance and stays completed', async () => {
+  const f = fixture();
+  await f.service.switchGateway('nexuspay', 1);
+  const started = await f.start();
+  const id = f.latest().id;
+  f.results.set(id, f.paid());
+  const response = await f.request('post', '/api/mpesa/stk-status', { checkoutRequestId: started.checkoutRequestId });
+  assert.equal(response.body.status, 'completed');
+  assert.equal(response.body.balance, 249);
+  assert.equal(response.body.receiptNumber, 'RBK71G1234');
+  assert.equal([...f.stores.transactions.values()][0].status, 'completed');
+  f.results.set(id, { status: 'failed' });
+  f.tick(5000);
+  const repeated = await f.request('post', '/api/mpesa/stk-status', { checkoutRequestId: started.checkoutRequestId });
+  assert.equal(repeated.body.status, 'completed');
+  assert.equal(f.stores.users.get(7).balance, 249);
+  assert.equal(f.calls.check.length, 1);
+});
+
 test('duplicate confirmations credit once, reuse one transaction row, and emit only one wallet event', async () => {
   const f = fixture();
   await f.start();

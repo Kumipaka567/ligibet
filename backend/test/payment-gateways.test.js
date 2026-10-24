@@ -36,6 +36,21 @@ test('Nexus Pay confirms matching checkout, amount, phone and receipt, and rejec
   }
 });
 
+test('Nexus live responses without an echoed checkout ID retain the documented payment status', async () => {
+  let body = { status: 'completed', amount: '100', phoneNumber: '254712345678', mpesaReceiptNumber: 'RBK71G1234', createdAt: '2026-04-24T14:01:05Z' };
+  const gateways = createPaymentGateways({ env, http: { get: async () => ({ data: body }) } });
+  const original = { ...body };
+  assert.equal((await gateways.check('nexuspay', deposit)).status, 'completed');
+  for (const patch of [{ amount: '99' }, { phoneNumber: '254711112222' }, { phoneNumber: undefined }, { mpesaReceiptNumber: null }, { checkoutRequestId: 'different-payment' }, { checkoutRequestId: null }]) {
+    body = { ...original, ...patch };
+    await assert.rejects(gateways.check('nexuspay', deposit));
+  }
+  for (const status of ['pending', 'failed', 'cancelled']) {
+    body = { status, amount: '100', phoneNumber: '254712345678', mpesaReceiptNumber: null };
+    assert.equal((await gateways.check('nexuspay', deposit)).status, status);
+  }
+});
+
 test('PayHero keeps its request format and matches payments only by their stored references', async () => {
   let rows = [{ transaction_type: 'inbound_payment', amount: 100, description: '712345678', provider_reference: 'RBK71G1234' }];
   let sent;
