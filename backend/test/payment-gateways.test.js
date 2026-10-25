@@ -82,3 +82,35 @@ test('unconfigured gateways cannot send requests and transport timeouts are dist
   assert.equal(phoneNumber('+254712345678'), '254712345678');
   assert.throws(() => phoneNumber('199'));
 });
+
+test('PayHero reconciles through the saved provider reference when history cannot identify the payment', async () => {
+  const saved = { ...deposit, provider_reference: 'PH-request-7' };
+  let body = { reference: saved.provider_reference, external_reference: saved.external_reference,
+    CheckoutRequestID: '', status: 'SUCCESS', amount: 100, phone_number: '+254712345678', provider_reference: 'RBK71G1234' };
+  const calls = [];
+  const gateways = createPaymentGateways({ env, http: { get: async (...args) => { calls.push(args); return { data: body }; } } });
+  assert.equal((await gateways.check('payhero', saved)).status, 'completed');
+  assert.equal(calls[0][0], 'https://backend.payhero.co.ke/api/v2/transaction-status');
+  assert.deepEqual(calls[0][1].params, { reference: 'PH-request-7' });
+  assert.equal(calls[0][1].headers.Authorization, 'Basic test-token');
+  const original = { ...body };
+  for (const patch of [{ reference: 'other' }, { reference: undefined }, { external_reference: 'other' },
+    { CheckoutRequestID: 'other' }, { amount: 99 }, { amount: undefined }, { phone_number: '254711112222' }, { provider_reference: '' }]) {
+    body = { ...original, ...patch };
+    await assert.rejects(gateways.check('payhero', saved));
+  }
+  for (const [status, expected] of [['QUEUED', 'pending'], ['FAILED', 'failed'], ['CANCELLED', 'failed']]) {
+    body = { reference: saved.provider_reference, status };
+    assert.equal((await gateways.check('payhero', saved)).status, expected);
+  }
+});
+
+test('PayHero checks the documented callback Phone and does not let a success label override a failure code', () => {
+  const gateways = createPaymentGateways({ env });
+  const body = { ExternalReference: deposit.external_reference, CheckoutRequestID: deposit.mpesa_checkout_request_id,
+    Amount: 100, Phone: '+254712345678', Status: 'Success', ResultCode: 0, MpesaReceiptNumber: 'RBK71G1234' };
+  assert.equal(gateways.parsePayHero(deposit, body).status, 'completed');
+  assert.throws(() => gateways.parsePayHero(deposit, { ...body, Phone: '+254711112222' }));
+  assert.equal(gateways.parsePayHero(deposit, { ...body, ResultCode: 1032 }).status, 'failed');
+  assert.throws(() => gateways.parsePayHero(deposit, { ...body, CheckoutRequestID: 'another-checkout' }));
+});

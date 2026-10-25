@@ -48,12 +48,21 @@ function createPaymentGateways({ http = axios, env = process.env } = {}) {
     return { ...result, amount: money(result.amount), receipt: result.receipt.trim().toUpperCase() };
   }
   function parsePayHero(deposit, raw) {
-    const state = String(raw.status || raw.Status || raw.transaction_type || '').toLowerCase();
+    // PayHero's callback calls this field Phone; its status API uses phone_number.
+    const state = String(raw.Status || raw.status || raw.transaction_type || '').trim().toLowerCase();
     const code = raw.ResultCode;
-    const status = ['success', 'completed', 'complete', 'inbound_payment'].includes(state) || code === 0 || code === '0' ? 'completed'
-      : ['failed', 'cancelled', 'canceled', 'rejected'].includes(state) || (code !== undefined && code !== null && String(code) !== '0') ? 'failed' : 'pending';
-    return verified(deposit, { status, amount: raw.amount ?? raw.Amount, phone: raw.phone_number || raw.PhoneNumber,
-      receipt: raw.provider_reference || raw.mpesa_reference || raw.MpesaReceiptNumber || raw.receipt,
+    const hasCode = code !== undefined && code !== null && String(code).trim() !== '';
+    const status = (hasCode && String(code) !== '0') || ['failed', 'cancelled', 'canceled', 'rejected'].includes(state) ? 'failed'
+      : code === 0 || code === '0' || ['success', 'completed', 'complete', 'inbound_payment'].includes(state) ? 'completed' : 'pending';
+    for (const [expected, supplied] of [
+      [deposit.external_reference, raw.ExternalReference || raw.external_reference],
+      [deposit.mpesa_checkout_request_id, raw.CheckoutRequestID || raw.checkout_request_id],
+      [deposit.provider_reference, raw.reference]
+    ]) {
+      if (expected && supplied && expected !== supplied) throw error('Payment request identity could not be verified.');
+    }
+    return verified(deposit, { status, amount: raw.amount ?? raw.Amount, phone: raw.phone_number || raw.Phone || raw.PhoneNumber,
+      receipt: raw.provider_reference || raw.mpesa_reference || raw.MpesaReceiptNumber || raw.third_party_reference || raw.receipt,
       reason: raw.status_reason || raw.ResultDesc || 'Payment failed or was cancelled on the phone.', raw });
   }
   async function initiate(provider, deposit, customerName) {
@@ -104,6 +113,18 @@ function createPaymentGateways({ http = axios, env = process.env } = {}) {
       return verified(deposit, { status: data.status, amount: data.amount, phone: data.phoneNumber,
         receipt: data.mpesaReceiptNumber, reason: data.status === 'cancelled' ? 'Payment cancelled on the phone.' : 'Payment failed on the phone.', raw: data });
     }
+    if (deposit.provider_reference) {
+      // The account history is paginated and can omit request identifiers. Query
+      // the exact PayHero reference saved when the STK request was accepted.
+      const { data } = await http.get(`${baseURL}/transaction-status`, {
+        params: { reference: deposit.provider_reference }, headers: { Authorization: authorization() }, timeout: 8000
+      });
+      const raw = data?.response || data;
+      if (!raw || raw.reference !== deposit.provider_reference) throw error('Payment request identity could not be verified.');
+      return parsePayHero(deposit, raw);
+    }
+    // Older deposits may predate saving PayHero's reference. Retain exact
+    // external/checkout matching for those records; never infer identity from PII.
     const { data } = await http.get(`${baseURL}/transactions`, { headers: { Authorization: authorization() }, timeout: 8000 });
     const rows = data?.response || data?.transactions || (Array.isArray(data) ? data : []);
     const references = new Set([deposit.external_reference, deposit.mpesa_checkout_request_id].filter(Boolean));

@@ -97,7 +97,10 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
   async function findDeposit(reference, userId, provider) {
     const filter = { $or: [{ external_reference: reference }, { mpesa_checkout_request_id: reference }] };
     if (userId !== undefined) filter.user_id = userId;
-    if (provider === 'payhero') filter.provider = { $in: legacyProviders };
+    if (provider === 'payhero') {
+      filter.provider = { $in: legacyProviders };
+      filter.$or.push({ provider_reference: reference });
+    }
     if (provider === 'nexuspay') filter.provider = 'nexuspay';
     return Deposit.findOne(filter).lean();
   }
@@ -181,8 +184,7 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
       if (!authenticated) throw error('Unauthorized callback.', 401);
     }
     const payload = req.body || {}, raw = payload.response || payload;
-    if (payload.status === false) return;
-    const reference = raw.ExternalReference || raw.external_reference || raw.CheckoutRequestID || raw.checkout_request_id || raw.MerchantRequestID || payload.external_reference;
+    const reference = raw.ExternalReference || raw.external_reference || raw.CheckoutRequestID || raw.checkout_request_id || raw.reference || raw.MerchantRequestID || payload.external_reference;
     if (typeof reference !== 'string' || !reference.trim() || reference.length > 256) return;
     const deposit = await findDeposit(reference, undefined, 'payhero');
     if (!deposit || deposit.status === 'completed') return;

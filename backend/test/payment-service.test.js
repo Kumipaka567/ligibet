@@ -318,3 +318,48 @@ test('unsigned PayHero callbacks are hints and require server-side verification'
   assert.equal(f.stores.users.get(7).balance, 50);
   assert.equal(f.calls.check.length, 1);
 });
+
+test('a missed unsigned PayHero callback recovers once in the background', async () => {
+  const f = fixture();
+  delete f.env.PAYHERO_CALLBACK_TOKEN;
+  await f.start();
+  const deposit = f.latest();
+  f.tick(65000);
+  f.results.set(deposit.id, f.paid());
+  await f.service.reconcilePending();
+  await f.service.callback({ headers: {}, query: {}, body: { reference: deposit.provider_reference, Status: 'Success' } });
+  await f.service.reconcilePending();
+  assert.equal(f.stores.deposits.get(deposit.id).status, 'completed');
+  assert.equal(f.stores.users.get(7).balance, 249);
+  assert.equal([...f.stores.transactions.values()][0].status, 'completed');
+  assert.equal(f.stores.receipts.size, 1);
+  assert.equal(f.calls.check.length, 1);
+});
+
+test('PayHero callbacks match the provider reference, verify the documented Phone and credit only once', async () => {
+  const f = fixture();
+  await f.start();
+  const deposit = f.latest();
+  const request = { headers: {}, query: { token: 'callback-secret' }, body: { response: {
+    reference: deposit.provider_reference, Status: 'Success', ResultCode: 0, Amount: 199,
+    Phone: '+254711112222', MpesaReceiptNumber: 'RBK71G1234'
+  } } };
+  await assert.rejects(f.service.callback(request));
+  assert.equal(f.stores.users.get(7).balance, 50);
+  request.body.response.Phone = '+254712345678';
+  await Promise.all([f.service.callback(request), f.service.callback(request)]);
+  assert.equal(f.stores.users.get(7).balance, 249);
+  assert.equal(f.stores.receipts.size, 1);
+  assert.equal(f.stores.transactions.size, 1);
+});
+
+test('PayHero failure callbacks finish pending deposits even when the envelope status is false', async () => {
+  const f = fixture();
+  await f.start();
+  await f.service.callback({ headers: { authorization: 'Bearer callback-secret' }, query: {}, body: {
+    status: false, response: { ExternalReference: f.latest().external_reference, Status: 'Failed', ResultCode: 1032 }
+  } });
+  assert.equal(f.latest().status, 'failed');
+  assert.equal([...f.stores.transactions.values()][0].status, 'failed');
+  assert.equal(f.stores.users.get(7).balance, 50);
+});
