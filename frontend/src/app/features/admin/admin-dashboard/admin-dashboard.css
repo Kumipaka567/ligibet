@@ -3496,9 +3496,10 @@
 .staged-timeout-toggle-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 6px 12px;
+  gap: 6px;
+  min-height: 32px;
+  height: 32px;
+  padding: 4px 10px;
   color: #94a3b8;
   border: 1px solid var(--line, #2a3543);
   background: #151d27;
@@ -3508,6 +3509,8 @@
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .staged-timeout-toggle-btn:hover:not(:disabled) {
@@ -3533,12 +3536,19 @@
   cursor: not-allowed;
 }
 
+.timeout-topbar-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
 .timeout-pulse-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #64748b;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .timeout-pulse-dot.is-active {
@@ -3553,9 +3563,16 @@
   100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
-.timeout-btn-label strong {
+.timeout-btn-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+}
+
+.timeout-btn-text strong {
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
 }
 
 .staged-timeout-monitor-box {
@@ -3702,4 +3719,108 @@
   border-radius: 4px;
   font-family: monospace;
 }
+
+/* Responsive adjustments for phones and tablets */
+@media (max-width: 900px) {
+  .timeout-full-label {
+    display: none;
+  }
+}
+
+@media (max-width: 680px) {
+  .topbar-actions {
+    gap: 4px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    max-width: 100% !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .topbar-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .staged-timeout-toggle-btn {
+    min-height: 30px;
+    height: 30px;
+    padding: 3px 6px;
+    gap: 4px;
+    font-size: 10px !important;
+  }
+
+  .timeout-topbar-icon {
+    width: 13px;
+    height: 13px;
+  }
+
+  .timeout-pulse-dot {
+    width: 6px;
+    height: 6px;
+  }
+
+  .timeout-full-label {
+    display: none;
+  }
+
+  .timeout-state-word {
+    font-size: 10px;
+  }
+
+  .staged-timeout-monitor-box {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .staged-timeout-monitor-box .staged-timeout-action-btn {
+    width: 100%;
+  }
+
+  .timeout-status-banner {
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .timeout-switch-container {
+    width: 100%;
+  }
+
+  .timeout-switch-container .staged-timeout-action-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .staged-timeout-toggle-btn {
+    padding: 2px 5px;
+    gap: 3px;
+    min-height: 28px;
+    height: 28px;
+  }
+
+  .timeout-topbar-icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  .timeout-state-word {
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 375px) {
+  .timeout-btn-text {
+    display: none;
+  }
+
+  .staged-timeout-toggle-btn {
+    padding: 4px;
+    width: 28px;
+    min-width: 28px;
+    justify-content: center;
+  }
+}
+
 
