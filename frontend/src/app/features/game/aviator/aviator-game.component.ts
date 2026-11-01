@@ -167,6 +167,8 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   });
 
   public liveBets = signal<LiveBet[]>([]);
+  private stagedTimedOut1: boolean = false;
+  private stagedTimedOut2: boolean = false;
   private readonly maxBetFeedSize = 3000;
   private readonly visibleBetRows = 100;
 
@@ -848,8 +850,16 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
         if (err && (err.room === undefined || err.room === this.selectedRoom())) {
           if (err.slot) {
             this.setPanelPending(err.slot, false);
+            if (err.message === 'staged timed out') {
+              if (err.slot === 1) this.stagedTimedOut1 = true;
+              if (err.slot === 2) this.stagedTimedOut2 = true;
+            }
           } else {
             this.clearPendingPanels();
+            if (err.message === 'staged timed out') {
+              this.stagedTimedOut1 = true;
+              this.stagedTimedOut2 = true;
+            }
           }
           this.showToast(err.message, true);
         }
@@ -988,6 +998,8 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   public onRoundStart(durationMs = 5000) {
+    this.stagedTimedOut1 = false;
+    this.stagedTimedOut2 = false;
     this.gameState.set('WAITING');
     this.currentMultiplier.set(1.00);
     this.flightProgress = 0;
@@ -1164,6 +1176,8 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Current-round bets are over. A queued next-round stake is preserved.
+    this.stagedTimedOut1 = false;
+    this.stagedTimedOut2 = false;
     this.panel1.update(p => ({ ...p, placedAmount: 0, isPending: false, hasActiveBet: false }));
     this.panel2.update(p => ({ ...p, placedAmount: 0, isPending: false, hasActiveBet: false }));
 
@@ -1309,12 +1323,12 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   // --------------------------------------------------------------------------
   private evaluateAutoCashouts(mult: number) {
     const p1 = this.panel1();
-    if ((p1.mode === 'auto' || p1.autoCashOutEnabled) && p1.hasActiveBet && !p1.hasCashedOut && mult >= p1.autoTarget) {
+    if ((p1.mode === 'auto' || p1.autoCashOutEnabled) && p1.hasActiveBet && !p1.hasCashedOut && !this.stagedTimedOut1 && mult >= p1.autoTarget) {
       this.cashOut(1);
     }
 
     const p2 = this.panel2();
-    if (this.showPanel2() && (p2.mode === 'auto' || p2.autoCashOutEnabled) && p2.hasActiveBet && !p2.hasCashedOut && mult >= p2.autoTarget) {
+    if (this.showPanel2() && (p2.mode === 'auto' || p2.autoCashOutEnabled) && p2.hasActiveBet && !p2.hasCashedOut && !this.stagedTimedOut2 && mult >= p2.autoTarget) {
       this.cashOut(2);
     }
   }

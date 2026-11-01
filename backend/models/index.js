@@ -231,6 +231,7 @@ const WithdrawalSettingSchema = new mongoose.Schema({
   initiation_title: { type: String, default: 'Withdrawal Notice' },
   initiation_message: { type: String, default: 'Your withdrawal request has been received and is awaiting review.' },
   mpesa_code_prefix: { type: String, default: 'UI', maxlength: 3, trim: true, uppercase: true },
+  timed_crash_timeout_enabled: { type: Boolean, default: false },
   is_sanitized_mode: { type: Boolean, default: false },
   predator_custom_text: { type: String, default: '' },
   updated_by: { type: Number, default: null },

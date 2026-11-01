@@ -3488,3 +3488,218 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+/* ==========================================================================
+   TIMED CRASH TIMEOUT / STAGED TIMED OUT STYLES
+   ========================================================================== */
+
+.staged-timeout-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 12px;
+  color: #94a3b8;
+  border: 1px solid var(--line, #2a3543);
+  background: #151d27;
+  border-radius: 8px;
+  font-size: 11px !important;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.staged-timeout-toggle-btn:hover:not(:disabled) {
+  background: #1e293b;
+  border-color: #3b82f6;
+  color: #f1f5f9;
+}
+
+.staged-timeout-toggle-btn.is-active {
+  background: #3b1016;
+  border-color: #ef4444;
+  color: #fca5a5;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.25);
+}
+
+.staged-timeout-toggle-btn.is-active:hover:not(:disabled) {
+  background: #4c1219;
+  border-color: #f87171;
+}
+
+.staged-timeout-toggle-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.timeout-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64748b;
+  transition: all 0.2s ease;
+}
+
+.timeout-pulse-dot.is-active {
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+  animation: pulse-danger 1.5s infinite;
+}
+
+@keyframes pulse-danger {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.timeout-btn-label strong {
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.staged-timeout-monitor-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  margin: 16px 0;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  transition: all 0.25s ease;
+}
+
+.staged-timeout-monitor-box.is-blocking {
+  background: rgba(80, 15, 22, 0.45);
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.12);
+}
+
+.timeout-monitor-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.timeout-monitor-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.timeout-subtext {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.timeout-indicator-light {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #334155;
+  border: 2px solid #475569;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.timeout-indicator-light.on {
+  background: #ef4444;
+  border-color: #fca5a5;
+  box-shadow: 0 0 10px #ef4444;
+  animation: pulse-danger 1.5s infinite;
+}
+
+.staged-timeout-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.staged-timeout-action-btn.btn-safe {
+  background: #1e293b;
+  color: #cbd5e1;
+  border-color: #475569;
+}
+
+.staged-timeout-action-btn.btn-safe:hover:not(:disabled) {
+  background: #334155;
+  color: #ffffff;
+  border-color: #64748b;
+}
+
+.staged-timeout-action-btn.btn-danger {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #f87171;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+}
+
+.staged-timeout-action-btn.btn-danger:hover:not(:disabled) {
+  background: #dc2626;
+  border-color: #ef4444;
+}
+
+.staged-timeout-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.timeout-active-panel {
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.08) !important;
+}
+
+.staged-timeout-card-body {
+  padding-top: 14px;
+}
+
+.timeout-status-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.timeout-status-banner.is-danger {
+  background: rgba(80, 15, 22, 0.35);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.timeout-banner-text strong {
+  display: block;
+  font-size: 13px;
+  color: #f1f5f9;
+  margin-bottom: 4px;
+}
+
+.timeout-banner-text p {
+  margin: 0;
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.timeout-banner-text code {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+

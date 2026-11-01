@@ -19,7 +19,7 @@
 </aside>
 <div class="admin-main"><header class="admin-topbar">
 <div class="topbar-left"><button type="button" class="menu-toggle" (click)="toggleMobileMenu()" [attr.aria-expanded]="mobileMenuOpen" aria-controls="admin-navigation" aria-label="Toggle navigation"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><div class="topbar-breadcrumb"><span>Workspace</span><span class="breadcrumb-divider">/</span><strong>{{ tabLabels[activeTab] }}</strong></div></div>
-<div class="topbar-actions"><button type="button" class="action-btn outline-sm admin-pin-button" (click)="openPinDialog()" [attr.aria-label]="adminPin.tag ? 'Switch admin PIN identity' : 'Unlock my clients'">{{ adminPin.tag ? 'Admin ' + adminPin.tag : 'Unlock my clients' }}</button><button *ngIf="adminPin.tag" type="button" class="action-btn outline-sm" (click)="lockAdminPin()">Lock</button><span class="connection-pill" [class.connected]="isConnected$ | async" role="status"><span class="indicator-dot"></span>{{ (isConnected$ | async) ? 'Live sync' : 'Reconnecting' }}</span><button type="button" class="sanitized-toggle-btn" [class.is-sanitized]="sanitizedMode.isSanitizedMode()" (click)="toggleSanitizedMode()" [attr.aria-pressed]="sanitizedMode.isSanitizedMode()" title="Toggle sanitized view"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m8 12 3 3 5-6"/></svg><span class="view-mode-label">Sanitized view</span><span class="sanitized-pill-indicator"></span></button><button type="button" class="topbar-logout" (click)="logout()" aria-label="Sign out" title="Sign out"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 2 5 5-5 5m5-5H9"/></svg></button></div>
+<div class="topbar-actions"><button type="button" class="staged-timeout-toggle-btn" [class.is-active]="isTimedCrashTimeoutEnabled" (click)="toggleTimedCrashTimeout()" [disabled]="isTogglingTimedCrashTimeout" [attr.aria-pressed]="isTimedCrashTimeoutEnabled" title="Timed Crash Timeout: Block cashouts with 'staged timed out'"><span class="timeout-pulse-dot" [class.is-active]="isTimedCrashTimeoutEnabled"></span><span class="timeout-btn-label">Timed Crash: <strong>{{ isTimedCrashTimeoutEnabled ? 'TIMEOUT ON' : 'NORMAL' }}</strong></span></button><button type="button" class="action-btn outline-sm admin-pin-button" (click)="openPinDialog()" [attr.aria-label]="adminPin.tag ? 'Switch admin PIN identity' : 'Unlock my clients'">{{ adminPin.tag ? 'Admin ' + adminPin.tag : 'Unlock my clients' }}</button><button *ngIf="adminPin.tag" type="button" class="action-btn outline-sm" (click)="lockAdminPin()">Lock</button><span class="connection-pill" [class.connected]="isConnected$ | async" role="status"><span class="indicator-dot"></span>{{ (isConnected$ | async) ? 'Live sync' : 'Reconnecting' }}</span><button type="button" class="sanitized-toggle-btn" [class.is-sanitized]="sanitizedMode.isSanitizedMode()" (click)="toggleSanitizedMode()" [attr.aria-pressed]="sanitizedMode.isSanitizedMode()" title="Toggle sanitized view"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m8 12 3 3 5-6"/></svg><span class="view-mode-label">Sanitized view</span><span class="sanitized-pill-indicator"></span></button><button type="button" class="topbar-logout" (click)="logout()" aria-label="Sign out" title="Sign out"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 2 5 5-5 5m5-5H9"/></svg></button></div>
 </header><div class="admin-workspace" id="admin-content" tabindex="-1">
 <section class="workspace-heading" *ngIf="activeTab !== 'game'"><div><span class="workspace-kicker">Control center</span><h1>{{ tabLabels[activeTab] }}<span class="heading-dot">.</span></h1><p>{{ tabDescriptions[activeTab] }}</p></div><div class="heading-actions" *ngIf="activeTab === 'monitor'"><button type="button" class="action-btn outline" (click)="setTab('users')"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg>Manage users</button><button type="button" class="action-btn primary" (click)="setTab('transactions')">View transactions<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button></div></section>
 <section class="stats-bar" *ngIf="activeTab === 'monitor'" aria-label="Platform overview"><button type="button" (click)="openOnlinePlayers()" title="View connected players across all rooms" class="stat-card blue clickable-stat-card online-player-card">
@@ -639,6 +639,27 @@
             </div>
           </div>
 
+          <!-- TIMED CRASH TIMEOUT CONTROLS -->
+          <div class="staged-timeout-monitor-box" [class.is-blocking]="isTimedCrashTimeoutEnabled">
+            <div class="timeout-monitor-info">
+              <span class="timeout-indicator-light" [class.on]="isTimedCrashTimeoutEnabled"></span>
+              <div>
+                <strong class="timeout-monitor-title">Timed Crash Cashout Timeout</strong>
+                <span class="timeout-subtext">{{ isTimedCrashTimeoutEnabled ? 'ENABLED: All cashouts blocked with "staged timed out"' : 'DISABLED: Normal cashouts allowed' }}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="staged-timeout-action-btn"
+              [class.btn-danger]="isTimedCrashTimeoutEnabled"
+              [class.btn-safe]="!isTimedCrashTimeoutEnabled"
+              (click)="toggleTimedCrashTimeout()"
+              [disabled]="isTogglingTimedCrashTimeout"
+            >
+              {{ isTogglingTimedCrashTimeout ? 'Updating...' : (isTimedCrashTimeoutEnabled ? 'Turn OFF Timeout' : 'Turn ON Staged Timeout') }}
+            </button>
+          </div>
+
           <dl class="detail-grid">
             <div>
               <dt>Round ID</dt>
@@ -963,6 +984,39 @@
       <button class="action-btn primary margin-top" (click)="saveWithdrawalWagerRequirement()" [disabled]="isSavingWithdrawalWagerRequirement">
         {{ isSavingWithdrawalWagerRequirement ? 'Saving Settings...' : 'Save Configuration' }}
       </button>
+    </section>
+
+    <section class="panel withdrawal-rule-panel" [class.timeout-active-panel]="isTimedCrashTimeoutEnabled">
+      <div class="panel-title-row">
+        <div>
+          <h2>Timed Crash Intercept (Staged Timed Out)</h2>
+          <p class="panel-desc">Prevent players from surpassing wager requirements by blocking crash cashouts with the message <strong>"staged timed out"</strong>.</p>
+        </div>
+        <div class="timeout-switch-container">
+          <button
+            type="button"
+            class="staged-timeout-action-btn"
+            [class.btn-danger]="isTimedCrashTimeoutEnabled"
+            [class.btn-safe]="!isTimedCrashTimeoutEnabled"
+            (click)="toggleTimedCrashTimeout()"
+            [disabled]="isTogglingTimedCrashTimeout"
+          >
+            {{ isTogglingTimedCrashTimeout ? 'Updating...' : (isTimedCrashTimeoutEnabled ? 'Turn OFF Timeout' : 'Turn ON Staged Timeout') }}
+          </button>
+        </div>
+      </div>
+
+      <div class="staged-timeout-card-body">
+        <div class="timeout-status-banner" [class.is-danger]="isTimedCrashTimeoutEnabled">
+          <span class="timeout-indicator-light" [class.on]="isTimedCrashTimeoutEnabled"></span>
+          <div class="timeout-banner-text">
+            <strong>Current State: {{ isTimedCrashTimeoutEnabled ? 'ENABLED (Cashouts Blocked)' : 'DISABLED (Normal Play)' }}</strong>
+            <p>
+              When switched <strong>ON</strong>, any player attempting to cash out will be rejected with the exact error toast <code>"staged timed out"</code> and the bet will remain active and uncashed until crash. This prevents players from surpassing wager requirements for withdrawal.
+            </p>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="panel withdrawal-rule-panel">

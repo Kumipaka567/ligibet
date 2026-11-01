@@ -235,6 +235,7 @@ export class AdminSocketService {
   public supportTicketUpdated$ = new BehaviorSubject<{ ticket: any } | null>(null);
   public clientClaimed$ = new BehaviorSubject<{ userId: number; tag: string; transactionId?: number } | null>(null);
   public pinChanged$ = new BehaviorSubject<{ tags: string[] } | null>(null);
+  public timedCrashTimeoutUpdated$ = new BehaviorSubject<{ enabled: boolean } | null>(null);
 
   public connect(token: string, pinToken: string | null = null): void {
     if (this.socket) {
@@ -376,6 +377,14 @@ export class AdminSocketService {
       this.supportTicketUpdated$.next(data);
     });
 
+    this.listen('timed_crash_timeout_status', (data: { enabled: boolean }) => {
+      this.timedCrashTimeoutUpdated$.next(data);
+    });
+
+    this.listen('timed_crash_timeout_updated', (data: { enabled: boolean }) => {
+      this.timedCrashTimeoutUpdated$.next(data);
+    });
+
     this.listen('admin_access_revoked', (data: { userId: number; reason: string }) => {
       this.accessRevoked$.next(data);
       this.socket?.disconnect();
@@ -401,6 +410,12 @@ export class AdminSocketService {
   public resetCrashPoint(room: number = 1): void {
     if (this.socket && this.socket.connected) {
       this.socket.emit('admin_reset_crash_point', { room });
+    }
+  }
+
+  public toggleTimedCrashTimeout(enabled: boolean): void {
+    if (this.socket && this.socket.connected) {
+      this.socket.emit('admin_toggle_timed_crash_timeout', { enabled });
     }
   }
 
@@ -443,6 +458,7 @@ export class AdminSocketService {
     this.supportTicketUpdated$.next(null);
     this.clientClaimed$.next(null);
     this.pinChanged$.next(null);
+    this.timedCrashTimeoutUpdated$.next(null);
   }
 
   private applySnapshot(snapshot: AdminSnapshot): void {

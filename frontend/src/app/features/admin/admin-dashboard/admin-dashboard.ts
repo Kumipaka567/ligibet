@@ -463,6 +463,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public isSavingMinimumDeposit: boolean = false;
   public mpesaCodePrefix: string = 'UI';
   public isSavingMpesaPrefix: boolean = false;
+  public isTimedCrashTimeoutEnabled: boolean = false;
+  public isTogglingTimedCrashTimeout: boolean = false;
 
   // Crash Point Override State
   public customCrashPoint: number = 2.00;
@@ -1024,6 +1026,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       this.fetchOnlinePlayersSummary();
     }, 12000);
     this.sanitizedMode.fetchStatus();
+    this.fetchWithdrawalSettings();
     this.predatorInputText = this.sanitizedMode.predatorCustomText();
     // Load expensive lists only when their tab is opened. Previously every
     // dashboard visit fetched users, transactions, admins, logs, and settings
@@ -1207,6 +1210,12 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           this.unreadSupportCount++;
         }
         this.cdr.markForCheck();
+      }),
+      this.adminSocket.timedCrashTimeoutUpdated$.subscribe(data => {
+        if (data && typeof data.enabled === 'boolean') {
+          this.isTimedCrashTimeoutEnabled = data.enabled;
+          this.cdr.markForCheck();
+        }
       })
     );
   }
@@ -1586,7 +1595,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     const token = this.authService.getToken();
     if (!token) return;
 
-    this.http.get<{ minimum_total_wager: number; initiation_title: string; initiation_message: string; mpesa_code_prefix?: string }>(
+    this.http.get<{ minimum_total_wager: number; initiation_title: string; initiation_message: string; mpesa_code_prefix?: string; timed_crash_timeout_enabled?: boolean }>(
       `${this.baseUrl}/api/admin/withdrawal-settings`,
       { headers: { Authorization: `Bearer ${token}` } }
     ).subscribe({
@@ -1597,6 +1606,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.withdrawalInitiationMessage = res.initiation_message || this.withdrawalInitiationMessage;
         if (res.mpesa_code_prefix) {
           this.mpesaCodePrefix = res.mpesa_code_prefix.toUpperCase();
+        }
+        if (typeof res.timed_crash_timeout_enabled === 'boolean') {
+          this.isTimedCrashTimeoutEnabled = res.timed_crash_timeout_enabled;
         }
       }
     });
@@ -1714,13 +1726,14 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
     if (this.isSavingWithdrawalWagerRequirement) return;
     this.isSavingWithdrawalWagerRequirement = true;
-    this.http.put<{ minimum_total_wager: number; initiation_title: string; initiation_message: string; mpesa_code_prefix?: string }>(
+    this.http.put<{ minimum_total_wager: number; initiation_title: string; initiation_message: string; mpesa_code_prefix?: string; timed_crash_timeout_enabled?: boolean }>(
       `${this.baseUrl}/api/admin/withdrawal-settings`,
       {
         minimum_total_wager: minimumTotalWager,
         initiation_title: this.withdrawalInitiationTitle,
         initiation_message: this.withdrawalInitiationMessage,
-        mpesa_code_prefix: (this.mpesaCodePrefix || 'UI').trim().toUpperCase().slice(0, 3)
+        mpesa_code_prefix: (this.mpesaCodePrefix || 'UI').trim().toUpperCase().slice(0, 3),
+        timed_crash_timeout_enabled: this.isTimedCrashTimeoutEnabled
       },
       { headers: { Authorization: `Bearer ${token}` } }
     ).pipe(
@@ -1737,11 +1750,54 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         if (res.mpesa_code_prefix) {
           this.mpesaCodePrefix = res.mpesa_code_prefix.toUpperCase();
         }
+        if (typeof res.timed_crash_timeout_enabled === 'boolean') {
+          this.isTimedCrashTimeoutEnabled = res.timed_crash_timeout_enabled;
+        }
         this.showAdminToast('Withdrawal settings and popup template saved.', 'success');
         this.cdr.markForCheck();
       },
       error: (err) => {
         this.showAdminToast(err?.error?.error || 'Failed to save withdrawal wager requirement.', 'error');
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  public toggleTimedCrashTimeout(): void {
+    const token = this.authService.getToken();
+    if (!token) {
+      this.showAdminToast('Admin authentication token missing. Please log in again.', 'error');
+      return;
+    }
+    if (this.isTogglingTimedCrashTimeout) return;
+
+    const nextState = !this.isTimedCrashTimeoutEnabled;
+    this.isTogglingTimedCrashTimeout = true;
+    this.cdr.markForCheck();
+
+    this.http.post<{ success: boolean; enabled: boolean }>(
+      `${this.baseUrl}/api/admin/timed-crash-timeout`,
+      { enabled: nextState },
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).pipe(
+      timeout(8000),
+      finalize(() => {
+        this.isTogglingTimedCrashTimeout = false;
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: (res) => {
+        this.isTimedCrashTimeoutEnabled = !!res.enabled;
+        this.adminSocket.toggleTimedCrashTimeout(this.isTimedCrashTimeoutEnabled);
+        if (this.isTimedCrashTimeoutEnabled) {
+          this.showAdminToast('Timed Crash Timeout ENABLED: Cashouts will be rejected with "staged timed out"', 'info');
+        } else {
+          this.showAdminToast('Timed Crash Timeout DISABLED: Normal cashouts restored', 'success');
+        }
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        this.showAdminToast(err?.error?.error || 'Failed to toggle timed crash timeout setting.', 'error');
         this.cdr.markForCheck();
       }
     });

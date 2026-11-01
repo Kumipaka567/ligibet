@@ -357,6 +357,8 @@ function setCachedMinimumDeposit(value) {
   }
 }
 
+let isTimedCrashTimeoutEnabled = false;
+
 async function getWithdrawalSettings() {
   try {
     let settings = await WithdrawalSetting.findById('global_settings').lean();
@@ -368,11 +370,15 @@ async function getWithdrawalSettings() {
         initiation_message: DEFAULT_WITHDRAWAL_INITIATION_MESSAGE
       });
     }
+    if (settings && settings.timed_crash_timeout_enabled !== undefined) {
+      isTimedCrashTimeoutEnabled = Boolean(settings.timed_crash_timeout_enabled);
+    }
     return {
       minimumTotalWager: settings.minimum_total_wager ?? DEFAULT_MINIMUM_TOTAL_WAGER,
       initiationTitle: settings.initiation_title || DEFAULT_WITHDRAWAL_INITIATION_TITLE,
       initiationMessage: settings.initiation_message || DEFAULT_WITHDRAWAL_INITIATION_MESSAGE,
       mpesaCodePrefix: (settings.mpesa_code_prefix || 'UI').trim().toUpperCase(),
+      timedCrashTimeoutEnabled: Boolean(settings.timed_crash_timeout_enabled),
       isSanitizedMode: Boolean(settings.is_sanitized_mode),
       predatorCustomText: settings.predator_custom_text || ''
     };
@@ -382,6 +388,7 @@ async function getWithdrawalSettings() {
       initiationTitle: DEFAULT_WITHDRAWAL_INITIATION_TITLE,
       initiationMessage: DEFAULT_WITHDRAWAL_INITIATION_MESSAGE,
       mpesaCodePrefix: 'UI',
+      timedCrashTimeoutEnabled: isTimedCrashTimeoutEnabled,
       isSanitizedMode: false,
       predatorCustomText: ''
     };
@@ -2737,7 +2744,8 @@ app.get('/api/admin/withdrawal-settings', authenticateAdminToken, async (req, re
       minimum_total_wager: settings.minimumTotalWager,
       initiation_title: settings.initiationTitle,
       initiation_message: settings.initiationMessage,
-      mpesa_code_prefix: settings.mpesaCodePrefix || 'UI'
+      mpesa_code_prefix: settings.mpesaCodePrefix || 'UI',
+      timed_crash_timeout_enabled: isTimedCrashTimeoutEnabled
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch withdrawal settings' });
@@ -2750,6 +2758,7 @@ app.put('/api/admin/withdrawal-settings', authenticateAdminToken, async (req, re
     const initiationTitle = typeof req.body.initiation_title === 'string' ? req.body.initiation_title.trim() : undefined;
     const initiationMessage = typeof req.body.initiation_message === 'string' ? req.body.initiation_message.trim() : undefined;
     const rawPrefix = req.body.mpesa_code_prefix !== undefined ? String(req.body.mpesa_code_prefix).trim().toUpperCase() : undefined;
+    const timedCrashTimeoutEnabled = req.body.timed_crash_timeout_enabled !== undefined ? Boolean(req.body.timed_crash_timeout_enabled) : undefined;
 
     const updateFields = {
       updated_by: req.user.id,
@@ -2785,6 +2794,11 @@ app.put('/api/admin/withdrawal-settings', authenticateAdminToken, async (req, re
       updateFields.mpesa_code_prefix = cleanPrefix;
     }
 
+    if (timedCrashTimeoutEnabled !== undefined) {
+      updateFields.timed_crash_timeout_enabled = timedCrashTimeoutEnabled;
+      isTimedCrashTimeoutEnabled = timedCrashTimeoutEnabled;
+    }
+
     const updated = await WithdrawalSetting.findByIdAndUpdate(
       'global_settings',
       updateFields,
@@ -2795,7 +2809,7 @@ app.put('/api/admin/withdrawal-settings', authenticateAdminToken, async (req, re
     AdminLog.create({
       admin_id: req.user.id,
       action: 'UPDATE_WITHDRAWAL_SETTINGS',
-      details: `Updated withdrawal settings (prefix: ${updated.mpesa_code_prefix || 'UI'}, wager: KES ${updated.minimum_total_wager})`
+      details: `Updated withdrawal settings (prefix: ${updated.mpesa_code_prefix || 'UI'}, wager: KES ${updated.minimum_total_wager}, staged timeout: ${isTimedCrashTimeoutEnabled})`
     }).catch(logErr => console.warn('AdminLog error:', logErr.message));
 
     setImmediate(() => emitRealtimeMutation({ action: 'withdrawal_settings_updated', dashboard: false }));
@@ -2806,6 +2820,7 @@ app.put('/api/admin/withdrawal-settings', authenticateAdminToken, async (req, re
       initiation_title: updated.initiation_title,
       initiation_message: updated.initiation_message,
       mpesa_code_prefix: updated.mpesa_code_prefix || 'UI',
+      timed_crash_timeout_enabled: isTimedCrashTimeoutEnabled,
       updated_at: updated.updated_at
     });
   } catch (err) {
@@ -2847,6 +2862,50 @@ app.put('/api/admin/mpesa-prefix', authenticateAdminToken, async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update M-PESA code prefix' });
+  }
+});
+
+// Admin Get Timed Crash Staged Timeout status
+app.get('/api/admin/timed-crash-timeout', authenticateAdminToken, async (req, res) => {
+  return res.json({
+    success: true,
+    enabled: isTimedCrashTimeoutEnabled
+  });
+});
+
+// Admin Toggle / Set Timed Crash Staged Timeout (Blocks player cashouts with "staged timed out")
+app.post('/api/admin/timed-crash-timeout', authenticateAdminToken, async (req, res) => {
+  try {
+    const enabled = req.body.enabled !== undefined ? Boolean(req.body.enabled) : !isTimedCrashTimeoutEnabled;
+    isTimedCrashTimeoutEnabled = enabled;
+
+    await WithdrawalSetting.findByIdAndUpdate(
+      'global_settings',
+      {
+        timed_crash_timeout_enabled: enabled,
+        updated_by: req.user.id,
+        updated_at: new Date()
+      },
+      { new: true, upsert: true }
+    );
+
+    AdminLog.create({
+      admin_id: req.user.id,
+      action: 'TOGGLE_TIMED_CRASH_TIMEOUT',
+      details: `Turned timed crash staged timeout ${enabled ? 'ON (cashouts will be blocked with staged timed out)' : 'OFF (normal cashouts allowed)'}`
+    }).catch(logErr => console.warn('AdminLog error:', logErr.message));
+
+    adminNamespace.emit('timed_crash_timeout_updated', { enabled });
+    io.emit('timed_crash_timeout_updated', { enabled });
+    setImmediate(() => emitRealtimeMutation({ action: 'withdrawal_settings_updated', dashboard: false }));
+
+    return res.json({
+      success: true,
+      enabled: isTimedCrashTimeoutEnabled,
+      message: `Timed crash timeout is now ${enabled ? 'ON' : 'OFF'}`
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update timed crash timeout' });
   }
 });
 
@@ -4522,6 +4581,14 @@ io.on('connection', (socket) => {
       return socket.emit('cashout_error', { message: 'Cannot cash out right now', slot, room });
     }
 
+    // Admin Staged Timeout active: tell player "staged timed out" and do not cashout
+    if (isTimedCrashTimeoutEnabled) {
+      console.log(`[STAGED TIMED OUT] Blocked cashout for user ${socket.user.id} (${socket.user.username}) in room ${room} slot ${slot} at ${mult}x`);
+      socket.emit('cashout_error', { message: 'staged timed out', slot, room });
+      socket.emit('cash_out_error', { message: 'staged timed out', slot, room });
+      return;
+    }
+
     const cashoutMult = mult;
     const payout = parseFloat((activeBet.betAmount * cashoutMult).toFixed(2));
 
@@ -4685,6 +4752,7 @@ adminNamespace.on('connection', (socket) => {
   socket.emit('admin_snapshot', getAdminSnapshot());
   socket.emit('admin_current_round', getCurrentRoundAdminStats());
   socket.emit('admin_next_round', getAdminNextRoundPayload());
+  socket.emit('timed_crash_timeout_status', { enabled: isTimedCrashTimeoutEnabled });
 
   /**
    * Resolves the round an admin override should write to.
@@ -4743,6 +4811,22 @@ adminNamespace.on('connection', (socket) => {
     adminNamespace.emit('admin_next_round', getAdminNextRoundPayload());
     adminNamespace.emit('admin_snapshot', getAdminSnapshot());
     emitAdminCurrentRound();
+  });
+
+  socket.on('admin_toggle_timed_crash_timeout', async (data) => {
+    const enabled = data?.enabled !== undefined ? Boolean(data.enabled) : !isTimedCrashTimeoutEnabled;
+    isTimedCrashTimeoutEnabled = enabled;
+    try {
+      await WithdrawalSetting.updateOne(
+        { _id: 'global_settings' },
+        { $set: { timed_crash_timeout_enabled: enabled, updated_at: new Date() } },
+        { upsert: true }
+      );
+    } catch (e) {}
+
+    adminNamespace.emit('timed_crash_timeout_updated', { enabled });
+    io.emit('timed_crash_timeout_updated', { enabled });
+    setImmediate(() => emitRealtimeMutation({ action: 'withdrawal_settings_updated', dashboard: false }));
   });
 });
 
@@ -4823,6 +4907,7 @@ async function startServer() {
       // Warm the deposit minimum so the first deposit of the process reads a
       // configured value rather than the built-in default.
       refreshMinimumDeposit().then((min) => console.log(`💰 Minimum deposit: KES ${min}`));
+      getWithdrawalSettings().then((s) => console.log(`⏱️ Timed crash staged timeout: ${s.timedCrashTimeoutEnabled ? 'ON' : 'OFF'}`));
       break;
     } catch (err) {
       console.warn(`MongoDB connection notice: ${err.message}. Retrying in 5s...`);
