@@ -423,7 +423,10 @@ export class AuthService {
           }, 3500);
         }
       }),
-      catchError(err => throwError(() => this.extractErrorMessage(err)))
+      catchError(err => throwError(() => Object.assign(new Error(this.extractErrorMessage(err)), {
+        popup: err?.error?.popup || err?.error?.notification,
+        status: err?.status
+      })))
     );
   }
 

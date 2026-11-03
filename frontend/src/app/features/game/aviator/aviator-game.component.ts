@@ -19,6 +19,7 @@ import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ChatMessage, GameRoom, GameSocketService, LiveBetBroadcast, RoomState } from '../../../core/services/game-socket.service';
 import { AuthService, User, TransactionRecord } from '../../../core/services/auth.service';
+import { withdrawalErrorPopup } from '../../../core/services/withdrawal-feedback';
 import { SanitizedModeService } from '../../../core/services/sanitized-mode.service';
 import { getBackendOrigin } from '../../../core/config/backend-url';
 
@@ -2915,18 +2916,14 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
         this.loadTransactionsHistory();
         this.isSubmittingWithdrawal.set(false);
       },
-      error: (message: string) => {
-        const errorMsg = message || 'Insufficient funds to complete this withdrawal.';
-        const isInsufficient = errorMsg.toLowerCase().includes('insufficient') || errorMsg.toLowerCase().includes('balance');
+      error: (error: unknown) => {
         this.walletTab.set('withdraw');
+        this.showWalletModal.set(false);
         this.showWithdrawalNotification({
           id: Date.now(),
-          title: isInsufficient ? 'Insufficient Funds' : 'Withdrawal Notice',
-          message: errorMsg,
-          type: 'rejected',
+          ...withdrawalErrorPopup(error),
           createdAt: new Date().toISOString()
         });
-        this.showToast(errorMsg, true);
         this.transactionHistoryTab.set('withdrawal');
         this.loadTransactionsHistory();
         this.isSubmittingWithdrawal.set(false);

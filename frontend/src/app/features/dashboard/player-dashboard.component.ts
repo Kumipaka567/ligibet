@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthService, User } from '../../core/services/auth.service';
+import { withdrawalErrorPopup } from '../../core/services/withdrawal-feedback';
 import { GameSocketService } from '../../core/services/game-socket.service';
 import { SanitizedModeService } from '../../core/services/sanitized-mode.service';
 import { FootballMatch, MatchOutcome, SportsMarketService } from '../../core/services/sports-market.service';
@@ -592,16 +593,10 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
           this.withdrawalPopup.set(notification);
         }
       },
-      error: (message: string) => {
+      error: (error: unknown) => {
         this.isWithdrawing.set(false);
-        const text = message || 'Withdrawal could not be completed.';
-        const insufficient = /insufficient|balance/i.test(text);
         this.showWithdrawModal.set(false);
-        this.withdrawalPopup.set({
-          title: insufficient ? 'Insufficient Funds' : 'Withdrawal Notice',
-          message: text,
-          type: 'rejected'
-        });
+        this.withdrawalPopup.set(withdrawalErrorPopup(error));
       }
     });
   }

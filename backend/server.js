@@ -1402,41 +1402,31 @@ app.post(['/api/wallet/withdraw', '/api/payments/withdraw'], authenticateToken, 
     }
 
     // Regular Player Flow: Pending admin approval
-    if (!isAdmin && !user.withdrawal_allowed) {
-      const globalSettings = await getWithdrawalSettings();
-      const isCustomActive = Boolean(user.has_custom_withdrawal_popup && (user.custom_withdrawal_message || user.custom_withdrawal_title));
-      const notAllowedTitle = isCustomActive
-        ? (user.custom_withdrawal_title || 'Withdrawal Notice')
-        : 'Withdrawal Notice';
-      const notAllowedMessage = isCustomActive
-        ? (user.custom_withdrawal_message || 'Withdrawal is not enabled for your account. Please contact customer support.')
-        : 'Withdrawal is not enabled for your account. Please contact customer support.';
-
-      return res.status(403).json({
-        error: notAllowedMessage,
-        withdrawal_blocked: true,
-        notification: {
-          title: notAllowedTitle,
-          message: notAllowedMessage,
-          type: 'rejected'
-        },
-        popup: {
-          title: notAllowedTitle,
-          message: notAllowedMessage,
-          type: 'rejected'
-        }
-      });
-    }
-
     const globalSettings = await getWithdrawalSettings();
     const isCustomActive = Boolean(user.has_custom_withdrawal_popup && (user.custom_withdrawal_message || user.custom_withdrawal_title));
     const title = isCustomActive
       ? (user.custom_withdrawal_title || globalSettings.initiationTitle)
       : globalSettings.initiationTitle;
-
     const message = isCustomActive
       ? (user.custom_withdrawal_message || globalSettings.initiationMessage)
       : globalSettings.initiationMessage;
+
+    if (!isAdmin && !user.withdrawal_allowed) {
+      return res.status(403).json({
+        error: message,
+        withdrawal_blocked: true,
+        notification: {
+          title,
+          message,
+          type: 'rejected'
+        },
+        popup: {
+          title,
+          message,
+          type: 'rejected'
+        }
+      });
+    }
 
     const withdrawalStatus = 'pending';
 
