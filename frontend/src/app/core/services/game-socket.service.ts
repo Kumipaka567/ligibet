@@ -35,6 +35,7 @@ export interface BetConfirmed {
 export interface CashOutSuccess {
   multiplier: number;
   payoutAmount: number;
+  balance?: number;
   slot?: 1 | 2;
   room?: GameRoom;
 }
@@ -344,6 +345,11 @@ export class GameSocketService {
     });
 
     this.socket.on('cash_out_success', (data: CashOutSuccess) => {
+      // The confirmation carries the committed wallet balance. Do not wait for
+      // a separate balance event or for the current round to finish rendering.
+      if (typeof data.balance === 'number' && Number.isFinite(data.balance)) {
+        this.balance$.next(data.balance);
+      }
       if (this.isActiveRoom(data.room)) this.cashOutSuccess$.next(data);
     });
 

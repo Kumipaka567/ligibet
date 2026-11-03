@@ -838,7 +838,6 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
         if (c && (c.room === undefined || c.room === this.selectedRoom())) {
           const panel = this.resolveResponsePanel(c.slot);
           if (panel) this.confirmCashout(panel, c.multiplier, c.payoutAmount);
-          this.triggerCashoutNotification(c.multiplier, c.payoutAmount, c.slot || 1);
         }
       }),
       this.gameSocket.betPlacedBroadcast$.subscribe(b => {

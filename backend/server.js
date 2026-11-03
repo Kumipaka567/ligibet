@@ -4597,19 +4597,14 @@ io.on('connection', (socket) => {
         { $inc: { balance: payout } },
         { new: true }
       );
+      if (!user) throw new Error('Cashout account not found');
 
-      const payoutTransaction = await Transaction.create({
-        user_id: socket.user.id,
-        type: 'bet_payout',
-        amount: payout,
-        status: 'completed',
-        reference: `PAYOUT-BET-${activeBet.id}`
-      });
-
-      const successPayload = { multiplier: cashoutMult, payoutAmount: payout, slot, room };
+      // Confirm the committed wallet credit before history/tagging hooks run.
+      // Those writes can be slow and must not keep a paid bet showing "Taking...".
+      const successPayload = { multiplier: cashoutMult, payoutAmount: payout, balance: user.balance, slot, room };
       socket.emit('cash_out_success', successPayload);
       socket.emit('cashOutSuccess', successPayload);
-      emitRealtimeMutation({ action: 'bet_cashout', userId: socket.user.id, balance: user?.balance, transaction: payoutTransaction });
+      emitRealtimeMutation({ action: 'bet_cashout', userId: socket.user.id, balance: user.balance });
 
       const cashedOutBroadcast = {
         id: activeBet.id,
@@ -4626,6 +4621,21 @@ io.on('connection', (socket) => {
       io.to(playerRoomName(room)).emit('liveBet', cashedOutBroadcast);
 
       emitAdminCurrentRound();
+
+      // A history failure cannot turn an already credited cashout into a
+      // rejection or encourage a second payout attempt.
+      try {
+        const payoutTransaction = await Transaction.create({
+          user_id: socket.user.id,
+          type: 'bet_payout',
+          amount: payout,
+          status: 'completed',
+          reference: `PAYOUT-BET-${activeBet.id}`
+        });
+        emitRealtimeMutation({ action: 'bet_cashout_recorded', userId: socket.user.id, transaction: payoutTransaction });
+      } catch (err) {
+        console.error(`Cashout history write failed for bet ${activeBet.id}:`, err.message);
+      }
     } catch (err) {
       console.error('Cashout error:', err.message);
       socket.emit('cashout_error', { message: 'Cashout failed', slot, room });
