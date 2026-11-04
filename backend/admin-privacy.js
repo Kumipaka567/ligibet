@@ -37,7 +37,7 @@ function adminTicketScope(req) {
 }
 
 // Work on a copy: player responses and in-memory presence retain their original data.
-function protectPayload(payload, directory, tag = null, search = '') {
+function protectPayload(payload, directory, tag = null, search = '', showSupportContactNumbers = false) {
   const byId = new Map(directory.map(user => [Number(user.id), user]));
   const byName = new Map(directory.filter(user => user.username).map(user => [user.username, user]));
   const byPhone = new Map();
@@ -112,6 +112,14 @@ function protectPayload(payload, directory, tag = null, search = '') {
     if ((ownerTag || failedHidden) && ('phone_number' in value || 'phoneNumber' in value)) {
       if (ownerTag) result.client_admin_tag = ownerTag;
       result.phone_hidden = hidden;
+    }
+    // Support exposes only the ticket contact field. Message text, usernames,
+    // other payload fields and access to another PIN's tickets stay protected.
+    if (showSupportContactNumbers && ['ticket', 'tickets'].includes(field)
+      && (!tag || !ownerTag || owner?.exempt || ownerTag === tag)
+      && typeof value.phone_number === 'string') {
+      result.phone_number = value.phone_number;
+      if ('phone_hidden' in result) result.phone_hidden = false;
     }
     if (value.user_id !== undefined && value.type) {
       result.ownership_exempt = Boolean(owner?.exempt);
@@ -373,6 +381,8 @@ function createAdminPrivacy(models) {
     res.set('Cache-Control', 'no-store');
     const accountToken = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
     req.adminAccountToken = accountToken;
+    const supportResponse = (req.method === 'GET' && (req.originalUrl || '').split('?')[0] === '/api/admin/support/tickets')
+      || (req.method === 'POST' && (req.originalUrl || '').split('?')[0] === '/api/admin/support/reply');
     const controlRequest = req.method === 'POST' && /^\/api\/admin\/(?:pin\/(?:unlock|lock|configure)|transactions\/\d+\/claim-tag)$/.test((req.originalUrl || '').split('?')[0]) || (['GET', 'PUT'].includes(req.method) && (req.originalUrl || '').split('?')[0] === '/api/admin/payment-gateway');
     (controlRequest ? Promise.resolve(null) : identity(req.headers['x-admin-pin'], accountToken)).then(async pinIdentity => {
       req.pinIdentity = pinIdentity;
@@ -389,7 +399,7 @@ function createAdminPrivacy(models) {
           return res;
         }
         Promise.all([directory(), identity(req.headers['x-admin-pin'], accountToken)])
-          .then(([users, currentIdentity]) => sendJson(protectPayload(snapshot, users, currentIdentity?.tag, req.query?.search)))
+          .then(([users, currentIdentity]) => sendJson(protectPayload(snapshot, users, currentIdentity?.tag, req.query?.search, supportResponse)))
           .catch(() => { if (!res.headersSent) { res.status(503); sendJson({ error: 'Phone privacy verification unavailable. Please retry.' }); } });
         return res;
       };
@@ -417,7 +427,7 @@ function createAdminPrivacy(models) {
           const [users, pinIdentity] = await Promise.all([
             sharedDirectory || directory(), identity(socket.handshake.auth?.pinToken, socket.handshake.auth?.token)
           ]);
-          if (socket.connected) send(event, protectPayload(snapshot, users, pinIdentity?.tag));
+          if (socket.connected) send(event, protectPayload(snapshot, users, pinIdentity?.tag, '', event === 'support_ticket_update'));
         } finally {
           if (event === 'admin_current_round') currentRoundInFlight = false;
         }

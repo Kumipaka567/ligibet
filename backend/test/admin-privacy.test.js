@@ -59,6 +59,31 @@ test('phone searches cannot confirm masked full numbers, and owners can search l
   assert.equal(search.total, 0);
 });
 
+test('Support reveals only ticket contact numbers and leaves all other masking unchanged', () => {
+  const ticket = { id: 100, phone_number: '0712 345 678', username: '0712345678', password_hash: 'secret',
+    messages: [{ sender_name: '0712345678', text: 'Call 0799887766' }] };
+  const payload = { tickets: [ticket], ticket, users: [{ id: 7, role: 'user', phone_number: '0712345678' }],
+    transactions: [{ user_id: 7, type: 'deposit', phone_number: '0712345678' }], logs: [{ details: 'Call 0712345678' }] };
+  const masked = protectPayload(payload, directory);
+  const support = protectPayload(payload, directory, null, '', true);
+  for (const contact of [support.tickets[0], support.ticket]) {
+    assert.equal(contact.phone_number, ticket.phone_number);
+    assert.equal(contact.phone_hidden, false);
+    assert.equal(contact.password_hash, undefined);
+    assert.equal(contact.username, masked.ticket.username);
+    assert.deepEqual(contact.messages, masked.ticket.messages);
+  }
+  for (const field of ['users', 'transactions', 'logs']) assert.deepEqual(support[field], masked[field]);
+  assert.equal(ticket.phone_number, '0712 345 678');
+});
+
+test('Support phone visibility preserves PIN ownership filtering and foreign-ticket masking', () => {
+  const ticket = { id: 100, phone_number: '0711112222' };
+  const payload = { tickets: [ticket], ticket };
+  assert.deepEqual(protectPayload(payload, directory, 'R', '', true), protectPayload(payload, directory, 'R'));
+  assert.equal(protectPayload(payload, directory, 'G', '', true).tickets[0].phone_number, ticket.phone_number);
+});
+
 test('database scopes exclude other owners before pagination, including support phone formats', () => {
   const request = { blockedClientIds: [7], blockedClients: [directory[0]] };
   assert.deepEqual(adminClientScope(request, 'id'), { id: { $nin: [7] } });
@@ -417,6 +442,52 @@ test('all HTTP admin response data fails closed if ownership lookup fails', asyn
   assert.equal(response.statusCode, 503);
   assert.equal(response.headers['Cache-Control'], 'no-store');
   assert.ok(!JSON.stringify(payload).includes('0712345678'));
+});
+
+test('only the Support ticket list and reply routes reveal the ticket contact number', async () => {
+  const { service } = fixture();
+  await service.claim(101, 'R', 1);
+  for (const [method, originalUrl, visible] of [
+    ['GET', '/api/admin/support/tickets?search=anything', true],
+    ['POST', '/api/admin/support/reply', true],
+    ['GET', '/api/admin/users?showSupportContactNumbers=true', false],
+    ['GET', '/api/admin/logs', false],
+    ['GET', '/api/admin/support/tickets/other', false],
+    ['POST', '/api/admin/support/tickets', false]
+  ]) {
+    const req = { method, originalUrl, headers: { authorization: 'Bearer admin-account' }, query: {} };
+    const res = { set() {}, status() { return this; } };
+    const finished = new Promise(resolve => { res.json = resolve; });
+    service.middleware(req, res, () => res.json({ ticket: { id: 100, phone_number: '0712345678' },
+      users: [{ id: 7, role: 'user', phone_number: '0712345678' }] }));
+    const result = await finished;
+    assert.equal(result.ticket.phone_number, visible ? '0712345678' : '071*****78', originalUrl);
+    assert.equal(result.users[0].phone_number, '071*****78', originalUrl);
+  }
+});
+
+test('only live Support updates reveal contact numbers; ordinary socket events stay masked', async () => {
+  const { service, profiles } = fixture();
+  await service.claim(101, 'R', 1);
+  profiles.set('G', bcrypt.hashSync('2468', 4));
+  const foreign = await service.unlock('G', '2468', 'shared');
+  for (const [event, pinToken, expected] of [
+    ['support_ticket_update', null, '0712345678'],
+    ['support_ticket_update', foreign.pinToken, '071*****78'],
+    ['activity_updated', null, '071*****78']
+  ]) {
+    let finish;
+    const done = new Promise(resolve => { finish = resolve; });
+    const socket = { connected: true, handshake: { auth: { token: 'shared', pinToken } },
+      emit: (name, payload) => finish({ name, payload }) };
+    service.protectSocket(socket);
+    socket.emit(event, { ticket: { id: 100, phone_number: '0712345678' },
+      users: [{ id: 7, role: 'user', phone_number: '0712345678' }] });
+    const result = await done;
+    assert.equal(result.name, event);
+    assert.equal(result.payload.ticket.phone_number, expected);
+    if (!pinToken) assert.equal(result.payload.users[0].phone_number, '071*****78');
+  }
 });
 
 test('socket broadcasts verify each PIN independently and initial snapshots cannot expose claimed phones', async () => {
