@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { getBackendOrigin } from '../config/backend-url';
+import { retryTemporarySocketAuth, socketOptions } from './socket-options';
 
 export interface PhaseUpdate {
   phase: 'betting' | 'flying' | 'crashed';
@@ -164,6 +165,7 @@ export class GameSocketService {
   public chatRainUpdated$ = new BehaviorSubject<{ rainId: string; quantityClaimed: number; quantityTotal: number } | null>(null);
 
   constructor() {}
+  private verificationRetry: ReturnType<typeof setTimeout> | null = null;
 
   private isActiveRoom(room?: GameRoom): boolean {
     return room === undefined || room === this.activeRoom;
@@ -178,6 +180,7 @@ export class GameSocketService {
    * Initialize Socket.IO connection with JWT token authentication handshake
    */
   public connect(token: string): void {
+    if (this.verificationRetry) clearTimeout(this.verificationRetry);
     if (this.socket) {
       if (this.currentToken === token && (this.socket.connected || (this.socket as any).active)) {
         return;
@@ -189,23 +192,22 @@ export class GameSocketService {
 
     this.currentToken = token;
     this.socket = io(this.serverUrl, {
+      ...socketOptions(),
       auth: {
         token: token
-      },
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000
+      }
     });
 
     this.socket.on('connect', () => {
+      if (this.verificationRetry) clearTimeout(this.verificationRetry);
       console.log('[SOCKET] Connected to Aviator Game Engine socket:', this.socket?.id);
       this.isConnected$.next(true);
       this.errorNotification$.next(null);
+      if (this.activeRoom !== 1) this.socket?.emit('change_room', { room: this.activeRoom });
     });
 
     this.socket.on('connect_error', (err) => {
+      if (this.verificationRetry) clearTimeout(this.verificationRetry);
       console.error('[SOCKET] Socket connection error:', err.message);
       this.isConnected$.next(false);
 
@@ -215,6 +217,9 @@ export class GameSocketService {
         this.accountSuspended$.next('Your account has been suspended by an administrator.');
         return;
       }
+
+      const socket = this.socket;
+      this.verificationRetry = retryTemporarySocketAuth(err, socket, () => this.socket === socket);
 
       this.errorNotification$.next({ message: err.message || 'Failed to connect to real-time game server.' });
     });
@@ -267,7 +272,7 @@ export class GameSocketService {
     });
 
     this.socket.on('room_state', (data: RoomState) => {
-      if (!data || !Array.isArray(data.history)) return;
+      if (!data || !Array.isArray(data.history) || data.room !== this.activeRoom) return;
       this.activeRoom = data.room;
       if (data.phase === 'crashed') {
         this.lastCrashedRoundKey = `${data.room}:${data.roundId ?? ''}`;
@@ -460,7 +465,7 @@ export class GameSocketService {
       this.errorNotification$.next({ message: 'Socket connection offline. Please reconnect.', slot });
       return;
     }
-    this.socket.emit('cash_out', { slot });
+    this.socket.emit('cash_out', { slot, room: this.activeRoom });
   }
 
   /**
@@ -474,6 +479,7 @@ export class GameSocketService {
    * Disconnect socket cleanly
    */
   public disconnect(): void {
+    if (this.verificationRetry) clearTimeout(this.verificationRetry);
     if (this.socket) {
       this.socket.removeAllListeners();
       this.socket.disconnect();

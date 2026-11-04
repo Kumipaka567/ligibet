@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap, catchError, of, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, tap, catchError, of, throwError, timeout, defer, finalize, map, retry, shareReplay, switchMap, timer } from 'rxjs';
 import { getBackendOrigin } from '../config/backend-url';
 import { WithdrawalNoticeService } from './withdrawal-notice.service';
 
@@ -106,6 +106,9 @@ export class AuthService {
   // Survives a blocked storage for the life of the page, so a player can still
   // finish signing up even when the browser refuses to persist anything.
   private memoryToken: string | null = null;
+  private backendReadiness: Observable<void> | null = null;
+  private profileRequest: Observable<{ user: User } | null> | null = null;
+  private profileToken: string | null = null;
 
 
   public currentUser$ = new BehaviorSubject<User | null>(null);
@@ -248,20 +251,49 @@ export class AuthService {
    * every one of them as "Invalid phone number or password".
    */
   private toAuthError(err: any): AuthError {
+    if (err?.name === 'TimeoutError') {
+      return { status: 0, message: 'The server is taking too long to respond. Please try again.' };
+    }
     return {
       status: typeof err?.status === 'number' ? err.status : 0,
       message: this.extractErrorMessage(err)
     };
   }
 
+  /** Wake an idle API with read-only requests; never retry credential submissions. */
+  public prepareBackend(): Observable<void> {
+    if (!this.backendReadiness) {
+      const readiness: Observable<void> = defer(() => this.http.get<{ status?: string }>(`${getBackendOrigin()}/healthz`)).pipe(
+        timeout({ first: 10000 }),
+        map(health => {
+          if (health?.status !== 'ok') throw { status: 503, message: 'The server is starting. Please wait a moment.' };
+        }),
+        retry({ delay: error => {
+          const transient = error?.name === 'TimeoutError' || [0, 200, 500, 502, 503, 504, 520, 521, 522, 523, 524].includes(error?.status);
+          if (!transient || error?.error?.configuration === 'invalid') return throwError(() => error);
+          return timer(2000);
+        } }),
+        timeout({ first: 90000 }),
+        catchError(error => throwError(() => error?.name === 'TimeoutError'
+          ? { status: 503, message: 'The server is still starting or unavailable. Please try again shortly.' } : error)),
+        finalize(() => { if (this.backendReadiness === readiness) this.backendReadiness = null; }),
+        shareReplay({ bufferSize: 1, refCount: true })
+      );
+      this.backendReadiness = readiness;
+    }
+    return this.backendReadiness;
+  }
+
   public register(credentials: { username: string; phone_number?: string; password: string }): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/register`, credentials).pipe(
+    return this.prepareBackend().pipe(
+      switchMap(() => this.http.post<AuthResponse>(`${this.apiUrl}/register`, credentials).pipe(timeout({ first: 30000 }))),
       catchError(err => throwError(() => this.toAuthError(err)))
     );
   }
 
   public login(credentials: { username: string; password: string }): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/login`, credentials).pipe(
+    return this.prepareBackend().pipe(
+      switchMap(() => this.http.post<AuthResponse>(`${this.apiUrl}/login`, credentials).pipe(timeout({ first: 30000 }))),
       tap(res => this.setSession(res)),
       catchError(err => throwError(() => this.toAuthError(err)))
     );
@@ -276,24 +308,32 @@ export class AuthService {
   public loadCurrentUser(): Observable<{ user: User } | null> {
     const token = this.getToken();
     if (!token) return of(null);
+    if (this.profileRequest && this.profileToken === token) return this.profileRequest;
 
     const headers = new HttpHeaders({
       Authorization: `Bearer ${token}`
     });
 
-    return this.http.get<{ user: User }>(`${this.apiUrl}/me`, { headers }).pipe(
+    const request: Observable<{ user: User } | null> = this.http.get<{ user: User }>(`${this.apiUrl}/me`, { headers }).pipe(
+      timeout({ first: 15000 }),
       tap(res => {
-        if (res && res.user) {
+        if (res && res.user && this.getToken() === token) {
           this.currentUser$.next(res.user);
           this.userBalance$.next(res.user.balance);
           this.isAuthenticated$.next(true);
         }
       }),
-      catchError(() => {
-        this.logout();
+      catchError(error => {
+        // An outage is not an expired session. A late response from a previous
+        // account must not overwrite or log out the current account either.
+        if ([401, 403].includes(error?.status) && this.getToken() === token) this.logout();
         return of(null);
-      })
+      }),
+      finalize(() => { if (this.profileRequest === request) this.profileRequest = null; }),
+      shareReplay({ bufferSize: 1, refCount: true })
     );
+    this.profileToken = token;
+    return this.profileRequest = request;
   }
 
   // The minimum deposit is admin-configurable, so the client reads the live

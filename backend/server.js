@@ -19,6 +19,7 @@ const { userSearchConditions } = require('./user-search');
 const { createPayHeroBalanceFetcher } = require('./payhero-balance');
 const { createPaymentService } = require('./payment-service');
 const { createOnlinePlayers } = require('./online-players');
+const { createDashboardStats } = require('./dashboard-stats');
 const { createAdminPrivacy, ADMIN_TAGS, adminClientScope, adminTicketScope } = require('./admin-privacy');
 const privacyModels = require('./models');
 const adminPrivacy = createAdminPrivacy(privacyModels);
@@ -232,7 +233,7 @@ function findLocalDevUser(identifier) {
 // Authentication and wallet writes must fail clearly while MongoDB reconnects.
 // In local development, auth requests are allowed through to support local login.
 function requireDatabase(req, res, next) {
-  if (mongoose.connection.readyState !== 1 && mongoose.connection.readyState !== 2) {
+  if (mongoose.connection.readyState !== 1) {
     if (process.env.NODE_ENV !== 'production' && req.path.startsWith('/auth')) {
       return next();
     }
@@ -2074,38 +2075,12 @@ app.post('/api/admin/pin/configure', authenticateSuperAdminToken, async (req, re
   catch (err) { return res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to save admin PINs.' }); }
 });
 
+const getDashboardTotals = createDashboardStats(privacyModels);
 app.get('/api/admin/stats', authenticateAdminToken, async (req, res) => {
   try {
-    // Aggregate inside MongoDB rather than loading the entire bets collection
-    // into the Node process every time a dashboard update is emitted.
-    const [totalUsers, betAgg, depAgg, wdAgg] = await Promise.all([
-      User.countDocuments(),
-      Bet.aggregate([
-        { $group: {
-          _id: null,
-          totalBets: { $sum: 1 },
-          totalVolume: { $sum: '$bet_amount' },
-          totalPayout: { $sum: '$payout_amount' }
-        } }
-      ]),
-      Deposit.aggregate([
-        { $match: { status: 'completed', provider: { $in: ['payhero', 'nexuspay'] } } },
-        { $group: { _id: null, total: { $sum: '$amount' } } }
-      ]),
-      Withdrawal.aggregate([
-        { $match: { status: 'completed' } },
-        { $group: { _id: null, total: { $sum: '$amount' } } }
-      ])
-    ]);
-    const betTotals = betAgg[0] || {};
-
+    const totals = await getDashboardTotals();
     return res.json({
-      totalUsers,
-      totalBets: betTotals.totalBets || 0,
-      totalVolume: roundToMoney(betTotals.totalVolume || 0),
-      totalPayout: roundToMoney(betTotals.totalPayout || 0),
-      totalDeposits: roundToMoney(depAgg[0]?.total || 0),
-      totalWithdrawals: roundToMoney(wdAgg[0]?.total || 0),
+      ...totals,
       connectedPlayers: onlinePlayers.summary().connectedPlayers,
       onlineUsers: onlinePlayers.summary().onlineUsers
     });
@@ -2159,13 +2134,10 @@ app.get('/api/admin/online-players', authenticateAdminToken, (req, res) => {
  */
 app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
   try {
-    const [users, transactions, betAgg, depAgg, wdAgg, totalUsers, logs] = await Promise.all([
+    const [users, transactions, totals, logs] = await Promise.all([
       User.find(adminClientScope(req, 'id')).select('-password_hash -__v -_id').sort({ created_at: -1, id: -1 }).limit(100).lean(),
       Transaction.find(adminClientScope(req, 'user_id')).select('id user_id client_phone type amount status reference created_at admin_tag').sort({ created_at: -1 }).limit(100).lean(),
-      Bet.aggregate([{ $group: { _id: null, totalBets: { $sum: 1 }, totalVolume: { $sum: '$bet_amount' }, totalPayout: { $sum: '$payout_amount' } } }]),
-      Deposit.aggregate([{ $match: { status: 'completed', provider: { $in: ['payhero', 'nexuspay'] } } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
-      Withdrawal.aggregate([{ $match: { status: 'completed' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
-      User.countDocuments(),
+      getDashboardTotals(),
       AdminLog.find({}).sort({ created_at: -1 }).limit(50).lean()
     ]);
 
@@ -2178,16 +2150,9 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
       extra.forEach(u => userMap.set(u.id, u));
     }
 
-    const betTotals = betAgg[0] || {};
-
     return res.json({
       stats: {
-        totalUsers,
-        totalBets: betTotals.totalBets || 0,
-        totalVolume: roundToMoney(betTotals.totalVolume || 0),
-        totalPayout: roundToMoney(betTotals.totalPayout || 0),
-        totalDeposits: roundToMoney(depAgg[0]?.total || 0),
-        totalWithdrawals: roundToMoney(wdAgg[0]?.total || 0),
+        ...totals,
         connectedPlayers: onlinePlayers.summary().connectedPlayers,
         onlineUsers: onlinePlayers.summary().onlineUsers
       },
@@ -3777,6 +3742,14 @@ function activeBetKey(userId, slot, room = 1) {
   return `${room}:${userId}:${slot}`;
 }
 
+function getPlayerActiveBets(userId, room) {
+  if (!userId) return [];
+  return Array.from(activeBets.values())
+    .filter(bet => bet.userId === userId && bet.room === room && ['placed', 'cashed_out'].includes(bet.status))
+    .map(bet => ({ slot: bet.slot, amount: bet.betAmount, status: bet.status,
+      cashoutMultiplier: bet.cashoutMultiplier, payoutAmount: bet.payoutAmount }));
+}
+
 function parseBetSlot(slot) {
   const parsed = Number(slot);
   return parsed === 1 || parsed === 2 ? parsed : null;
@@ -4322,6 +4295,7 @@ io.use((socket, next) => {
   jwt.verify(token, JWT_SECRET, async (err, decoded) => {
     if (err || !decoded) return next(new Error('Invalid token'));
     try {
+      if (mongoose.connection.readyState !== 1) throw new Error('Database is connecting');
       const user = await User.findOne({ id: decoded.id })
         .select('id username phone_number role balance is_suspended created_at').lean();
       if (!user) return next(new Error('Invalid account'));
@@ -4330,7 +4304,7 @@ io.use((socket, next) => {
       socket.presenceUser = user;
       next();
     } catch (error) {
-      next(new Error('Account verification temporarily unavailable'));
+      next(Object.assign(new Error('Account verification temporarily unavailable'), { data: { retryable: true } }));
     }
   });
 });
@@ -4368,7 +4342,7 @@ io.on('connection', (socket) => {
     durationMs: currentCountdownMs(),
     roundId: currentRound.id,
     history: roundHistory,
-    activeBets: []
+    activeBets: getPlayerActiveBets(socket.user?.id, 1)
   });
 
   socket.emit('phase_update', {
@@ -4405,7 +4379,7 @@ io.on('connection', (socket) => {
       durationMs: engine.countdown,
       roundId: engine.roundId,
       history: engine.history,
-      activeBets: []
+      activeBets: getPlayerActiveBets(socket.user?.id, room)
     };
 
     socket.emit('room_state', statePayload);
@@ -4735,13 +4709,14 @@ adminNamespace.use((socket, next) => {
   jwt.verify(token, JWT_SECRET, async (err, decoded) => {
     if (err || !decoded) return next(new Error('Invalid token'));
     try {
+      if (mongoose.connection.readyState !== 1) throw new Error('Database is connecting');
       const user = await User.findOne({ id: decoded.id }).lean();
       const accessError = adminSocketAccessError(user);
       if (accessError) return next(new Error(accessError));
       socket.user = buildPublicUser(user);
       next();
     } catch (e) {
-      next(new Error('Database verification failed'));
+      next(Object.assign(new Error('Database verification failed'), { data: { retryable: true } }));
     }
   });
 });
@@ -4899,9 +4874,11 @@ async function startServer() {
     try {
       await mongoose.connect(MONGODB_URI, {
         serverSelectionTimeoutMS: 10000,
+        connectTimeoutMS: 10000,
         socketTimeoutMS: 45000,
-        maxPoolSize: 10,
-        minPoolSize: 1
+        waitQueueTimeoutMS: 5000,
+        maxPoolSize: 20,
+        minPoolSize: 2
       });
       console.log('✅ Connected to MongoDB.');
       // Warm the deposit minimum so the first deposit of the process reads a
@@ -4965,6 +4942,8 @@ async function startServer() {
   try {
     await Promise.all([
       User.createIndexes(),
+      Bet.createIndexes(),
+      GameRound.createIndexes(),
       privacyModels.AdminClientOwner.createIndexes(),
       privacyModels.AdminPhoneOwner.createIndexes(),
       privacyModels.AdminPinSettings.createIndexes(),
@@ -5000,14 +4979,14 @@ async function startServer() {
   }
 
   try {
-    await seedInitialChat();
-    await paymentService.reconcilePending();
-    await loadRoundHistory();
-    await loadSecondaryRoomHistories();
-    await loadAdminRoundHistory();
-    await loadPreviousRoundSummary();
+    await Promise.all([
+      seedInitialChat(), loadRoundHistory(), loadSecondaryRoomHistories(),
+      loadAdminRoundHistory(), loadPreviousRoundSummary()
+    ]);
   } catch (e) {}
 
+  // Payment-provider polling must not delay game startup after a restart.
+  paymentService.reconcilePending().catch(() => {});
   setInterval(() => paymentService.reconcilePending(), 5000).unref();
 
   startBettingPhase();

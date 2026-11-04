@@ -1127,6 +1127,7 @@
         <button type="button" [class.active]="txTypeFilter === 'withdrawal'" (click)="setTransactionType('withdrawal')">Withdrawals</button>
       </div>
 
+      <p *ngIf="userLoadError" role="alert">{{ userLoadError }} <button type="button" class="action-btn outline-sm" (click)="fetchUsers()">Retry</button></p>
       <div class="table-responsive margin-top" tabindex="0" aria-label="Scrollable account data">
         <table class="admin-table">
           <thead>

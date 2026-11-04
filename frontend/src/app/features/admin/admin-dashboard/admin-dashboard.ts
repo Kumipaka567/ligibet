@@ -654,6 +654,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public searchQuery: string = '';
   public roleFilter: string = 'all';
   public isLoadingUsers: boolean = false;
+  public userLoadError = '';
   public userPresenceFilter: 'all' | 'online' | 'offline' = 'all';
   public activeUserSearchQuery = '';
   public activeUserPresenceFilter: 'all' | 'online' | 'offline' = 'all';
@@ -1135,7 +1136,6 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           return;
         }
         if (event) {
-          this.fetchOverviewStats();
           this.queueRealtimeRefresh({ dashboard: true });
         }
       }),
@@ -1174,7 +1174,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       this.adminSocket.activityUpdated$.subscribe(event => {
         if (!event) return;
         this.queueRealtimeRefresh({
-          logs: true,
+          logs: !['bet_placed', 'bet_cancelled', 'bet_cashout', 'bet_cashout_recorded', 'user_online', 'user_offline'].includes(event.action),
           withdrawalSettings: event.action === 'withdrawal_settings_updated' || event.action === 'deposit_settings_updated'
         });
       }),
@@ -2324,6 +2324,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     const requestedSearch = this.searchQuery;
     const requestedRole = this.roleFilter;
     const realtimeVersion = this.realtimeVersion;
+    this.userLoadError = '';
     this.isLoadingUsers = true;
     const url = this.baseUrl + '/api/admin/users?search=' + encodeURIComponent(requestedSearch) +
       '&role=' + encodeURIComponent(requestedRole);
@@ -2345,7 +2346,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.markLoaded('users');
         this.cdr.markForCheck();
       },
-      error: () => {}
+      error: () => {
+        if (requestVersion === this.userRequestVersion) this.userLoadError = 'Unable to load users. Please retry.';
+      }
     });
   }
 

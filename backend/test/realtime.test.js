@@ -86,7 +86,8 @@ test('revocation disconnects only the target admin namespace session', () => {
 
 function matches(search, record) {
   return userSearchConditions(search).some(condition =>
-    Object.entries(condition).some(([field, pattern]) => pattern.test(record[field] || '')));
+    Object.entries(condition).some(([field, pattern]) => pattern instanceof RegExp
+      ? pattern.test(record[field] || '') : record[field] === pattern));
 }
 
 test('phone searches match local/international forms, formatting and partial numbers', () => {
@@ -98,6 +99,8 @@ test('phone searches match local/international forms, formatting and partial num
   assert.equal(matches('0712999999', { phone_number: '+254712345678' }), false);
   assert.equal(matches('.*', { username: 'alice' }), false);
   assert.equal(matches('ALIce', { username: 'alice' }), true);
+  assert.equal(matches('7', { id: 7, username: 'alice' }), true);
+  assert.equal(matches('7', { id: 8, username: 'alice' }), false);
   assert.deepEqual(userSearchConditions(''), []);
 });
 

@@ -2,6 +2,7 @@ import { Injectable, NgZone, inject } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { BehaviorSubject } from 'rxjs';
 import { getBackendOrigin } from '../config/backend-url';
+import { retryTemporarySocketAuth, socketOptions } from './socket-options';
 import { maskClientPhoneNumbers } from './admin-pin.service';
 
 export type AdminRoundStatus = 'Waiting' | 'Running' | 'Crashed';
@@ -209,6 +210,7 @@ const EMPTY_CURRENT_ROUND: AdminCurrentRound = {
 export class AdminSocketService {
   private zone = inject(NgZone);
   private socket: Socket | null = null;
+  private verificationRetry: ReturnType<typeof setTimeout> | null = null;
   private get serverUrl(): string {
     return `${getBackendOrigin()}/admin`;
   }
@@ -238,7 +240,9 @@ export class AdminSocketService {
   public timedCrashTimeoutUpdated$ = new BehaviorSubject<{ enabled: boolean } | null>(null);
 
   public connect(token: string, pinToken: string | null = null): void {
+    if (this.verificationRetry) clearTimeout(this.verificationRetry);
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
     }
@@ -246,22 +250,22 @@ export class AdminSocketService {
     this.clearRealtimeEvents();
 
     this.socket = io(this.serverUrl, {
-      auth: { token, pinToken },
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000
+      ...socketOptions(),
+      auth: { token, pinToken }
     });
 
     this.listen('connect', () => {
+      if (this.verificationRetry) clearTimeout(this.verificationRetry);
       this.isConnected$.next(true);
       this.error$.next(null);
     });
 
     this.listen('connect_error', (err: Error) => {
+      if (this.verificationRetry) clearTimeout(this.verificationRetry);
       this.isConnected$.next(false);
       this.error$.next(err.message || 'Admin socket connection failed.');
+      const socket = this.socket;
+      this.verificationRetry = retryTemporarySocketAuth(err, socket, () => this.socket === socket);
     });
 
     this.listen('admin_snapshot', (snapshot: AdminSnapshot) => {
@@ -420,7 +424,9 @@ export class AdminSocketService {
   }
 
   public disconnect(): void {
+    if (this.verificationRetry) clearTimeout(this.verificationRetry);
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
     }

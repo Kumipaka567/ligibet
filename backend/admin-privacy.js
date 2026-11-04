@@ -139,12 +139,14 @@ function createAdminPrivacy(models) {
   const { User, Transaction, Deposit, AdminClientOwner, AdminPhoneOwner, AdminPinSettings, AdminPinSession, AdminPinAttempt, AdminPinProfile } = models;
   const configuredHash = async tag => (await AdminPinProfile.findById(tag).lean())?.pin_hash || '';
   let migrationPromise;
+  let directoryRead = null;
 
   const identityCache = new Map();
   const IDENTITY_CACHE_TTL_MS = 15000;
 
   function invalidateCaches() {
     identityCache.clear();
+    directoryRead = null;
   }
 
   function ensureOwnershipMigration() {
@@ -193,7 +195,19 @@ function createAdminPrivacy(models) {
     }
   }
 
-  async function directory() {
+  function directory() {
+    // Share concurrent broadcasts/requests, without caching completed ownership
+    // reads. The next request still sees new claims, exemptions and deletions.
+    if (!directoryRead) {
+      const pending = readDirectory().finally(() => {
+        if (directoryRead === pending) directoryRead = null;
+      });
+      directoryRead = pending;
+    }
+    return directoryRead;
+  }
+
+  async function readDirectory() {
     await ensureOwnershipMigration();
     // Only the legacy import is memoized. Live ownership and exemptions are always fresh.
     const [users, existing] = await Promise.all([

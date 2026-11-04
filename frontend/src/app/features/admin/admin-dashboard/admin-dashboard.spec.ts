@@ -34,7 +34,7 @@ describe('Admin dashboard live account management', () => {
       ...Object.fromEntries([
         'transactionUpdate$', 'dashboardStatsUpdated$', 'walletUpdated$',
         'transactionsUpdated$', 'depositsUpdated$', 'withdrawalsUpdated$',
-        'userUpdated$', 'activityUpdated$', 'predatorTextUpdate$', 'accessRevoked$', 'depositInitiated$', 'onlinePlayers$', 'supportTicketUpdated$', 'clientClaimed$', 'pinChanged$'
+        'userUpdated$', 'activityUpdated$', 'predatorTextUpdate$', 'accessRevoked$', 'depositInitiated$', 'onlinePlayers$', 'supportTicketUpdated$', 'clientClaimed$', 'pinChanged$', 'timedCrashTimeoutUpdated$'
       ].map(key => [key, new BehaviorSubject(null)]))
     };
     auth = {
@@ -70,7 +70,8 @@ describe('Admin dashboard live account management', () => {
       onlineUsers: 0, connectedPlayers: 0, topPlayers: [], version: 0, updatedAt: '2026-10-05T12:00:00Z'
     });
     http.expectOne(request => request.url.endsWith('/api/admin/support/tickets')).flush({ tickets: [] });
-  });
+    http.expectOne(request => request.url.endsWith('/api/admin/withdrawal-settings')).flush({ minimum_total_wager: 2500 });
+  }, 30000);
 
   afterEach(() => {
     fixture.destroy();
@@ -145,6 +146,36 @@ describe('Admin dashboard live account management', () => {
     const latestRequest = http.expectOne(request => request.url.includes('search=%2B254%20712%20345%20678'));
     latestRequest.flush({ users: [user()] });
     expect(component.isLoadingUsers).toBe(false);
+  });
+
+  it('coalesces a statistics event burst into one request', () => {
+    socket.dashboardStatsUpdated$.next({ action: 'bet_placed', userId: 7 });
+    socket.dashboardStatsUpdated$.next({ action: 'bet_cashout', userId: 7 });
+    http.expectNone(request => request.url.endsWith('/api/admin/stats'));
+    vi.advanceTimersByTime(150);
+    http.expectOne(request => request.url.endsWith('/api/admin/stats')).flush({ totalBets: 1 });
+  });
+
+  it('does not reload audit history for game activity, but refreshes it after an admin change', () => {
+    component.activeTab = 'logs';
+    socket.activityUpdated$.next({ action: 'bet_cashout', userId: 7 });
+    vi.advanceTimersByTime(150);
+    http.expectNone(request => request.url.endsWith('/api/admin/logs'));
+    socket.activityUpdated$.next({ action: 'user_role_updated', userId: 7 });
+    vi.advanceTimersByTime(150);
+    http.expectOne(request => request.url.endsWith('/api/admin/logs')).flush({ logs: [] });
+  });
+
+  it('reports a failed user search and clears the error when the admin retries', () => {
+    component.fetchUsers();
+    http.expectOne(request => request.url.includes('/api/admin/users?'))
+      .flush({ error: 'Unavailable' }, { status: 503, statusText: 'Unavailable' });
+    expect(component.isLoadingUsers).toBe(false);
+    expect(component.userLoadError).toContain('retry');
+    component.fetchUsers();
+    expect(component.userLoadError).toBe('');
+    http.expectOne(request => request.url.includes('/api/admin/users?')).flush({ users: [user()] });
+    expect(component.userList[0].id).toBe(7);
   });
 
   it('inserts a new deposit immediately and removes it when the status filter no longer matches', () => {

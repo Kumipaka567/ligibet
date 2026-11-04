@@ -88,6 +88,7 @@ function socketAuth({ decoded = { id: 1 }, error = null, record = user(1), fail 
   let queries = 0;
   vm.runInNewContext(source.slice(start, end), {
     io: { use: callback => { middleware = callback; } }, JWT_SECRET: 'test',
+    mongoose: { connection: { readyState: 1 } },
     jwt: { verify: (_token, _secret, callback) => callback(error, decoded) },
     isSuspendedUser: () => false, buildPublicUser: record => ({ ...record }),
     User: { findOne: () => { queries++; return { select: () => ({ lean: async () => {

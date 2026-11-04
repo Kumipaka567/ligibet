@@ -9,6 +9,7 @@ function userSearchConditions(value) {
     { username: new RegExp(escapeSearch(search), 'i') },
     { phone_number: new RegExp(escapeSearch(search), 'i') }
   ];
+  if (/^\d+$/.test(search) && Number.isSafeInteger(Number(search))) conditions.unshift({ id: Number(search) });
   if (/^[+\d\s()-]+$/.test(search)) {
     const digits = search.replace(/\D/g, '');
     if (digits) {

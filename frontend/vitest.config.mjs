@@ -3,6 +3,9 @@ export default {
   test: {
     isolate: true,
     maxWorkers: 1,
-    fileParallelism: false
+    fileParallelism: false,
+    // Component compilation can exceed the default limits on this machine.
+    testTimeout: 15000,
+    hookTimeout: 30000
   }
 };

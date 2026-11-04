@@ -48,6 +48,7 @@ UserSchema.pre('save', async function(next) {
 // Equality lookups by phone are used for both player login and registration.
 UserSchema.index({ phone_number: 1 });
 UserSchema.index({ role: 1, id: -1 });
+UserSchema.index({ created_at: -1, id: -1 });
 
 // ─── BonusClaim Schema ───────────────────────────────────────────────────
 const BonusClaimSchema = new mongoose.Schema({
@@ -106,6 +107,8 @@ const BetSchema = new mongoose.Schema({
 });
 
 BetSchema.index({ round_id: 1, user_id: 1 });
+BetSchema.index({ user_id: 1, created_at: -1 });
+GameRoundSchema.index({ room_number: 1, created_at: -1 });
 
 BetSchema.pre('save', async function(next) {
   if (this.isNew && (this.id === undefined || this.id === null)) {

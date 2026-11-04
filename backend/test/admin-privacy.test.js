@@ -280,6 +280,19 @@ test('ownership migration shares concurrent work and can retry after a database 
   assert.equal(reads, 2);
 });
 
+test('overlapping privacy reads share work without keeping a completed ownership snapshot', async () => {
+  const { service, models, phoneOwners } = fixture();
+  await service.directory();
+  const find = models.User.find;
+  let reads = 0;
+  models.User.find = filter => { reads++; return find(filter); };
+  await Promise.all([service.directory(), service.directory(), service.directory()]);
+  assert.equal(reads, 1);
+  phoneOwners.set('254711112222', { _id: '254711112222', owner_tag: 'G', user_id: 8, client_phone: '254711112222' });
+  assert.equal((await service.directory()).find(row => row.id === 8).owner_tag, 'G');
+  assert.equal(reads, 2);
+});
+
 test('PIN-free claim acknowledgements do not require a privacy-directory or PIN lookup', async () => {
   const { models } = fixture();
   models.Transaction.aggregate = async () => { throw new Error('No history read needed for an acknowledgement'); };
