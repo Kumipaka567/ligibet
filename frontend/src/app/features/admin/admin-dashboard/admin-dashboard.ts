@@ -2336,6 +2336,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     const previousTag = tx.admin_tag;
     // Optimistic local update
     tx.admin_tag = tag;
+    this.optimisticAdminClaim(tag, Number(tx.amount) || 0);
     this.cdr.markForCheck();
 
     this.http.post<{ message: string; transactionId: number; tag: AdminInitial }>(
@@ -2358,6 +2359,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         tx.admin_tag = previousTag;
         const msg = err?.error?.error || 'Failed to claim transaction tag';
         this.showAdminToast(msg, 'error');
+        this.fetchAdminLeaderboard();
         this.cdr.markForCheck();
       }
     });
@@ -3000,6 +3002,45 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   public isLeaderboardAtStart(): boolean {
     return this.leaderboardSelectedDate <= this.leaderboardStartDate;
+  }
+
+  public get sortedDailyAdmins(): AdminLeaderboardAdmin[] {
+    if (!this.leaderboardData?.leaderboard) {
+      return [
+        { tag: 'R', name: 'Admin R', role: 'Operations', badgeColor: '#ef4444', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 1 },
+        { tag: 'S', name: 'Admin S', role: 'Settlements', badgeColor: '#0ea5e9', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 2 },
+        { tag: 'V', name: 'Admin V', role: 'Verification', badgeColor: '#a855f7', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 3 },
+        { tag: 'G', name: 'Admin G', role: 'Growth', badgeColor: '#10b981', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 4 }
+      ];
+    }
+    // Arrange dynamically in terms of total amount of money claimed within the day (descending)
+    return [...this.leaderboardData.leaderboard].sort((a, b) => {
+      if (b.totalVolume !== a.totalVolume) return b.totalVolume - a.totalVolume;
+      if (b.claimedCount !== a.claimedCount) return b.claimedCount - a.claimedCount;
+      return a.tag.localeCompare(b.tag);
+    });
+  }
+
+  public trackByAdminTag(_index: number, admin: AdminLeaderboardAdmin): string {
+    return admin.tag;
+  }
+
+  public optimisticAdminClaim(tag: AdminInitial, amount: number): void {
+    if (!this.leaderboardData?.leaderboard) return;
+    const target = this.leaderboardData.leaderboard.find(a => a.tag === tag);
+    if (target) {
+      target.claimedCount++;
+      target.totalVolume += amount;
+      this.leaderboardData.totalDayClaims++;
+      this.leaderboardData.totalDayVolume += amount;
+      this.leaderboardData.leaderboard.sort((a, b) => {
+        if (b.totalVolume !== a.totalVolume) return b.totalVolume - a.totalVolume;
+        if (b.claimedCount !== a.claimedCount) return b.claimedCount - a.claimedCount;
+        return a.tag.localeCompare(b.tag);
+      });
+      this.leaderboardData.leaderboard.forEach((item, idx) => item.rank = idx + 1);
+      this.cdr.markForCheck();
+    }
   }
 
   public logout(): void {

@@ -109,15 +109,13 @@ function createAdminLeaderboard(models = {}, options = {}) {
       };
     });
 
-    // Sort entries to determine ranking:
-    // 1. By score descending
+    // Sort entries in terms of total amount of money claimed within the day (descending):
+    // 1. By totalVolume descending
     // 2. By claimedCount descending
-    // 3. By totalVolume descending
-    // 4. By tag alphabetically
+    // 3. By tag alphabetically
     entries.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      if (b.claimedCount !== a.claimedCount) return b.claimedCount - a.claimedCount;
       if (b.totalVolume !== a.totalVolume) return b.totalVolume - a.totalVolume;
+      if (b.claimedCount !== a.claimedCount) return b.claimedCount - a.claimedCount;
       return a.tag.localeCompare(b.tag);
     });
 
