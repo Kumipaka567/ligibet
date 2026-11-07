@@ -71,6 +71,10 @@ export interface AdminLeaderboardAdmin {
   volumePoints: number;
   lastClaimedAt: string | null;
   rank: number;
+  allTimeClaimedCount?: number;
+  allTimeVolume?: number;
+  allTimeAvgTicket?: number;
+  allTimeRank?: number;
 }
 
 export interface AdminLeaderboardData {
@@ -80,6 +84,8 @@ export interface AdminLeaderboardData {
   serverTime: string;
   totalDayClaims: number;
   totalDayVolume: number;
+  totalAllTimeClaims?: number;
+  totalAllTimeVolume?: number;
   overallAvgTicket: number;
   leadingAdmin: AdminInitial | null;
   scoringFormula: string;
@@ -470,6 +476,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public readonly leaderboardStartDate = '2026-11-07';
   public leaderboardLastRefreshed: Date | null = null;
   public leaderboardIsLiveSpinning = false;
+  public leaderboardViewMode: 'today' | 'alltime' = 'today';
   private leaderboardPollTimer: any = null;
   private leaderboardRequest?: Subscription;
 
@@ -3004,21 +3011,43 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     return this.leaderboardSelectedDate <= this.leaderboardStartDate;
   }
 
-  public get sortedDailyAdmins(): AdminLeaderboardAdmin[] {
-    if (!this.leaderboardData?.leaderboard) {
-      return [
-        { tag: 'R', name: 'Admin R', role: 'Operations', badgeColor: '#ef4444', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 1 },
-        { tag: 'S', name: 'Admin S', role: 'Settlements', badgeColor: '#0ea5e9', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 2 },
-        { tag: 'V', name: 'Admin V', role: 'Verification', badgeColor: '#a855f7', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 3 },
-        { tag: 'G', name: 'Admin G', role: 'Growth', badgeColor: '#10b981', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 4 }
-      ];
+  public setLeaderboardViewMode(mode: 'today' | 'alltime'): void {
+    this.leaderboardViewMode = mode;
+    this.cdr.markForCheck();
+  }
+
+  public get activeLeaderboardAdmins(): AdminLeaderboardAdmin[] {
+    const fallback: AdminLeaderboardAdmin[] = [
+      { tag: 'R', name: 'Admin R', role: 'Operations', badgeColor: '#ef4444', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 1, allTimeClaimedCount: 0, allTimeVolume: 0, allTimeRank: 1 },
+      { tag: 'S', name: 'Admin S', role: 'Settlements', badgeColor: '#0ea5e9', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 2, allTimeClaimedCount: 0, allTimeVolume: 0, allTimeRank: 2 },
+      { tag: 'V', name: 'Admin V', role: 'Verification', badgeColor: '#a855f7', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 3, allTimeClaimedCount: 0, allTimeVolume: 0, allTimeRank: 3 },
+      { tag: 'G', name: 'Admin G', role: 'Growth', badgeColor: '#10b981', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 4, allTimeClaimedCount: 0, allTimeVolume: 0, allTimeRank: 4 }
+    ];
+
+    const list = this.leaderboardData?.leaderboard ? [...this.leaderboardData.leaderboard] : fallback;
+
+    if (this.leaderboardViewMode === 'alltime') {
+      return list.sort((a, b) => {
+        const volA = Number(a.allTimeVolume) || 0;
+        const volB = Number(b.allTimeVolume) || 0;
+        if (volB !== volA) return volB - volA;
+        const countA = Number(a.allTimeClaimedCount) || 0;
+        const countB = Number(b.allTimeClaimedCount) || 0;
+        if (countB !== countA) return countB - countA;
+        return a.tag.localeCompare(b.tag);
+      });
     }
-    // Arrange dynamically in terms of total amount of money claimed within the day (descending)
-    return [...this.leaderboardData.leaderboard].sort((a, b) => {
+
+    // Default 'today' mode: strictly by totalVolume (24h today) descending
+    return list.sort((a, b) => {
       if (b.totalVolume !== a.totalVolume) return b.totalVolume - a.totalVolume;
       if (b.claimedCount !== a.claimedCount) return b.claimedCount - a.claimedCount;
       return a.tag.localeCompare(b.tag);
     });
+  }
+
+  public get sortedDailyAdmins(): AdminLeaderboardAdmin[] {
+    return this.activeLeaderboardAdmins;
   }
 
   public trackByAdminTag(_index: number, admin: AdminLeaderboardAdmin): string {
@@ -3031,8 +3060,14 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (target) {
       target.claimedCount++;
       target.totalVolume += amount;
+      target.allTimeClaimedCount = (target.allTimeClaimedCount || 0) + 1;
+      target.allTimeVolume = (target.allTimeVolume || 0) + amount;
       this.leaderboardData.totalDayClaims++;
       this.leaderboardData.totalDayVolume += amount;
+      if (this.leaderboardData.totalAllTimeClaims !== undefined) {
+        this.leaderboardData.totalAllTimeClaims++;
+        this.leaderboardData.totalAllTimeVolume = (this.leaderboardData.totalAllTimeVolume || 0) + amount;
+      }
       this.leaderboardData.leaderboard.sort((a, b) => {
         if (b.totalVolume !== a.totalVolume) return b.totalVolume - a.totalVolume;
         if (b.claimedCount !== a.claimedCount) return b.claimedCount - a.claimedCount;

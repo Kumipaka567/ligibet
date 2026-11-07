@@ -22,6 +22,8 @@ test('admin leaderboard returns all 4 RSVG admins with zero claims when no trans
   assert.equal(result.startDate, '2026-11-07');
   assert.equal(result.totalDayClaims, 0);
   assert.equal(result.totalDayVolume, 0);
+  assert.equal(result.totalAllTimeClaims, 0);
+  assert.equal(result.totalAllTimeVolume, 0);
   assert.equal(result.overallAvgTicket, 0);
   assert.equal(result.leadingAdmin, null);
   assert.equal(result.leaderboard.length, 4);
@@ -31,11 +33,14 @@ test('admin leaderboard returns all 4 RSVG admins with zero claims when no trans
   for (const admin of result.leaderboard) {
     assert.equal(admin.claimedCount, 0);
     assert.equal(admin.totalVolume, 0);
+    assert.equal(admin.allTimeClaimedCount, 0);
+    assert.equal(admin.allTimeVolume, 0);
     assert.equal(admin.score, 0);
     assert.equal(admin.basePoints, 0);
     assert.equal(admin.volumePoints, 0);
     assert.equal(admin.avgTicket, 0);
     assert.ok(admin.rank >= 1 && admin.rank <= 4);
+    assert.ok(admin.allTimeRank >= 1 && admin.allTimeRank <= 4);
   }
 });
 
@@ -135,4 +140,52 @@ test('admin leaderboard calculates scores, volume, avg ticket and ranks admins c
   assert.equal(rank4.claimedCount, 0);
   assert.equal(rank4.totalVolume, 0);
   assert.equal(rank4.score, 0);
+});
+
+test('admin leaderboard limits today claims to 24h window while tracking all-time total volume', async () => {
+  const mockTransactions = [
+    // Historical transaction from earlier date: 100,000 KES for Admin R
+    { id: 99, amount: 100000, admin_tag: 'R', admin_tagged_at: new Date('2026-11-07T08:00:00Z'), created_at: new Date('2026-11-01T10:00:00Z') },
+    // Today's transaction for Admin R: 2,500 KES
+    { id: 100, amount: 2500, admin_tag: 'R', admin_tagged_at: new Date('2026-11-07T09:00:00Z'), created_at: new Date('2026-11-07T09:00:00Z') },
+    // Today's transaction for Admin S: 5,000 KES
+    { id: 101, amount: 5000, admin_tag: 'S', admin_tagged_at: new Date('2026-11-07T10:00:00Z'), created_at: new Date('2026-11-07T10:00:00Z') }
+  ];
+
+  const models = {
+    Transaction: {
+      find: () => ({
+        select: () => ({
+          lean: async () => mockTransactions
+        })
+      })
+    }
+  };
+
+  const service = createAdminLeaderboard(models);
+  const result = await service.getDailyLeaderboard('2026-11-07');
+
+  // Today (24h) stats: only the 2 transactions created today
+  assert.equal(result.totalDayClaims, 2);
+  assert.equal(result.totalDayVolume, 7500);
+
+  // All-time stats: all 3 transactions
+  assert.equal(result.totalAllTimeClaims, 3);
+  assert.equal(result.totalAllTimeVolume, 107500);
+
+  // Admin R should have 2,500 today (NOT 102,500 today!)
+  const adminR = result.leaderboard.find(a => a.tag === 'R');
+  assert.equal(adminR.claimedCount, 1);
+  assert.equal(adminR.totalVolume, 2500);
+  assert.equal(adminR.allTimeClaimedCount, 2);
+  assert.equal(adminR.allTimeVolume, 102500);
+
+  // Admin S should be #1 for today (5,000 > 2,500)
+  const adminS = result.leaderboard.find(a => a.tag === 'S');
+  assert.equal(adminS.rank, 1);
+  assert.equal(adminR.rank, 2);
+
+  // But for all-time, Admin R is #1 (102,500 > 5,000)
+  assert.equal(adminR.allTimeRank, 1);
+  assert.equal(adminS.allTimeRank, 2);
 });

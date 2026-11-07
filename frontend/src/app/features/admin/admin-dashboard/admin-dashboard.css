@@ -3826,14 +3826,15 @@
 
 
 /* ======================================================== */
-/* TOP OPERATIONAL STRIP (PAYHERO & RSVG DAILY CLAIMED)     */
+/* TOP OPERATIONAL STRIP (PAYHERO & RSVG LEADERBOARD BOX)   */
 /* ======================================================== */
 
 .stats-bar.top-operational-strip {
   display: grid !important;
-  grid-template-columns: minmax(280px, 1.25fr) repeat(4, minmax(0, 1fr)) !important;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr) !important;
   gap: 14px !important;
   margin-bottom: 14px !important;
+  align-items: stretch !important;
 }
 
 .stats-bar.platform-metrics-bar {
@@ -3843,220 +3844,404 @@
   margin-bottom: 24px !important;
 }
 
-/* Individual Admin Daily Claim Card (Beside PayHero) */
-.admin-daily-claim-card {
+/* ======================================================== */
+/* RSVG ADMIN CLAIMS COMPACT BOX (ALL ADMINS IN ONE BOX)    */
+/* ======================================================== */
+
+.admin-leaderboard-box {
   position: relative !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: space-between !important;
-  background: linear-gradient(130deg, #15202c, #101923) !important;
+  background: linear-gradient(135deg, #131e2c 0%, #0d1521 100%) !important;
   border: 1px solid #233649 !important;
   border-radius: 14px !important;
-  padding: 16px 18px !important;
+  padding: 14px 18px !important;
   min-width: 0 !important;
-  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease !important;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3) !important;
 }
 
-.admin-daily-claim-card:hover {
-  transform: translateY(-2px) !important;
-}
-
-/* Admin Accents */
-.admin-daily-claim-card.card-admin-r {
-  border-top: 3px solid #ef4444 !important;
-}
-.admin-daily-claim-card.card-admin-r:hover {
-  border-color: rgba(239, 68, 68, 0.6) !important;
-  box-shadow: 0 6px 22px rgba(239, 68, 68, 0.16) !important;
-}
-
-.admin-daily-claim-card.card-admin-s {
-  border-top: 3px solid #0ea5e9 !important;
-}
-.admin-daily-claim-card.card-admin-s:hover {
-  border-color: rgba(14, 165, 233, 0.6) !important;
-  box-shadow: 0 6px 22px rgba(14, 165, 233, 0.16) !important;
-}
-
-.admin-daily-claim-card.card-admin-v {
-  border-top: 3px solid #a855f7 !important;
-}
-.admin-daily-claim-card.card-admin-v:hover {
-  border-color: rgba(168, 85, 247, 0.6) !important;
-  box-shadow: 0 6px 22px rgba(168, 85, 247, 0.16) !important;
-}
-
-.admin-daily-claim-card.card-admin-g {
-  border-top: 3px solid #10b981 !important;
-}
-.admin-daily-claim-card.card-admin-g:hover {
-  border-color: rgba(16, 185, 129, 0.6) !important;
-  box-shadow: 0 6px 22px rgba(16, 185, 129, 0.16) !important;
-}
-
-/* Rank Leader (#1 highest claimed money today) */
-.admin-daily-claim-card.rank-leader {
-  background: linear-gradient(130deg, #1b2633, #121c26) !important;
-  border-color: rgba(245, 158, 11, 0.6) !important;
-  box-shadow: 0 6px 24px rgba(245, 158, 11, 0.16) !important;
-}
-
-/* Card Top Row */
-.admin-claim-head-left {
+/* Box Header */
+.leaderboard-box-header {
   display: flex !important;
   align-items: center !important;
-  gap: 8px !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  margin-bottom: 12px !important;
+  flex-wrap: wrap !important;
 }
 
-.admin-claim-avatar-badge {
-  width: 28px !important;
-  height: 28px !important;
-  border-radius: 7px !important;
+.box-title-cluster {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.box-trophy-badge {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 9px !important;
+  background: rgba(245, 158, 11, 0.15) !important;
+  border: 1px solid rgba(245, 158, 11, 0.4) !important;
+  color: #fbbf24 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  font-weight: 900 !important;
-  font-size: 13px !important;
-  border-width: 2px !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
   flex-shrink: 0 !important;
 }
 
-.admin-claim-name-block {
+.box-trophy-badge svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.box-text-headings {
   display: flex !important;
   flex-direction: column !important;
   gap: 1px !important;
 }
 
-.admin-claim-role-tag {
-  font-size: 9px !important;
-  font-weight: 700 !important;
-  color: #728a9f !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.4px !important;
+.box-title-line {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
 }
 
-.admin-live-rank-chip {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 3px !important;
-  padding: 2px 6px !important;
-  border-radius: 6px !important;
-  font-size: 11px !important;
+.box-main-title {
+  font-size: 14px !important;
   font-weight: 800 !important;
-  flex-shrink: 0 !important;
-}
-
-.admin-live-rank-chip.rank-1 {
-  background: rgba(245, 158, 11, 0.22) !important;
-  border: 1px solid rgba(245, 158, 11, 0.55) !important;
-  color: #fbbf24 !important;
-}
-
-.admin-live-rank-chip.rank-2 {
-  background: rgba(148, 163, 184, 0.22) !important;
-  border: 1px solid rgba(148, 163, 184, 0.45) !important;
-  color: #e2e8f0 !important;
-}
-
-.admin-live-rank-chip.rank-3 {
-  background: rgba(180, 83, 9, 0.22) !important;
-  border: 1px solid rgba(180, 83, 9, 0.45) !important;
-  color: #d97706 !important;
-}
-
-.admin-live-rank-chip.rank-4 {
-  background: rgba(51, 65, 85, 0.4) !important;
-  border: 1px solid rgba(71, 85, 105, 0.4) !important;
-  color: #94a3b8 !important;
-}
-
-/* Value Block */
-.admin-claim-body {
-  margin: 10px 0 12px 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 3px !important;
-}
-
-.admin-claim-amount {
-  font-size: clamp(20px, 1.7vw, 26px) !important;
-  font-weight: 900 !important;
-  letter-spacing: -0.6px !important;
   color: #f8fafc !important;
-  line-height: 1.1 !important;
+  margin: 0 !important;
+  line-height: 1.2 !important;
 }
 
-.curr-prefix {
-  font-size: 11px !important;
-  font-weight: 600 !important;
-  color: #94a3b8 !important;
-  margin-right: 4px !important;
-}
-
-/* Card Footer */
-.admin-claim-card-footer {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  font-size: 11px !important;
-  color: #8da4bb !important;
-  padding-top: 10px !important;
-  border-top: 1px solid #1e2e3f !important;
-  margin-top: auto !important;
-}
-
-.claims-count-indicator {
+.box-live-pill {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 5px !important;
-  color: #cbd5e1 !important;
-  font-weight: 600 !important;
-  font-size: 11px !important;
+  gap: 4px !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px !important;
+  padding: 1px 7px !important;
+  border-radius: 12px !important;
+  background: rgba(16, 185, 129, 0.14) !important;
+  border: 1px solid rgba(16, 185, 129, 0.4) !important;
+  color: #34d399 !important;
 }
 
-.pulse-dot-live {
-  width: 6px !important;
-  height: 6px !important;
+.box-live-pill .pulse-pip {
+  width: 5px !important;
+  height: 5px !important;
   border-radius: 50% !important;
-  background: #475569 !important;
-}
-
-.pulse-dot-live.active {
   background: #10b981 !important;
   box-shadow: 0 0 6px #10b981 !important;
   animation: pulseDotLive 2s infinite ease-in-out !important;
 }
 
-@keyframes pulseDotLive {
-  0% { transform: scale(0.9); opacity: 0.7; }
-  50% { transform: scale(1.3); opacity: 1; }
-  100% { transform: scale(0.9); opacity: 0.7; }
+.box-sub-title {
+  font-size: 11px !important;
+  color: #8da4bb !important;
+  margin: 0 !important;
+  line-height: 1.3 !important;
 }
 
-.live-rank-word {
-  font-size: 10px !important;
+/* Timeframe Segmented Switch */
+.box-controls {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.leaderboard-scope-switch {
+  display: inline-flex !important;
+  align-items: center !important;
+  background: #091018 !important;
+  border: 1px solid #1f2f42 !important;
+  border-radius: 8px !important;
+  padding: 2px !important;
+  gap: 2px !important;
+}
+
+.leaderboard-scope-switch .scope-btn {
+  background: transparent !important;
+  border: none !important;
+  color: #8da4bb !important;
+  font-size: 11px !important;
   font-weight: 700 !important;
-  color: #71889f !important;
+  padding: 4px 10px !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  line-height: 1.2 !important;
 }
 
-.live-rank-word.text-gold {
+.leaderboard-scope-switch .scope-btn:hover {
+  color: #f1f5f9 !important;
+}
+
+.leaderboard-scope-switch .scope-btn.active {
+  background: #19314d !important;
+  color: #38bdf8 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* 4 RSVG Admins Sub-Grid in One Box */
+.box-admins-row {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  margin-bottom: 10px !important;
+}
+
+.admin-slot-item {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  background: linear-gradient(135deg, rgba(23, 35, 49, 0.85), rgba(15, 23, 33, 0.95)) !important;
+  border: 1px solid #1f3144 !important;
+  border-radius: 10px !important;
+  padding: 10px 12px !important;
+  min-width: 0 !important;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease !important;
+}
+
+.admin-slot-item:hover {
+  transform: translateY(-2px) !important;
+}
+
+/* Admin Accents */
+.admin-slot-item.slot-admin-r {
+  border-top: 2.5px solid #ef4444 !important;
+}
+.admin-slot-item.slot-admin-r:hover {
+  border-color: rgba(239, 68, 68, 0.6) !important;
+}
+
+.admin-slot-item.slot-admin-s {
+  border-top: 2.5px solid #0ea5e9 !important;
+}
+.admin-slot-item.slot-admin-s:hover {
+  border-color: rgba(14, 165, 233, 0.6) !important;
+}
+
+.admin-slot-item.slot-admin-v {
+  border-top: 2.5px solid #a855f7 !important;
+}
+.admin-slot-item.slot-admin-v:hover {
+  border-color: rgba(168, 85, 247, 0.6) !important;
+}
+
+.admin-slot-item.slot-admin-g {
+  border-top: 2.5px solid #10b981 !important;
+}
+.admin-slot-item.slot-admin-g:hover {
+  border-color: rgba(16, 185, 129, 0.6) !important;
+}
+
+/* Highlight #1 */
+.admin-slot-item.is-first {
+  background: linear-gradient(135deg, rgba(32, 47, 66, 0.95), rgba(18, 27, 39, 0.98)) !important;
+  border-color: rgba(245, 158, 11, 0.55) !important;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.14) !important;
+}
+
+/* Slot Identity */
+.slot-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 6px !important;
+}
+
+.slot-identity {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+
+.slot-tag-badge {
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 900 !important;
+  font-size: 11px !important;
+  flex-shrink: 0 !important;
+}
+
+.slot-tag-badge.badge-r {
+  background: rgba(239, 68, 68, 0.22) !important;
+  color: #ef4444 !important;
+  border: 1px solid rgba(239, 68, 68, 0.5) !important;
+}
+
+.slot-tag-badge.badge-s {
+  background: rgba(14, 165, 233, 0.22) !important;
+  color: #0ea5e9 !important;
+  border: 1px solid rgba(14, 165, 233, 0.5) !important;
+}
+
+.slot-tag-badge.badge-v {
+  background: rgba(168, 85, 247, 0.22) !important;
+  color: #a855f7 !important;
+  border: 1px solid rgba(168, 85, 247, 0.5) !important;
+}
+
+.slot-tag-badge.badge-g {
+  background: rgba(16, 185, 129, 0.22) !important;
+  color: #10b981 !important;
+  border: 1px solid rgba(16, 185, 129, 0.5) !important;
+}
+
+.slot-names {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+}
+
+.slot-admin-name {
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  color: #f1f5f9 !important;
+  line-height: 1.1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.slot-admin-role {
+  font-size: 9px !important;
+  font-weight: 600 !important;
+  color: #728a9f !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px !important;
+  line-height: 1.1 !important;
+}
+
+.slot-rank-chip {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  padding: 1px 5px !important;
+  border-radius: 5px !important;
+  flex-shrink: 0 !important;
+}
+
+.slot-rank-chip.rank-1 {
+  background: rgba(245, 158, 11, 0.22) !important;
   color: #fbbf24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.5) !important;
 }
 
-/* Responsive Rules for the Top Operational Strip & Cards */
-@media (max-width: 1400px) {
+.slot-rank-chip.rank-2 {
+  background: rgba(148, 163, 184, 0.2) !important;
+  color: #e2e8f0 !important;
+  border: 1px solid rgba(148, 163, 184, 0.4) !important;
+}
+
+.slot-rank-chip.rank-3 {
+  background: rgba(180, 83, 9, 0.2) !important;
+  color: #d97706 !important;
+  border: 1px solid rgba(180, 83, 9, 0.4) !important;
+}
+
+.slot-rank-chip.rank-4 {
+  background: rgba(51, 65, 85, 0.3) !important;
+  color: #94a3b8 !important;
+  border: 1px solid rgba(71, 85, 105, 0.3) !important;
+}
+
+/* Slot Body & Values */
+.slot-body {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+}
+
+.slot-primary-val {
+  font-size: clamp(16px, 1.4vw, 20px) !important;
+  font-weight: 900 !important;
+  color: #f8fafc !important;
+  letter-spacing: -0.4px !important;
+  line-height: 1.1 !important;
+}
+
+.slot-primary-val .val-curr {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  color: #8da4bb !important;
+  margin-right: 3px !important;
+}
+
+.slot-secondary-info {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.slot-claims-count {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 11px !important;
+  color: #cbd5e1 !important;
+  font-weight: 600 !important;
+}
+
+.slot-pulse-dot {
+  width: 5px !important;
+  height: 5px !important;
+  border-radius: 50% !important;
+  background: #475569 !important;
+}
+
+.slot-pulse-dot.has-claims {
+  background: #10b981 !important;
+  box-shadow: 0 0 5px #10b981 !important;
+}
+
+.slot-alt-metric {
+  font-size: 10px !important;
+  color: #728a9f !important;
+  font-weight: 500 !important;
+}
+
+/* Box Footer */
+.box-footer-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  font-size: 11px !important;
+  color: #728a9f !important;
+  padding-top: 8px !important;
+  border-top: 1px solid #1a2736 !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+}
+
+.box-totals-note strong {
+  color: #e2e8f0 !important;
+}
+
+.box-sync-note {
+  font-size: 10px !important;
+  color: #556c82 !important;
+}
+
+/* Responsive Rules for the Top Operational Strip & Box */
+@media (max-width: 1200px) {
   .stats-bar.top-operational-strip {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  }
-  .stats-bar.platform-metrics-bar {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-columns: 1fr !important;
   }
 }
 
 @media (max-width: 900px) {
-  .stats-bar.top-operational-strip {
+  .box-admins-row {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
   .stats-bar.platform-metrics-bar {
@@ -4064,10 +4249,10 @@
   }
 }
 
-@media (max-width: 580px) {
-  .stats-bar.top-operational-strip {
+@media (max-width: 520px) {
+  .box-admins-row {
     grid-template-columns: 1fr !important;
-    gap: 10px !important;
+    gap: 8px !important;
   }
   .stats-bar.platform-metrics-bar {
     grid-template-columns: 1fr !important;

@@ -14,22 +14,23 @@ function createAdminLeaderboard(models = {}, options = {}) {
   const nowFn = options.now || (() => new Date());
 
   /**
-   * Formats a Date object to YYYY-MM-DD in local time
+   * Formats a Date object to YYYY-MM-DD in East Africa Time (UTC+3)
    */
-  function formatDateKey(date) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
+  function getEatDateKey(date = nowFn()) {
+    const eatDate = new Date(date.getTime() + (3 * 60 + date.getTimezoneOffset()) * 60000);
+    const y = eatDate.getFullYear();
+    const m = String(eatDate.getMonth() + 1).padStart(2, '0');
+    const d = String(eatDate.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
   }
 
   /**
-   * Parse date or default to today (clamping to >= 2026-11-07)
+   * Parse date or default to today in EAT (clamping to >= 2026-11-07)
    */
   function resolveTargetDate(inputDate) {
     let dateStr = String(inputDate || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      dateStr = formatDateKey(nowFn());
+      dateStr = getEatDateKey(nowFn());
     }
     // Beginning with today 7th November: clamp to 2026-11-07 if before
     if (dateStr < LEADERBOARD_START_DATE) {
@@ -39,41 +40,57 @@ function createAdminLeaderboard(models = {}, options = {}) {
   }
 
   /**
-   * Calculates the daily leadership board for RSVG admins on the given date
+   * Calculates the daily leadership board for RSVG admins on the given date (24h window),
+   * refreshing at 12:00 AM midnight EAT, and also computes all-time cumulative claims.
    */
   async function getDailyLeaderboard(targetDateStr) {
     const dateStr = resolveTargetDate(targetDateStr);
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const startOfDay = new Date(y, m - 1, d, 0, 0, 0, 0);
-    const endOfDay = new Date(y, m - 1, d, 23, 59, 59, 999);
 
-    let txs = [];
+    // 24-hour day window in East Africa Time (UTC+3, no DST)
+    // 12:00 AM (00:00:00.000) to 11:59:59 PM (23:59:59.999)
+    const startOfDay = new Date(`${dateStr}T00:00:00.000+03:00`);
+    const endOfDay = new Date(`${dateStr}T23:59:59.999+03:00`);
+
+    let allClaimedTxs = [];
     if (Transaction) {
-      txs = await Transaction.find({
+      allClaimedTxs = await Transaction.find({
         status: 'completed',
-        admin_tag: { $in: ['R', 'S', 'V', 'G'] },
-        $or: [
-          { admin_tagged_at: { $gte: startOfDay, $lte: endOfDay } },
-          { admin_tagged_at: null, created_at: { $gte: startOfDay, $lte: endOfDay } }
-        ]
+        admin_tag: { $in: ['R', 'S', 'V', 'G'] }
       }).select('id amount admin_tag admin_tagged_at created_at').lean();
     }
 
-    const totalDayClaims = txs.length;
-    const totalDayVolume = txs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+    // Filter strictly for transactions created within the 24 hours of target date
+    // Refreshes at 12:00 AM midnight (00:00:00 EAT)
+    const todayTxs = allClaimedTxs.filter(t => {
+      const cDate = t.created_at ? new Date(t.created_at) : null;
+      return cDate && cDate >= startOfDay && cDate <= endOfDay;
+    });
+
+    const totalDayClaims = todayTxs.length;
+    const totalDayVolume = todayTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
     const overallAvgTicket = totalDayClaims > 0 ? Math.round(totalDayVolume / totalDayClaims) : 0;
+
+    const totalAllTimeClaims = allClaimedTxs.length;
+    const totalAllTimeVolume = allClaimedTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
     // Process each of the RSVG admins
     const entries = RSVG_ADMINS_METADATA.map(admin => {
-      const adminTxs = txs.filter(t => t.admin_tag === admin.tag);
-      const claimedCount = adminTxs.length;
-      const totalVolume = adminTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+      // Today (24h)
+      const adminTodayTxs = todayTxs.filter(t => t.admin_tag === admin.tag);
+      const claimedCount = adminTodayTxs.length;
+      const totalVolume = adminTodayTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
       const avgTicket = claimedCount > 0 ? Math.round(totalVolume / claimedCount) : 0;
-      const maxTicket = adminTxs.length > 0 ? Math.max(...adminTxs.map(t => Number(t.amount) || 0)) : 0;
-      const minTicket = adminTxs.length > 0 ? Math.min(...adminTxs.map(t => Number(t.amount) || 0)) : 0;
+      const maxTicket = adminTodayTxs.length > 0 ? Math.max(...adminTodayTxs.map(t => Number(t.amount) || 0)) : 0;
+      const minTicket = adminTodayTxs.length > 0 ? Math.min(...adminTodayTxs.map(t => Number(t.amount) || 0)) : 0;
+
+      // All-time
+      const adminAllTimeTxs = allClaimedTxs.filter(t => t.admin_tag === admin.tag);
+      const allTimeClaimedCount = adminAllTimeTxs.length;
+      const allTimeVolume = adminAllTimeTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+      const allTimeAvgTicket = allTimeClaimedCount > 0 ? Math.round(allTimeVolume / allTimeClaimedCount) : 0;
 
       // Calculate timestamps to find latest claim
-      const timestamps = adminTxs
+      const timestamps = adminAllTimeTxs
         .map(t => t.admin_tagged_at || t.created_at)
         .filter(Boolean)
         .map(ts => new Date(ts).getTime())
@@ -105,6 +122,9 @@ function createAdminLeaderboard(models = {}, options = {}) {
         score,
         basePoints,
         volumePoints,
+        allTimeClaimedCount,
+        allTimeVolume,
+        allTimeAvgTicket,
         lastClaimedAt
       };
     });
@@ -119,12 +139,21 @@ function createAdminLeaderboard(models = {}, options = {}) {
       return a.tag.localeCompare(b.tag);
     });
 
-    const ranked = entries.map((item, index) => ({
-      ...item,
-      rank: index + 1
-    }));
+    entries.forEach((item, index) => {
+      item.rank = index + 1;
+    });
 
-    const leadingAdmin = ranked[0]?.claimedCount > 0 ? ranked[0].tag : null;
+    // Also calculate all-time rank
+    const allTimeSorted = [...entries].sort((a, b) => {
+      if (b.allTimeVolume !== a.allTimeVolume) return b.allTimeVolume - a.allTimeVolume;
+      if (b.allTimeClaimedCount !== a.allTimeClaimedCount) return b.allTimeClaimedCount - a.allTimeClaimedCount;
+      return a.tag.localeCompare(b.tag);
+    });
+    allTimeSorted.forEach((item, index) => {
+      item.allTimeRank = index + 1;
+    });
+
+    const leadingAdmin = entries[0]?.claimedCount > 0 ? entries[0].tag : null;
 
     return {
       success: true,
@@ -133,16 +162,19 @@ function createAdminLeaderboard(models = {}, options = {}) {
       serverTime: nowFn().toISOString(),
       totalDayClaims,
       totalDayVolume,
+      totalAllTimeClaims,
+      totalAllTimeVolume,
       overallAvgTicket,
       leadingAdmin,
       scoringFormula: 'Score = (Completed Claims × 100) + (Volume in KES × 0.05)',
-      leaderboard: ranked
+      leaderboard: entries
     };
   }
 
   return {
     getDailyLeaderboard,
     resolveTargetDate,
+    getEatDateKey,
     LEADERBOARD_START_DATE,
     RSVG_ADMINS_METADATA
   };

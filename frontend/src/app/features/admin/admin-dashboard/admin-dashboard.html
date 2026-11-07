@@ -61,45 +61,108 @@
   <p class="payhero-error" *ngIf="payHeroError">{{ payHeroError }}</p>
 </article>
 
-<!-- 4 RSVG ADMIN DAILY CLAIMED MONEY COMPONENTS (BESIDE PAYHERO, ARRANGED IN TERMS OF MONEY CLAIMED TODAY) -->
-<article
-  class="stat-card admin-daily-claim-card"
-  *ngFor="let admin of sortedDailyAdmins; let idx = index; trackBy: trackByAdminTag"
-  [ngClass]="'card-admin-' + admin.tag.toLowerCase()"
-  [class.rank-leader]="idx === 0 && admin.totalVolume > 0"
-  [attr.aria-label]="'Admin ' + admin.tag + ': KES ' + admin.totalVolume + ' claimed today'"
->
-  <div class="stat-card-top">
-    <div class="admin-claim-head-left">
-      <span class="admin-claim-avatar-badge" [ngClass]="'tag-' + admin.tag.toLowerCase()">
-        {{ admin.tag }}
-      </span>
-      <div class="admin-claim-name-block">
-        <span class="stat-label">Admin {{ admin.tag }}</span>
-        <span class="admin-claim-role-tag">{{ admin.role }}</span>
+<!-- RSVG ADMIN CLAIMS LEADERBOARD (NEATLY ARRANGED IN ONE BOX BESIDE PAYHERO) -->
+<article class="stat-card admin-leaderboard-box" aria-label="RSVG Admin Claims Leaderboard">
+  <div class="leaderboard-box-header">
+    <div class="box-title-cluster">
+      <div class="box-trophy-badge" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 9H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2"/>
+          <path d="M18 9h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/>
+          <path d="M4 22h16"/>
+          <path d="M10 14.66V17c0 .55-.45 1-1 1H7v4h10v-4h-2c-.55 0-1-.45-1-1v-2.34"/>
+          <path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/>
+        </svg>
+      </div>
+      <div class="box-text-headings">
+        <div class="box-title-line">
+          <h3 class="box-main-title">RSVG Admin Claims</h3>
+          <span class="box-live-pill"><span class="pulse-pip"></span> LIVE</span>
+        </div>
+        <p class="box-sub-title">
+          {{ leaderboardViewMode === 'today' ? 'Today\'s 24h claims · Resets 12:00 AM (00:00 EAT)' : 'All-time total cumulative claims & volume' }}
+        </p>
       </div>
     </div>
-    <div class="admin-live-rank-chip" [ngClass]="'rank-' + (idx + 1)">
-      <span class="rank-chip-medal">{{ idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : '🎖️')) }}</span>
-      <span class="rank-chip-num mono">#{{ idx + 1 }}</span>
+
+    <!-- VIEW TIMEFRAME TOGGLE: TODAY (24H) vs ALL-TIME -->
+    <div class="box-controls">
+      <div class="leaderboard-scope-switch" role="group" aria-label="Leaderboard timeframe">
+        <button
+          type="button"
+          class="scope-btn"
+          [class.active]="leaderboardViewMode === 'today'"
+          (click)="setLeaderboardViewMode('today')"
+          title="Show claims within today (24h) only, refreshes at 12:00 AM">
+          Today (24h)
+        </button>
+        <button
+          type="button"
+          class="scope-btn"
+          [class.active]="leaderboardViewMode === 'alltime'"
+          (click)="setLeaderboardViewMode('alltime')"
+          title="Show total claims of all time">
+          All-Time
+        </button>
+      </div>
     </div>
   </div>
 
-  <div class="admin-claim-body">
-    <span class="stat-currency">KES Claimed Today</span>
-    <strong class="stat-val admin-claim-amount mono">
-      <span class="curr-prefix">KES</span>{{ admin.totalVolume | number:'1.0-0' }}
-    </strong>
+  <!-- THE 4 RSVG ADMINS NEATLY ARRANGED IN THIS BOX -->
+  <div class="box-admins-row">
+    <div
+      *ngFor="let admin of activeLeaderboardAdmins; let idx = index; trackBy: trackByAdminTag"
+      class="admin-slot-item"
+      [ngClass]="'slot-admin-' + admin.tag.toLowerCase()"
+      [class.is-first]="idx === 0 && ((leaderboardViewMode === 'today' ? admin.totalVolume : (admin.allTimeVolume || 0)) > 0)"
+    >
+      <div class="slot-head">
+        <div class="slot-identity">
+          <span class="slot-tag-badge" [ngClass]="'badge-' + admin.tag.toLowerCase()">
+            {{ admin.tag }}
+          </span>
+          <div class="slot-names">
+            <strong class="slot-admin-name">Admin {{ admin.tag }}</strong>
+            <span class="slot-admin-role">{{ admin.role }}</span>
+          </div>
+        </div>
+        <div class="slot-rank-chip" [ngClass]="'rank-' + (idx + 1)">
+          <span>{{ idx === 0 ? '🥇 #1' : (idx === 1 ? '🥈 #2' : (idx === 2 ? '🥉 #3' : '🎖️ #4')) }}</span>
+        </div>
+      </div>
+
+      <div class="slot-body">
+        <div class="slot-primary-val mono">
+          <span class="val-curr">KES</span>{{ (leaderboardViewMode === 'today' ? admin.totalVolume : (admin.allTimeVolume || 0)) | number:'1.0-0' }}
+        </div>
+        <div class="slot-secondary-info">
+          <span class="slot-claims-count">
+            <span class="slot-pulse-dot" [class.has-claims]="(leaderboardViewMode === 'today' ? admin.claimedCount : (admin.allTimeClaimedCount || 0)) > 0"></span>
+            <strong>{{ leaderboardViewMode === 'today' ? admin.claimedCount : (admin.allTimeClaimedCount || 0) }}</strong> claim{{ (leaderboardViewMode === 'today' ? admin.claimedCount : (admin.allTimeClaimedCount || 0)) === 1 ? '' : 's' }}
+          </span>
+          <span class="slot-alt-metric">
+            {{ leaderboardViewMode === 'today'
+                ? ('All-time: KES ' + ((admin.allTimeVolume || 0) | number:'1.0-0'))
+                : ('Today: KES ' + (admin.totalVolume | number:'1.0-0')) }}
+          </span>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div class="stat-card-footer admin-claim-card-footer">
-    <span class="claims-count-indicator">
-      <span class="pulse-dot-live" [class.active]="admin.claimedCount > 0"></span>
-      <strong>{{ admin.claimedCount }}</strong> claim{{ admin.claimedCount === 1 ? '' : 's' }}
-    </span>
-    <span class="stat-footnote live-rank-word" [class.text-gold]="idx === 0 && admin.totalVolume > 0">
-      {{ idx === 0 && admin.totalVolume > 0 ? '👑 Leader' : 'Rank #' + (idx + 1) }}
-    </span>
+  <!-- BOX FOOTER WITH TOTALS & REFRESH NOTE -->
+  <div class="box-footer-row">
+    <div class="box-totals-note">
+      <span *ngIf="leaderboardViewMode === 'today'">
+        Today Total: <strong>KES {{ (leaderboardData?.totalDayVolume || 0) | number:'1.0-0' }}</strong> ({{ leaderboardData?.totalDayClaims || 0 }} claims) · Resets at 12:00 AM (00:00 EAT)
+      </span>
+      <span *ngIf="leaderboardViewMode === 'alltime'">
+        All-Time Total: <strong>KES {{ (leaderboardData?.totalAllTimeVolume || 0) | number:'1.0-0' }}</strong> ({{ leaderboardData?.totalAllTimeClaims || 0 }} claims)
+      </span>
+    </div>
+    <div class="box-sync-note">
+      <span>Auto-synced live on claim</span>
+    </div>
   </div>
 </article>
 </section>
