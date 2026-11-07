@@ -3945,45 +3945,32 @@
   line-height: 1.3 !important;
 }
 
-/* Timeframe Segmented Switch */
+/* Daily Date Pill & Refresh Control */
 .box-controls {
   display: flex !important;
   align-items: center !important;
   gap: 8px !important;
 }
 
-.leaderboard-scope-switch {
+.daily-date-pill {
   display: inline-flex !important;
   align-items: center !important;
-  background: #091018 !important;
-  border: 1px solid #1f2f42 !important;
+  gap: 6px !important;
+  background: #0a121b !important;
+  border: 1px solid #1f3144 !important;
   border-radius: 8px !important;
-  padding: 2px !important;
-  gap: 2px !important;
-}
-
-.leaderboard-scope-switch .scope-btn {
-  background: transparent !important;
-  border: none !important;
-  color: #8da4bb !important;
+  padding: 5px 10px !important;
   font-size: 11px !important;
   font-weight: 700 !important;
-  padding: 4px 10px !important;
-  border-radius: 6px !important;
-  cursor: pointer !important;
-  transition: all 0.15s ease !important;
-  line-height: 1.2 !important;
+  color: #cbd5e1 !important;
+  white-space: nowrap !important;
 }
 
-.leaderboard-scope-switch .scope-btn:hover {
-  color: #f1f5f9 !important;
-}
-
-.leaderboard-scope-switch .scope-btn.active {
-  background: #19314d !important;
+.daily-date-pill .calendar-mini-icon {
+  width: 13px !important;
+  height: 13px !important;
   color: #38bdf8 !important;
-  font-weight: 800 !important;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35) !important;
+  flex-shrink: 0 !important;
 }
 
 /* 4 RSVG Admins Sub-Grid in One Box */
@@ -3999,11 +3986,11 @@
   display: flex !important;
   flex-direction: column !important;
   justify-content: space-between !important;
-  gap: 8px !important;
+  gap: 10px !important;
   background: linear-gradient(135deg, rgba(23, 35, 49, 0.85), rgba(15, 23, 33, 0.95)) !important;
   border: 1px solid #1f3144 !important;
   border-radius: 10px !important;
-  padding: 10px 12px !important;
+  padding: 12px 13px !important;
   min-width: 0 !important;
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease !important;
 }
@@ -4048,7 +4035,7 @@
   box-shadow: 0 4px 16px rgba(245, 158, 11, 0.14) !important;
 }
 
-/* Slot Identity */
+/* Slot Identity (Clean, No Overlap) */
 .slot-head {
   display: flex !important;
   align-items: center !important;
@@ -4059,19 +4046,19 @@
 .slot-identity {
   display: flex !important;
   align-items: center !important;
-  gap: 6px !important;
+  gap: 7px !important;
   min-width: 0 !important;
 }
 
 .slot-tag-badge {
-  width: 22px !important;
-  height: 22px !important;
+  width: 24px !important;
+  height: 24px !important;
   border-radius: 6px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   font-weight: 900 !important;
-  font-size: 11px !important;
+  font-size: 11.5px !important;
   flex-shrink: 0 !important;
 }
 
@@ -4099,37 +4086,21 @@
   border: 1px solid rgba(16, 185, 129, 0.5) !important;
 }
 
-.slot-names {
-  display: flex !important;
-  flex-direction: column !important;
-  min-width: 0 !important;
-}
-
 .slot-admin-name {
-  font-size: 12px !important;
+  font-size: 12.5px !important;
   font-weight: 800 !important;
-  color: #f1f5f9 !important;
-  line-height: 1.1 !important;
+  color: #f8fafc !important;
+  line-height: 1.2 !important;
   white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-}
-
-.slot-admin-role {
-  font-size: 9px !important;
-  font-weight: 600 !important;
-  color: #728a9f !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.3px !important;
-  line-height: 1.1 !important;
 }
 
 .slot-rank-chip {
   font-size: 10px !important;
   font-weight: 800 !important;
-  padding: 1px 5px !important;
-  border-radius: 5px !important;
+  padding: 2px 6px !important;
+  border-radius: 6px !important;
   flex-shrink: 0 !important;
+  white-space: nowrap !important;
 }
 
 .slot-rank-chip.rank-1 {
@@ -4160,11 +4131,11 @@
 .slot-body {
   display: flex !important;
   flex-direction: column !important;
-  gap: 3px !important;
+  gap: 5px !important;
 }
 
 .slot-primary-val {
-  font-size: clamp(16px, 1.4vw, 20px) !important;
+  font-size: clamp(16px, 1.4vw, 21px) !important;
   font-weight: 900 !important;
   color: #f8fafc !important;
   letter-spacing: -0.4px !important;
@@ -4175,22 +4146,24 @@
   font-size: 10px !important;
   font-weight: 600 !important;
   color: #8da4bb !important;
-  margin-right: 3px !important;
+  margin-right: 4px !important;
 }
 
-.slot-secondary-info {
+.slot-meta-row {
   display: flex !important;
-  flex-direction: column !important;
-  gap: 2px !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 6px !important;
 }
 
 .slot-claims-count {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 4px !important;
+  gap: 5px !important;
   font-size: 11px !important;
   color: #cbd5e1 !important;
   font-weight: 600 !important;
+  white-space: nowrap !important;
 }
 
 .slot-pulse-dot {
@@ -4198,6 +4171,7 @@
   height: 5px !important;
   border-radius: 50% !important;
   background: #475569 !important;
+  flex-shrink: 0 !important;
 }
 
 .slot-pulse-dot.has-claims {
@@ -4205,10 +4179,40 @@
   box-shadow: 0 0 5px #10b981 !important;
 }
 
-.slot-alt-metric {
-  font-size: 10px !important;
-  color: #728a9f !important;
-  font-weight: 500 !important;
+.slot-share-pct {
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  color: #8da4bb !important;
+}
+
+.slot-progress-track {
+  width: 100% !important;
+  height: 4px !important;
+  background: #0b131d !important;
+  border-radius: 999px !important;
+  overflow: hidden !important;
+}
+
+.slot-progress-fill {
+  height: 100% !important;
+  border-radius: 999px !important;
+  transition: width 0.35s ease !important;
+}
+
+.slot-progress-fill.fill-r {
+  background: linear-gradient(90deg, #ef4444, #f87171) !important;
+}
+
+.slot-progress-fill.fill-s {
+  background: linear-gradient(90deg, #0ea5e9, #38bdf8) !important;
+}
+
+.slot-progress-fill.fill-v {
+  background: linear-gradient(90deg, #a855f7, #c084fc) !important;
+}
+
+.slot-progress-fill.fill-g {
+  background: linear-gradient(90deg, #10b981, #34d399) !important;
 }
 
 /* Box Footer */

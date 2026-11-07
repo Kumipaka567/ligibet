@@ -10,7 +10,7 @@ const RSVG_ADMINS_METADATA = [
 const LEADERBOARD_START_DATE = '2026-11-07';
 
 function createAdminLeaderboard(models = {}, options = {}) {
-  const { Transaction } = models;
+  const { Transaction, User } = models;
   const nowFn = options.now || (() => new Date());
 
   /**
@@ -41,7 +41,8 @@ function createAdminLeaderboard(models = {}, options = {}) {
 
   /**
    * Calculates the daily leadership board for RSVG admins on the given date (24h window),
-   * refreshing at 12:00 AM midnight EAT, and also computes all-time cumulative claims.
+   * strictly for completed deposits (type === 'deposit', status === 'completed')
+   * created within that 24-hour day, refreshing at 12:00 AM midnight EAT.
    */
   async function getDailyLeaderboard(targetDateStr) {
     const dateStr = resolveTargetDate(targetDateStr);
@@ -51,17 +52,33 @@ function createAdminLeaderboard(models = {}, options = {}) {
     const startOfDay = new Date(`${dateStr}T00:00:00.000+03:00`);
     const endOfDay = new Date(`${dateStr}T23:59:59.999+03:00`);
 
-    let allClaimedTxs = [];
-    if (Transaction) {
-      allClaimedTxs = await Transaction.find({
-        status: 'completed',
-        admin_tag: { $in: ['R', 'S', 'V', 'G'] }
-      }).select('id amount admin_tag admin_tagged_at created_at').lean();
+    let staffUserIds = new Set();
+    if (User && typeof User.find === 'function') {
+      try {
+        const staffUsers = await User.find({ role: { $in: ['admin', 'superadmin'] } }).select('id').lean();
+        if (Array.isArray(staffUsers)) {
+          staffUserIds = new Set(staffUsers.map(u => Number(u.id)));
+        }
+      } catch (_e) {
+        // Ignore if User mock is not provided in unit tests
+      }
     }
 
-    // Filter strictly for transactions created within the 24 hours of target date
-    // Refreshes at 12:00 AM midnight (00:00:00 EAT)
-    const todayTxs = allClaimedTxs.filter(t => {
+    let queriedTxs = [];
+    if (Transaction) {
+      queriedTxs = await Transaction.find({
+        type: 'deposit',
+        status: 'completed',
+        admin_tag: { $in: ['R', 'S', 'V', 'G'] },
+        created_at: { $gte: startOfDay, $lte: endOfDay }
+      }).select('id user_id type status amount admin_tag admin_tagged_at created_at').lean();
+    }
+
+    // Defensive filter: strictly completed deposits within the 24-hour window, excluding staff accounts
+    const todayTxs = (queriedTxs || []).filter(t => {
+      if (t.type && t.type !== 'deposit') return false;
+      if (t.status && t.status !== 'completed') return false;
+      if (t.user_id !== undefined && staffUserIds.has(Number(t.user_id))) return false;
       const cDate = t.created_at ? new Date(t.created_at) : null;
       return cDate && cDate >= startOfDay && cDate <= endOfDay;
     });
@@ -70,12 +87,8 @@ function createAdminLeaderboard(models = {}, options = {}) {
     const totalDayVolume = todayTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
     const overallAvgTicket = totalDayClaims > 0 ? Math.round(totalDayVolume / totalDayClaims) : 0;
 
-    const totalAllTimeClaims = allClaimedTxs.length;
-    const totalAllTimeVolume = allClaimedTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-
-    // Process each of the RSVG admins
+    // Process each of the RSVG admins for today's 24h claims
     const entries = RSVG_ADMINS_METADATA.map(admin => {
-      // Today (24h)
       const adminTodayTxs = todayTxs.filter(t => t.admin_tag === admin.tag);
       const claimedCount = adminTodayTxs.length;
       const totalVolume = adminTodayTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
@@ -83,14 +96,8 @@ function createAdminLeaderboard(models = {}, options = {}) {
       const maxTicket = adminTodayTxs.length > 0 ? Math.max(...adminTodayTxs.map(t => Number(t.amount) || 0)) : 0;
       const minTicket = adminTodayTxs.length > 0 ? Math.min(...adminTodayTxs.map(t => Number(t.amount) || 0)) : 0;
 
-      // All-time
-      const adminAllTimeTxs = allClaimedTxs.filter(t => t.admin_tag === admin.tag);
-      const allTimeClaimedCount = adminAllTimeTxs.length;
-      const allTimeVolume = adminAllTimeTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-      const allTimeAvgTicket = allTimeClaimedCount > 0 ? Math.round(allTimeVolume / allTimeClaimedCount) : 0;
-
-      // Calculate timestamps to find latest claim
-      const timestamps = adminAllTimeTxs
+      // Latest claim timestamp today
+      const timestamps = adminTodayTxs
         .map(t => t.admin_tagged_at || t.created_at)
         .filter(Boolean)
         .map(ts => new Date(ts).getTime())
@@ -98,7 +105,7 @@ function createAdminLeaderboard(models = {}, options = {}) {
       const lastClaimedAt = timestamps.length > 0 ? new Date(timestamps[0]).toISOString() : null;
 
       // Performance score per transaction claimed:
-      // Base: 100 points per claimed completed transaction
+      // Base: 100 points per claimed completed deposit
       // Volume: 1 point for every 20 KES claimed (totalVolume * 0.05)
       const basePoints = claimedCount * 100;
       const volumePoints = Math.round(totalVolume * 0.05);
@@ -122,17 +129,11 @@ function createAdminLeaderboard(models = {}, options = {}) {
         score,
         basePoints,
         volumePoints,
-        allTimeClaimedCount,
-        allTimeVolume,
-        allTimeAvgTicket,
         lastClaimedAt
       };
     });
 
-    // Sort entries in terms of total amount of money claimed within the day (descending):
-    // 1. By totalVolume descending
-    // 2. By claimedCount descending
-    // 3. By tag alphabetically
+    // Sort entries strictly by daily claimed money (totalVolume descending), then claimedCount descending, then tag
     entries.sort((a, b) => {
       if (b.totalVolume !== a.totalVolume) return b.totalVolume - a.totalVolume;
       if (b.claimedCount !== a.claimedCount) return b.claimedCount - a.claimedCount;
@@ -141,16 +142,6 @@ function createAdminLeaderboard(models = {}, options = {}) {
 
     entries.forEach((item, index) => {
       item.rank = index + 1;
-    });
-
-    // Also calculate all-time rank
-    const allTimeSorted = [...entries].sort((a, b) => {
-      if (b.allTimeVolume !== a.allTimeVolume) return b.allTimeVolume - a.allTimeVolume;
-      if (b.allTimeClaimedCount !== a.allTimeClaimedCount) return b.allTimeClaimedCount - a.allTimeClaimedCount;
-      return a.tag.localeCompare(b.tag);
-    });
-    allTimeSorted.forEach((item, index) => {
-      item.allTimeRank = index + 1;
     });
 
     const leadingAdmin = entries[0]?.claimedCount > 0 ? entries[0].tag : null;
@@ -162,11 +153,9 @@ function createAdminLeaderboard(models = {}, options = {}) {
       serverTime: nowFn().toISOString(),
       totalDayClaims,
       totalDayVolume,
-      totalAllTimeClaims,
-      totalAllTimeVolume,
       overallAvgTicket,
       leadingAdmin,
-      scoringFormula: 'Score = (Completed Claims × 100) + (Volume in KES × 0.05)',
+      scoringFormula: 'Score = (Completed Deposit Claims × 100) + (Volume in KES × 0.05)',
       leaderboard: entries
     };
   }
