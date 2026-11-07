@@ -236,6 +236,7 @@ export class AdminSocketService {
   public predatorTextUpdate$ = new BehaviorSubject<string | null>(null);
   public supportTicketUpdated$ = new BehaviorSubject<{ ticket: any } | null>(null);
   public clientClaimed$ = new BehaviorSubject<{ userId: number; tag: string; transactionId?: number } | null>(null);
+  public leaderboardUpdated$ = new BehaviorSubject<{ date?: string; tag?: string; transactionId?: number } | null>(null);
   public pinChanged$ = new BehaviorSubject<{ tags: string[] } | null>(null);
   public timedCrashTimeoutUpdated$ = new BehaviorSubject<{ enabled: boolean } | null>(null);
 
@@ -273,6 +274,9 @@ export class AdminSocketService {
     });
     this.listen('admin_client_claimed', (data: { userId: number; tag: string; transactionId?: number }) => {
       this.clientClaimed$.next(data);
+    });
+    this.listen('admin_leaderboard_updated', (data: { date?: string; tag?: string; transactionId?: number }) => {
+      this.leaderboardUpdated$.next(data);
     });
     this.listen('admin_pin_changed', (data: { tags: string[] }) => this.pinChanged$.next(data));
 
@@ -462,6 +466,7 @@ export class AdminSocketService {
     this.onlinePlayers$.next(null);
     this.accessRevoked$.next(null);
     this.supportTicketUpdated$.next(null);
+    this.leaderboardUpdated$.next(null);
     this.clientClaimed$.next(null);
     this.pinChanged$.next(null);
     this.timedCrashTimeoutUpdated$.next(null);

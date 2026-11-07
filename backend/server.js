@@ -52,6 +52,9 @@ const {
   Counter
 } = require('./models');
 
+const { createAdminLeaderboard } = require('./admin-leaderboard');
+const adminLeaderboard = createAdminLeaderboard({ Transaction, mongoose });
+
 // Collected by the checks below and reported by /healthz. Declared here so the
 // constants that follow can refuse to fall back to an unsafe default.
 const startupConfigurationErrors = [];
@@ -2187,6 +2190,16 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
   }
 });
 
+app.get('/api/admin/leaderboard', authenticateAdminToken, async (req, res) => {
+  try {
+    const data = await adminLeaderboard.getDailyLeaderboard(req.query.date);
+    return res.json(data);
+  } catch (err) {
+    console.error('Admin leaderboard error:', err);
+    return res.status(500).json({ error: 'Failed to calculate admin leadership board' });
+  }
+});
+
 app.get('/api/admin/users', authenticateAdminToken, async (req, res) => {
   try {
     const search = req.query.search ? String(req.query.search).trim() : '';
@@ -2539,6 +2552,7 @@ app.post('/api/admin/transactions/:id/claim-tag', authenticateAdminToken, async 
     await AdminLog.create({ admin_id: req.user.id, action: 'CLAIM_TRANSACTION', target_user_id: tx.user_id,
       details: 'Admin [' + tag + '] claimed completed deposit #' + txId }).catch(() => {});
     adminNamespace.emit('admin_client_claimed', { userId: tx.user_id, tag, transactionId: tx.id });
+    adminNamespace.emit('admin_leaderboard_updated', { date: new Date().toISOString().slice(0, 10), tag, transactionId: tx.id });
     emitRealtimeMutation({ action: 'transaction_tag_claimed', userId: tx.user_id, transaction: tx, user: true });
     return res.json({ message: 'Client claimed by admin ' + tag, transactionId: tx.id, tag: tx.admin_tag });
   } catch (err) {

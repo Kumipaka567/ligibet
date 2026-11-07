@@ -791,6 +791,245 @@
         </article>
       </section>
     </ng-container>
+
+    <!-- ======================================================== -->
+    <!-- RSVG ADMIN LEADERSHIP BOARD (DAILY CLAIMS & PERFORMANCE) -->
+    <!-- ======================================================== -->
+    <section class="panel admin-leaderboard-panel margin-top" aria-label="RSVG Admin Leadership Board">
+      <div class="panel-title-row leaderboard-header-row">
+        <div class="panel-heading-group">
+          <div class="leaderboard-kicker-row">
+            <span class="panel-kicker">Overview · Leadership Analytics</span>
+            <span class="live-pulse-badge" title="Live syncs automatically when an admin claims a client">
+              <span class="pulse-pip"></span>
+              LIVE SYNC
+            </span>
+          </div>
+          <div class="leaderboard-title-line">
+            <div class="leaderboard-trophy-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2a1 1 0 0 1 1 1v1.07A7.002 7.002 0 0 1 19 11v1a5 5 0 0 1-4.064 4.896A6 6 0 0 1 13 18.917V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.083a6 6 0 0 1-1.936-2.021A5 5 0 0 1 5 12v-1a7.002 7.002 0 0 1 6-6.93V3a1 1 0 0 1 1-1Zm0 4a5 5 0 0 0-5 5v1a3 3 0 0 0 3 3h4a3 3 0 0 0 3-3v-1a5 5 0 0 0-5-5Zm-6 3H5a2 2 0 0 0-2 2v1a4 4 0 0 0 3.824 3.995L7 16a6.974 6.974 0 0 1-1-4.14V9Zm12 0v2.86a6.974 6.974 0 0 1-1 4.14 4 4 0 0 0 3.824-3.855L21 12v-1a2 2 0 0 0-2-2h-1Z"/>
+              </svg>
+            </div>
+            <div>
+              <h3>RSVG Admin Leadership Board</h3>
+              <p class="leaderboard-subtitle">Daily completed transactions claimed rankings · Refreshes daily & in real-time</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- DATE CONTROLS & REFRESH -->
+        <div class="panel-action-group leaderboard-action-group">
+          <div class="date-picker-cluster">
+            <button
+              type="button"
+              class="date-nav-btn"
+              (click)="stepLeaderboardDate(-1)"
+              [disabled]="isLeaderboardAtStart()"
+              title="Previous Day"
+              aria-label="Previous Day"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+
+            <button
+              type="button"
+              class="today-quick-btn"
+              [class.active]="isLeaderboardToday()"
+              (click)="resetLeaderboardToToday()"
+              title="Jump to Today"
+            >
+              Today
+            </button>
+
+            <div class="date-input-wrapper">
+              <input
+                type="date"
+                class="leaderboard-date-input mono"
+                [ngModel]="leaderboardSelectedDate"
+                (ngModelChange)="selectLeaderboardDate($event)"
+                [min]="leaderboardStartDate"
+                [max]="getLeaderboardTodayString()"
+                title="Select day (starting 7 Nov 2026)"
+              />
+            </div>
+
+            <button
+              type="button"
+              class="date-nav-btn"
+              (click)="stepLeaderboardDate(1)"
+              [disabled]="isLeaderboardToday()"
+              title="Next Day"
+              aria-label="Next Day"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            class="action-btn outline-sm leaderboard-refresh-btn"
+            (click)="fetchAdminLeaderboard()"
+            [disabled]="leaderboardLoading"
+            title="Refresh daily leaderboard stats"
+          >
+            <svg class="btn-icon" [class.spin]="leaderboardIsLiveSpinning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-1.19"/>
+            </svg>
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- DAILY SUMMARY METRICS STRIP -->
+      <div class="leaderboard-kpi-strip">
+        <div class="kpi-mini-card">
+          <span class="kpi-label">TOTAL CLAIMS TODAY</span>
+          <strong class="kpi-value mono text-gold">{{ leaderboardData?.totalDayClaims || 0 }}</strong>
+          <span class="kpi-sub">Completed deposits claimed</span>
+        </div>
+        <div class="kpi-mini-card">
+          <span class="kpi-label">TOTAL VOLUME CLAIMED</span>
+          <strong class="kpi-value mono">{{ (leaderboardData?.totalDayVolume || 0) | number:'1.0-0' }} <small>KES</small></strong>
+          <span class="kpi-sub">Across all RSVG admins</span>
+        </div>
+        <div class="kpi-mini-card">
+          <span class="kpi-label">AVERAGE TICKET / CLAIM</span>
+          <strong class="kpi-value mono">{{ (leaderboardData?.overallAvgTicket || 0) | number:'1.0-0' }} <small>KES</small></strong>
+          <span class="kpi-sub">Per transaction claimed</span>
+        </div>
+        <div class="kpi-mini-card leader-highlight-card">
+          <span class="kpi-label">DAY LEADER (#1)</span>
+          <div class="leader-badge-inline" *ngIf="leaderboardData?.leadingAdmin; else noLeaderYet">
+            <span class="admin-claimed-tag" [ngClass]="'tag-' + leaderboardData!.leadingAdmin!.toLowerCase()">
+              {{ leaderboardData!.leadingAdmin }}
+            </span>
+            <strong class="leader-name">Admin {{ leaderboardData!.leadingAdmin }}</strong>
+            <span class="crown-icon">👑</span>
+          </div>
+          <ng-template #noLeaderYet>
+            <strong class="kpi-value-muted">Awaiting 1st Claim</strong>
+          </ng-template>
+          <span class="kpi-sub">{{ leaderboardData?.date === getLeaderboardTodayString() ? 'Today (7 Nov)' : leaderboardData?.date }}</span>
+        </div>
+      </div>
+
+      <!-- 4 RSVG ADMIN PODIUM CARDS -->
+      <div class="rsvg-cards-grid" *ngIf="leaderboardData?.leaderboard as admins">
+        <article
+          class="rsvg-admin-card"
+          *ngFor="let admin of admins"
+          [ngClass]="'card-tag-' + admin.tag.toLowerCase()"
+          [class.podium-first]="admin.rank === 1 && admin.claimedCount > 0"
+        >
+          <!-- CARD HEADER: RANK & ADMIN AVATAR -->
+          <div class="admin-card-head">
+            <div class="admin-identity-group">
+              <span class="admin-tag-avatar" [ngClass]="'tag-' + admin.tag.toLowerCase()">
+                {{ admin.tag }}
+              </span>
+              <div class="admin-info-titles">
+                <div class="admin-title-row">
+                  <h4 class="admin-name">{{ admin.name }}</h4>
+                  <span class="admin-dept-pill">{{ admin.role }}</span>
+                </div>
+                <span class="admin-subtext">Initials: [{{ admin.tag }}]</span>
+              </div>
+            </div>
+
+            <!-- RANK PILL / MEDAL -->
+            <div class="admin-rank-badge" [class.rank-gold]="admin.rank === 1" [class.rank-silver]="admin.rank === 2" [class.rank-bronze]="admin.rank === 3" [class.rank-active]="admin.rank === 4">
+              <span class="rank-medal">{{ admin.rank === 1 ? '🥇' : (admin.rank === 2 ? '🥈' : (admin.rank === 3 ? '🥉' : '🎖️')) }}</span>
+              <strong class="rank-number">#{{ admin.rank }}</strong>
+            </div>
+          </div>
+
+          <!-- PRIMARY HERO METRICS: CLAIMS & VOLUME -->
+          <div class="admin-card-hero">
+            <div class="hero-metric-block">
+              <span class="hero-metric-label">TRANSACTIONS CLAIMED</span>
+              <div class="hero-metric-value mono">
+                <span class="big-number">{{ admin.claimedCount }}</span>
+                <span class="hero-metric-unit">claimed</span>
+              </div>
+            </div>
+            <div class="hero-metric-divider"></div>
+            <div class="hero-metric-block">
+              <span class="hero-metric-label">CLAIMED VOLUME</span>
+              <div class="hero-metric-value mono text-gold">
+                <span class="big-number">{{ admin.totalVolume | number:'1.0-0' }}</span>
+                <span class="hero-metric-unit">KES</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- SHARE OF DAILY CLAIMS BAR -->
+          <div class="claims-share-wrapper">
+            <div class="share-label-row">
+              <span class="share-label">Share of Day's Claims</span>
+              <strong class="share-percent mono">{{ admin.sharePercent }}%</strong>
+            </div>
+            <div class="share-progress-track">
+              <div
+                class="share-progress-fill"
+                [ngClass]="'fill-tag-' + admin.tag.toLowerCase()"
+                [style.width.%]="admin.sharePercent"
+              ></div>
+            </div>
+          </div>
+
+          <!-- DETAILED CALCULATION ROW -->
+          <div class="admin-detail-stats-grid">
+            <div class="detail-stat-box">
+              <span class="detail-stat-label">Avg / Claim</span>
+              <strong class="detail-stat-value mono">{{ admin.avgTicket | number:'1.0-0' }} <small>KES</small></strong>
+            </div>
+            <div class="detail-stat-box">
+              <span class="detail-stat-label">Top Claim</span>
+              <strong class="detail-stat-value mono">{{ admin.maxTicket | number:'1.0-0' }} <small>KES</small></strong>
+            </div>
+            <div class="detail-stat-box">
+              <span class="detail-stat-label">Vol Share</span>
+              <strong class="detail-stat-value mono">{{ admin.volumeSharePercent }}%</strong>
+            </div>
+          </div>
+
+          <!-- PERFORMANCE SCORE & FORMULA PILL -->
+          <div class="score-calculation-box">
+            <div class="score-head-row">
+              <span class="score-label">PERFORMANCE SCORE</span>
+              <strong class="score-points mono">{{ admin.score | number:'1.0-0' }} <small>PTS</small></strong>
+            </div>
+            <div class="score-breakdown-sub mono">
+              <span>Claims: +{{ admin.basePoints }} pts</span>
+              <span class="dot-sep">·</span>
+              <span>Volume: +{{ admin.volumePoints }} pts</span>
+            </div>
+          </div>
+
+          <!-- FOOTER: LATEST ACTIVITY -->
+          <div class="admin-card-foot">
+            <span class="last-claim-text" *ngIf="admin.lastClaimedAt">
+              Latest claim: <strong>{{ admin.lastClaimedAt | date:'shortTime' }}</strong>
+            </span>
+            <span class="last-claim-text text-muted" *ngIf="!admin.lastClaimedAt">
+              No claims tagged today
+            </span>
+          </div>
+        </article>
+      </div>
+
+      <!-- FOOTER NOTE & SCORING METHODOLOGY -->
+      <div class="leaderboard-footnote">
+        <div class="footnote-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span><strong>Scoring Formula:</strong> 100 Points per completed transaction claimed + 1 Point per 20 KES processed (5% volume). Refreshes daily at 00:00 EAT.</span>
+        </div>
+        <div class="footnote-item right">
+          <span>Tracking began: <strong>7th November 2026</strong> · Last synced: <strong>{{ (leaderboardLastRefreshed || leaderboardData?.serverTime) | date:'mediumTime' }}</strong></span>
+        </div>
+      </div>
+    </section>
   </ng-container>
 
   <!-- TAB: PREDATOR SCREEN & WRITINGS CONFIGURATION -->

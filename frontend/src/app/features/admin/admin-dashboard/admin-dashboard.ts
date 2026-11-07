@@ -54,6 +54,38 @@ export interface AdminTransaction {
   created_at: string;
 }
 
+export interface AdminLeaderboardAdmin {
+  tag: AdminInitial;
+  name: string;
+  role: string;
+  badgeColor: string;
+  claimedCount: number;
+  totalVolume: number;
+  avgTicket: number;
+  maxTicket: number;
+  minTicket: number;
+  sharePercent: number;
+  volumeSharePercent: number;
+  score: number;
+  basePoints: number;
+  volumePoints: number;
+  lastClaimedAt: string | null;
+  rank: number;
+}
+
+export interface AdminLeaderboardData {
+  success: boolean;
+  date: string;
+  startDate: string;
+  serverTime: string;
+  totalDayClaims: number;
+  totalDayVolume: number;
+  overallAvgTicket: number;
+  leadingAdmin: AdminInitial | null;
+  scoringFormula: string;
+  leaderboard: AdminLeaderboardAdmin[];
+}
+
 export interface AdminLog {
   id: number;
   action: string;
@@ -430,6 +462,16 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     connectedPlayers: 0,
     onlineUsers: 0
   };
+
+  // RSVG Admin Leadership Board State
+  public leaderboardData: AdminLeaderboardData | null = null;
+  public leaderboardLoading = false;
+  public leaderboardSelectedDate: string = '2026-11-07';
+  public readonly leaderboardStartDate = '2026-11-07';
+  public leaderboardLastRefreshed: Date | null = null;
+  public leaderboardIsLiveSpinning = false;
+  private leaderboardPollTimer: any = null;
+  private leaderboardRequest?: Subscription;
 
   // Active Users & Withdrawal Wager State
   public activeUsersList: ActiveUser[] = [];
@@ -1009,6 +1051,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (this.adminSocket.clientClaimed$) this.realtimeSubscriptions.push(this.adminSocket.clientClaimed$.subscribe(event => {
       if (event) this.refreshClientClaim(event.userId, event.tag, event.transactionId);
     }));
+    if (this.adminSocket.leaderboardUpdated$) this.realtimeSubscriptions.push(this.adminSocket.leaderboardUpdated$.subscribe(event => {
+      if (event) this.fetchAdminLeaderboard();
+    }));
     if (this.adminSocket.pinChanged$) this.realtimeSubscriptions.push(this.adminSocket.pinChanged$.subscribe(event => {
       if (event && this.adminPin.tag && event.tags.includes(this.adminPin.tag)) {
         this.closePinDialogs();
@@ -1021,6 +1066,13 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.fetchPayHeroBalance();
     this.fetchOnlinePlayersSummary();
     this.fetchSupportTickets(true);
+    this.leaderboardSelectedDate = this.getLeaderboardTodayString();
+    this.fetchAdminLeaderboard();
+    this.leaderboardPollTimer = setInterval(() => {
+      if (!this.destroyed && this.activeTab === 'monitor') {
+        this.fetchAdminLeaderboard();
+      }
+    }, 30000);
     this.payHeroPollTimer = setInterval(() => {
       this.fetchOverviewStats();
       this.fetchPayHeroBalance();
@@ -1039,7 +1091,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.destroyed = true;
     this.statsRequest?.unsubscribe();
     this.payHeroRequest?.unsubscribe();
+    this.leaderboardRequest?.unsubscribe();
     if (this.payHeroPollTimer !== null) clearInterval(this.payHeroPollTimer);
+    if (this.leaderboardPollTimer !== null) clearInterval(this.leaderboardPollTimer);
     this.realtimeSubscriptions.forEach(subscription => subscription.unsubscribe());
     if (this.realtimeRefreshTimer !== null) clearTimeout(this.realtimeRefreshTimer);
     if (this.userSearchTimer !== null) clearTimeout(this.userSearchTimer);
@@ -1387,6 +1441,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       this.fetchOverviewStats();
       this.fetchPayHeroBalance();
       this.fetchOnlinePlayersSummary();
+      this.fetchAdminLeaderboard();
     }
     if (tab === 'withdrawal-settings') {
       this.fetchWithdrawalSettings();
@@ -2267,6 +2322,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       for (const row of this.transactionsList) if (row.user_id === userId) row.admin_tag = tag as AdminInitial;
     }
     this.adminPin.refresh();
+    this.fetchAdminLeaderboard();
   }
 
   public claimTransactionTag(tx: AdminTransaction, tag: 'S' | 'G' | 'R' | 'V'): void {
@@ -2867,6 +2923,83 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.cdr.markForCheck();
       }
     });
+  }
+
+  // RSVG Admin Leadership Board Methods
+  public getLeaderboardTodayString(): string {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  public fetchAdminLeaderboard(dateOverride?: string): void {
+    const token = this.authService.getToken();
+    if (!token) return;
+    const targetDate = dateOverride || this.leaderboardSelectedDate || this.getLeaderboardTodayString();
+    this.leaderboardLoading = true;
+    this.leaderboardIsLiveSpinning = true;
+    this.cdr.markForCheck();
+
+    this.leaderboardRequest?.unsubscribe();
+    this.leaderboardRequest = this.http.get<AdminLeaderboardData>(
+      `${this.baseUrl}/api/admin/leaderboard?date=${targetDate}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).pipe(
+      finalize(() => {
+        this.leaderboardLoading = false;
+        setTimeout(() => { this.leaderboardIsLiveSpinning = false; this.cdr.markForCheck(); }, 350);
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: (res) => {
+        if (res && res.success) {
+          this.leaderboardData = res;
+          this.leaderboardSelectedDate = res.date;
+          this.leaderboardLastRefreshed = new Date();
+        }
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.error('Failed to load admin leaderboard:', err);
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  public selectLeaderboardDate(newDate: string): void {
+    if (!newDate) return;
+    if (newDate < this.leaderboardStartDate) newDate = this.leaderboardStartDate;
+    this.leaderboardSelectedDate = newDate;
+    this.fetchAdminLeaderboard(newDate);
+  }
+
+  public resetLeaderboardToToday(): void {
+    const today = this.getLeaderboardTodayString();
+    this.selectLeaderboardDate(today);
+  }
+
+  public stepLeaderboardDate(daysDelta: number): void {
+    const parts = (this.leaderboardSelectedDate || this.getLeaderboardTodayString()).split('-').map(Number);
+    const curr = new Date(parts[0], parts[1] - 1, parts[2]);
+    curr.setDate(curr.getDate() + daysDelta);
+    const y = curr.getFullYear();
+    const m = String(curr.getMonth() + 1).padStart(2, '0');
+    const d = String(curr.getDate()).padStart(2, '0');
+    const nextStr = `${y}-${m}-${d}`;
+    if (nextStr < this.leaderboardStartDate) return;
+    const todayStr = this.getLeaderboardTodayString();
+    if (nextStr > todayStr) return;
+    this.selectLeaderboardDate(nextStr);
+  }
+
+  public isLeaderboardToday(): boolean {
+    return this.leaderboardSelectedDate === this.getLeaderboardTodayString();
+  }
+
+  public isLeaderboardAtStart(): boolean {
+    return this.leaderboardSelectedDate <= this.leaderboardStartDate;
   }
 
   public logout(): void {
