@@ -339,7 +339,7 @@ export class AuthService {
   // The minimum deposit is admin-configurable, so the client reads the live
   // value instead of hardcoding it. Cached for the page so the deposit modal
   // opens instantly; the server enforces the real rule either way.
-  public readonly minimumDeposit$ = new BehaviorSubject<number>(999);
+  public readonly minimumDeposit$ = new BehaviorSubject<number>(199);
   private minimumDepositLoaded = false;
 
   public get minimumDeposit(): number {
@@ -353,7 +353,7 @@ export class AuthService {
       catchError(() => of({ minimum_deposit: this.minimumDeposit$.value }))
     ).subscribe(res => {
       const value = Number(res?.minimum_deposit);
-      if (Number.isFinite(value) && value > 0) this.minimumDeposit$.next(value);
+      if (Number.isFinite(value) && value >= 199 && value <= 10000) this.minimumDeposit$.next(value);
     });
   }
 

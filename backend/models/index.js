@@ -258,7 +258,7 @@ const PaymentReceiptSchema = new mongoose.Schema({
 
 const DepositSettingSchema = new mongoose.Schema({
   _id: { type: String, default: 'global_settings' },
-  minimum_deposit: { type: Number, default: 999, min: 1 },
+  minimum_deposit: { type: Number, default: 199, min: 199, max: 10000 },
   updated_by: { type: Number, default: null },
   updated_at: { type: Date, default: Date.now }
 });

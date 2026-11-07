@@ -53,10 +53,10 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
   readonly betNotice = signal<string | null>(null);
   readonly depositNotice = signal<string | null>(null);
   readonly isDepositing = signal(false);
-  readonly minimumDeposit = signal(999);
+  readonly minimumDeposit = signal(199);
 
   stake = 20;
-  depositAmount = 999;
+  depositAmount = 199;
   depositPhone = '';
   betslipCode = '';
 

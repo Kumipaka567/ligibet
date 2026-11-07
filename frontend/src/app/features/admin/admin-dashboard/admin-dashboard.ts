@@ -459,7 +459,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public withdrawalInitiationTitle: string = 'Withdrawal Notice';
   public withdrawalInitiationMessage: string = 'Your withdrawal request has been received and is awaiting review.';
   public isSavingWithdrawalWagerRequirement: boolean = false;
-  public minimumDepositAmount: number = 999;
+  public minimumDepositAmount: number = 199;
   public isSavingMinimumDeposit: boolean = false;
   public mpesaCodePrefix: string = 'UI';
   public isSavingMpesaPrefix: boolean = false;
@@ -1631,12 +1631,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   public saveMinimumDeposit(): void {
     const minimumDeposit = Math.round(Number(this.minimumDepositAmount));
-    if (!Number.isFinite(minimumDeposit) || minimumDeposit < 1) {
-      this.showAdminToast('Enter a minimum deposit of at least KES 1.', 'error');
-      return;
-    }
-    if (minimumDeposit > 1000000) {
-      this.showAdminToast('Minimum deposit cannot exceed KES 1,000,000.', 'error');
+    if (!Number.isFinite(minimumDeposit) || minimumDeposit < 199 || minimumDeposit > 10000) {
+      this.showAdminToast('Minimum deposit must be between KES 199 and KES 10,000.', 'error');
       return;
     }
 

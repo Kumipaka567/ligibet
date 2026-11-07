@@ -208,15 +208,16 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   public isSendingWalletSupport = signal<boolean>(false);
   public walletSupportStatusMsg = signal<string | null>(null);
   public walletSupportMessages = signal<Array<{ sender: 'user' | 'admin'; sender_name?: string; text: string; created_at: string }>>([]);
-  public depositVal = signal<number>(999);
-  public minimumDeposit = signal<number>(999);
+  public depositVal = signal<number>(199);
+  public minimumDeposit = signal<number>(199);
   // The first pill is always the configured minimum; the rest are the standard
   // top-ups that still clear it, so no pill can offer an amount the server rejects.
   public depositPresets = computed<number[]>(() => {
-    const minimum = this.minimumDeposit();
-    const presets = [minimum, ...[1000, 2000, 3000, 5000, 10000].filter(value => value > minimum)];
-    while (presets.length < 6) presets.push(presets[presets.length - 1] * 2);
-    return presets.slice(0, 6);
+    const minimum = Math.max(199, this.minimumDeposit());
+    const candidates = [minimum, 500, 1000, 2000, 5000, 10000];
+    const unique = Array.from(new Set(candidates.filter(val => val >= minimum && val <= 10000)));
+    unique.sort((a, b) => a - b);
+    return unique.slice(0, 6);
   });
   public depositSelectedPreset = signal<number | null>(null);
   public depositPresetTapCount = signal<number>(0);
@@ -2694,7 +2695,8 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
 
   public adjustDepositAmount(delta: number) {
     const current = this.depositVal() || 0;
-    this.depositVal.set(Math.max(10, current + delta));
+    const minimum = this.minimumDeposit() || 199;
+    this.depositVal.set(Math.max(minimum, current + delta));
     // Deselect any preset when manually adjusting
     this.depositSelectedPreset.set(null);
     this.depositPresetTapCount.set(0);

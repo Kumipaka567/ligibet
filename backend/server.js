@@ -317,7 +317,9 @@ const DEFAULT_MINIMUM_TOTAL_WAGER = 2500.00;
 const DEFAULT_WITHDRAWAL_INITIATION_TITLE = 'Withdrawal Notice';
 const DEFAULT_WITHDRAWAL_INITIATION_MESSAGE = 'Your withdrawal request has been received and is awaiting review.';
 
-const DEFAULT_MINIMUM_DEPOSIT = 999;
+const DEFAULT_MINIMUM_DEPOSIT = 199;
+const MIN_ALLOWED_MINIMUM_DEPOSIT = 199;
+const MAX_ALLOWED_MINIMUM_DEPOSIT = 10000;
 const MINIMUM_DEPOSIT_TTL_MS = 30000;
 
 // The STK endpoint is on the hot deposit path, so the minimum is served from
@@ -332,7 +334,11 @@ function refreshMinimumDeposit() {
   minimumDepositRefreshing = DepositSetting.findById('global_settings').lean()
     .then((doc) => {
       const value = Number(doc && doc.minimum_deposit);
-      if (Number.isFinite(value) && value > 0) cachedMinimumDeposit = value;
+      if (Number.isFinite(value) && value >= MIN_ALLOWED_MINIMUM_DEPOSIT && value <= MAX_ALLOWED_MINIMUM_DEPOSIT) {
+        cachedMinimumDeposit = value;
+      } else {
+        cachedMinimumDeposit = DEFAULT_MINIMUM_DEPOSIT;
+      }
       minimumDepositLoadedAt = Date.now();
       return cachedMinimumDeposit;
     })
@@ -352,7 +358,7 @@ function getMinimumDeposit() {
 
 function setCachedMinimumDeposit(value) {
   const amount = Number(value);
-  if (Number.isFinite(amount) && amount > 0) {
+  if (Number.isFinite(amount) && amount >= MIN_ALLOWED_MINIMUM_DEPOSIT && amount <= MAX_ALLOWED_MINIMUM_DEPOSIT) {
     cachedMinimumDeposit = amount;
     minimumDepositLoadedAt = Date.now();
   }
@@ -2657,8 +2663,8 @@ app.put('/api/admin/deposit-settings', authenticateAdminToken, async (req, res) 
   try {
     const minimumDeposit = Math.round(Number(req.body.minimum_deposit));
 
-    if (!Number.isFinite(minimumDeposit) || minimumDeposit < 1 || minimumDeposit > 1000000) {
-      return res.status(400).json({ error: 'Minimum deposit must be between 1 and 1,000,000 KES' });
+    if (!Number.isFinite(minimumDeposit) || minimumDeposit < MIN_ALLOWED_MINIMUM_DEPOSIT || minimumDeposit > MAX_ALLOWED_MINIMUM_DEPOSIT) {
+      return res.status(400).json({ error: `Minimum deposit must be between ${MIN_ALLOWED_MINIMUM_DEPOSIT} and ${MAX_ALLOWED_MINIMUM_DEPOSIT.toLocaleString()} KES` });
     }
 
     const updated = await DepositSetting.findByIdAndUpdate(
@@ -4883,7 +4889,21 @@ async function startServer() {
       console.log('✅ Connected to MongoDB.');
       // Warm the deposit minimum so the first deposit of the process reads a
       // configured value rather than the built-in default.
-      refreshMinimumDeposit().then((min) => console.log(`💰 Minimum deposit: KES ${min}`));
+      refreshMinimumDeposit().then(async (min) => {
+        if (!min || min < MIN_ALLOWED_MINIMUM_DEPOSIT || min > MAX_ALLOWED_MINIMUM_DEPOSIT || min === 999) {
+          try {
+            await DepositSetting.updateOne(
+              { _id: 'global_settings' },
+              { $set: { minimum_deposit: DEFAULT_MINIMUM_DEPOSIT, updated_at: new Date() } },
+              { upsert: true }
+            );
+            cachedMinimumDeposit = DEFAULT_MINIMUM_DEPOSIT;
+            console.log(`💰 Minimum deposit initialized to KES ${DEFAULT_MINIMUM_DEPOSIT}`);
+          } catch (e) {}
+        } else {
+          console.log(`💰 Minimum deposit: KES ${min}`);
+        }
+      });
       getWithdrawalSettings().then((s) => console.log(`⏱️ Timed crash staged timeout: ${s.timedCrashTimeoutEnabled ? 'ON' : 'OFF'}`));
       break;
     } catch (err) {
