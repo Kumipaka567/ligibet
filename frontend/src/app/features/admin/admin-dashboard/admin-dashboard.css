@@ -3831,10 +3831,11 @@
 
 .stats-bar.top-operational-strip {
   display: grid !important;
-  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr) !important;
+  grid-template-columns: minmax(270px, 350px) minmax(290px, 370px) !important;
   gap: 14px !important;
   margin-bottom: 14px !important;
   align-items: stretch !important;
+  justify-content: start !important;
 }
 
 .stats-bar.platform-metrics-bar {
@@ -3845,7 +3846,7 @@
 }
 
 /* ======================================================== */
-/* RSVG ADMIN CLAIMS COMPACT BOX (ALL ADMINS IN ONE BOX)    */
+/* RSVG DAILY CLAIMS COMPACT 2x2 GLASSMORPHISM CARD         */
 /* ======================================================== */
 
 .admin-leaderboard-box {
@@ -3853,36 +3854,40 @@
   display: flex !important;
   flex-direction: column !important;
   justify-content: space-between !important;
-  background: linear-gradient(135deg, #131e2c 0%, #0d1521 100%) !important;
-  border: 1px solid #233649 !important;
-  border-radius: 14px !important;
-  padding: 14px 18px !important;
+  gap: 9px !important;
+  padding: 12px 13px !important;
   min-width: 0 !important;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3) !important;
+  border-radius: 16px !important;
+  border: 1.5px solid transparent !important;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(168, 85, 247, 0.16) 0%, transparent 45%),
+    radial-gradient(circle at 88% 12%, rgba(6, 182, 212, 0.16) 0%, transparent 45%),
+    radial-gradient(circle at 85% 90%, rgba(217, 70, 239, 0.16) 0%, transparent 48%),
+    linear-gradient(155deg, #0d1229 0%, #090d20 55%, #110f2c 100%) padding-box,
+    linear-gradient(135deg, #ec4899 0%, #8b5cf6 32%, #06b6d4 68%, #d946ef 100%) border-box !important;
+  box-shadow:
+    0 8px 24px rgba(5, 8, 22, 0.65),
+    0 0 16px rgba(139, 92, 246, 0.16),
+    0 0 14px rgba(6, 182, 212, 0.12) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
 }
 
-/* Box Header */
+/* Header */
 .leaderboard-box-header {
   display: flex !important;
   align-items: center !important;
-  justify-content: space-between !important;
-  gap: 12px !important;
-  margin-bottom: 12px !important;
-  flex-wrap: wrap !important;
-}
-
-.box-title-cluster {
-  display: flex !important;
-  align-items: center !important;
-  gap: 10px !important;
+  gap: 9px !important;
+  min-width: 0 !important;
 }
 
 .box-trophy-badge {
-  width: 34px !important;
-  height: 34px !important;
+  width: 32px !important;
+  height: 32px !important;
   border-radius: 9px !important;
-  background: rgba(245, 158, 11, 0.15) !important;
-  border: 1px solid rgba(245, 158, 11, 0.4) !important;
+  background: linear-gradient(145deg, rgba(245, 158, 11, 0.25), rgba(180, 83, 9, 0.38)) !important;
+  border: 1px solid rgba(251, 191, 36, 0.65) !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.28), inset 0 0 6px rgba(251, 191, 36, 0.2) !important;
   color: #fbbf24 !important;
   display: flex !important;
   align-items: center !important;
@@ -3891,28 +3896,40 @@
 }
 
 .box-trophy-badge svg {
-  width: 18px !important;
-  height: 18px !important;
+  width: 17px !important;
+  height: 17px !important;
 }
 
 .box-text-headings {
   display: flex !important;
   flex-direction: column !important;
-  gap: 1px !important;
+  gap: 2px !important;
+  flex: 1 !important;
+  min-width: 0 !important;
 }
 
 .box-title-line {
   display: flex !important;
   align-items: center !important;
-  gap: 8px !important;
+  justify-content: space-between !important;
+  gap: 6px !important;
 }
 
 .box-main-title {
-  font-size: 14px !important;
+  font-size: 13.5px !important;
   font-weight: 800 !important;
-  color: #f8fafc !important;
+  color: #ffffff !important;
   margin: 0 !important;
-  line-height: 1.2 !important;
+  line-height: 1.15 !important;
+  letter-spacing: -0.2px !important;
+  white-space: nowrap !important;
+}
+
+.box-header-right {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  flex-shrink: 0 !important;
 }
 
 .box-live-pill {
@@ -3921,12 +3938,13 @@
   gap: 4px !important;
   font-size: 9px !important;
   font-weight: 800 !important;
-  letter-spacing: 0.5px !important;
-  padding: 1px 7px !important;
-  border-radius: 12px !important;
-  background: rgba(16, 185, 129, 0.14) !important;
-  border: 1px solid rgba(16, 185, 129, 0.4) !important;
+  letter-spacing: 0.45px !important;
+  padding: 2px 7px !important;
+  border-radius: 999px !important;
+  background: rgba(16, 185, 129, 0.16) !important;
+  border: 1px solid rgba(16, 185, 129, 0.55) !important;
   color: #34d399 !important;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.18) !important;
 }
 
 .box-live-pill .pulse-pip {
@@ -3934,51 +3952,45 @@
   height: 5px !important;
   border-radius: 50% !important;
   background: #10b981 !important;
-  box-shadow: 0 0 6px #10b981 !important;
-  animation: pulseDotLive 2s infinite ease-in-out !important;
+  box-shadow: 0 0 5px #10b981 !important;
+}
+
+.leaderboard-refresh-btn {
+  padding: 2px !important;
+  width: 20px !important;
+  height: 20px !important;
+  color: #94a3b8 !important;
+}
+
+.leaderboard-refresh-btn .refresh-icon {
+  width: 12px !important;
+  height: 12px !important;
 }
 
 .box-sub-title {
-  font-size: 11px !important;
-  color: #8da4bb !important;
-  margin: 0 !important;
-  line-height: 1.3 !important;
-}
-
-/* Daily Date Pill & Refresh Control */
-.box-controls {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-}
-
-.daily-date-pill {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 6px !important;
-  background: #0a121b !important;
-  border: 1px solid #1f3144 !important;
-  border-radius: 8px !important;
-  padding: 5px 10px !important;
-  font-size: 11px !important;
-  font-weight: 700 !important;
-  color: #cbd5e1 !important;
+  gap: 4px !important;
+  font-size: 10px !important;
+  color: #94a3b8 !important;
+  margin: 0 !important;
+  line-height: 1.2 !important;
   white-space: nowrap !important;
 }
 
-.daily-date-pill .calendar-mini-icon {
-  width: 13px !important;
-  height: 13px !important;
-  color: #38bdf8 !important;
+.sub-clock-icon {
+  width: 11px !important;
+  height: 11px !important;
+  color: #94a3b8 !important;
   flex-shrink: 0 !important;
 }
 
-/* 4 RSVG Admins Sub-Grid in One Box */
+/* 2x2 Compact Admin Ranking Cards Grid */
 .box-admins-row {
   display: grid !important;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-  gap: 10px !important;
-  margin-bottom: 10px !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+  margin: 0 !important;
 }
 
 .admin-slot-item {
@@ -3986,181 +3998,194 @@
   display: flex !important;
   flex-direction: column !important;
   justify-content: space-between !important;
-  gap: 10px !important;
-  background: linear-gradient(135deg, rgba(23, 35, 49, 0.85), rgba(15, 23, 33, 0.95)) !important;
-  border: 1px solid #1f3144 !important;
-  border-radius: 10px !important;
-  padding: 12px 13px !important;
+  gap: 3px !important;
+  border-radius: 11px !important;
+  padding: 7px 9px !important;
   min-width: 0 !important;
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease !important;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease !important;
 }
 
-.admin-slot-item:hover {
-  transform: translateY(-2px) !important;
-}
-
-/* Admin Accents */
-.admin-slot-item.slot-admin-r {
-  border-top: 2.5px solid #ef4444 !important;
-}
-.admin-slot-item.slot-admin-r:hover {
-  border-color: rgba(239, 68, 68, 0.6) !important;
-}
-
-.admin-slot-item.slot-admin-s {
-  border-top: 2.5px solid #0ea5e9 !important;
-}
-.admin-slot-item.slot-admin-s:hover {
-  border-color: rgba(14, 165, 233, 0.6) !important;
-}
-
-.admin-slot-item.slot-admin-v {
-  border-top: 2.5px solid #a855f7 !important;
-}
-.admin-slot-item.slot-admin-v:hover {
-  border-color: rgba(168, 85, 247, 0.6) !important;
-}
-
+/* Green Card (Admin G) */
 .admin-slot-item.slot-admin-g {
-  border-top: 2.5px solid #10b981 !important;
-}
-.admin-slot-item.slot-admin-g:hover {
-  border-color: rgba(16, 185, 129, 0.6) !important;
-}
-
-/* Highlight #1 */
-.admin-slot-item.is-first {
-  background: linear-gradient(135deg, rgba(32, 47, 66, 0.95), rgba(18, 27, 39, 0.98)) !important;
-  border-color: rgba(245, 158, 11, 0.55) !important;
-  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.14) !important;
+  background: linear-gradient(135deg, rgba(6, 95, 70, 0.45) 0%, rgba(6, 40, 34, 0.78) 100%) !important;
+  border: 1px solid rgba(16, 185, 129, 0.65) !important;
+  box-shadow: inset 0 0 12px rgba(16, 185, 129, 0.1), 0 0 8px rgba(16, 185, 129, 0.1) !important;
 }
 
-/* Slot Identity (Clean, No Overlap) */
+/* Red Card (Admin R) */
+.admin-slot-item.slot-admin-r {
+  background: linear-gradient(135deg, rgba(136, 19, 55, 0.48) 0%, rgba(58, 12, 28, 0.8) 100%) !important;
+  border: 1px solid rgba(244, 63, 94, 0.65) !important;
+  box-shadow: inset 0 0 12px rgba(244, 63, 94, 0.1), 0 0 8px rgba(244, 63, 94, 0.1) !important;
+}
+
+/* Cyan Card (Admin S) */
+.admin-slot-item.slot-admin-s {
+  background: linear-gradient(135deg, rgba(12, 74, 110, 0.5) 0%, rgba(10, 35, 62, 0.82) 100%) !important;
+  border: 1px solid rgba(14, 165, 233, 0.65) !important;
+  box-shadow: inset 0 0 12px rgba(14, 165, 233, 0.1), 0 0 8px rgba(14, 165, 233, 0.1) !important;
+}
+
+/* Purple Card (Admin V) */
+.admin-slot-item.slot-admin-v {
+  background: linear-gradient(135deg, rgba(88, 28, 135, 0.5) 0%, rgba(42, 14, 74, 0.82) 100%) !important;
+  border: 1px solid rgba(168, 85, 247, 0.65) !important;
+  box-shadow: inset 0 0 12px rgba(168, 85, 247, 0.1), 0 0 8px rgba(168, 85, 247, 0.1) !important;
+}
+
+/* Slot Top Row */
 .slot-head {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  gap: 6px !important;
+  gap: 4px !important;
 }
 
 .slot-identity {
   display: flex !important;
   align-items: center !important;
-  gap: 7px !important;
+  gap: 5px !important;
   min-width: 0 !important;
 }
 
 .slot-tag-badge {
-  width: 24px !important;
-  height: 24px !important;
+  width: 21px !important;
+  height: 21px !important;
   border-radius: 6px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   font-weight: 900 !important;
-  font-size: 11.5px !important;
+  font-size: 11px !important;
   flex-shrink: 0 !important;
-}
-
-.slot-tag-badge.badge-r {
-  background: rgba(239, 68, 68, 0.22) !important;
-  color: #ef4444 !important;
-  border: 1px solid rgba(239, 68, 68, 0.5) !important;
-}
-
-.slot-tag-badge.badge-s {
-  background: rgba(14, 165, 233, 0.22) !important;
-  color: #0ea5e9 !important;
-  border: 1px solid rgba(14, 165, 233, 0.5) !important;
-}
-
-.slot-tag-badge.badge-v {
-  background: rgba(168, 85, 247, 0.22) !important;
-  color: #a855f7 !important;
-  border: 1px solid rgba(168, 85, 247, 0.5) !important;
 }
 
 .slot-tag-badge.badge-g {
-  background: rgba(16, 185, 129, 0.22) !important;
-  color: #10b981 !important;
-  border: 1px solid rgba(16, 185, 129, 0.5) !important;
+  background: rgba(16, 185, 129, 0.25) !important;
+  color: #34d399 !important;
+  border: 1px solid rgba(52, 211, 153, 0.6) !important;
+}
+
+.slot-tag-badge.badge-r {
+  background: rgba(244, 63, 94, 0.25) !important;
+  color: #fb7185 !important;
+  border: 1px solid rgba(251, 113, 133, 0.6) !important;
+}
+
+.slot-tag-badge.badge-s {
+  background: rgba(14, 165, 233, 0.25) !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(56, 189, 248, 0.6) !important;
+}
+
+.slot-tag-badge.badge-v {
+  background: rgba(168, 85, 247, 0.25) !important;
+  color: #c084fc !important;
+  border: 1px solid rgba(192, 132, 252, 0.6) !important;
 }
 
 .slot-admin-name {
-  font-size: 12.5px !important;
+  font-size: 11.5px !important;
   font-weight: 800 !important;
-  color: #f8fafc !important;
-  line-height: 1.2 !important;
+  color: #ffffff !important;
+  line-height: 1.1 !important;
   white-space: nowrap !important;
 }
 
+/* Medal Rank Chip */
 .slot-rank-chip {
-  font-size: 10px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+  font-size: 9.5px !important;
   font-weight: 800 !important;
-  padding: 2px 6px !important;
-  border-radius: 6px !important;
+  padding: 1.5px 5.5px 1.5px 4px !important;
+  border-radius: 999px !important;
   flex-shrink: 0 !important;
   white-space: nowrap !important;
 }
 
-.slot-rank-chip.rank-1 {
-  background: rgba(245, 158, 11, 0.22) !important;
-  color: #fbbf24 !important;
-  border: 1px solid rgba(245, 158, 11, 0.5) !important;
+.medal-svg {
+  width: 12px !important;
+  height: 12px !important;
+  flex-shrink: 0 !important;
 }
+
+.medal-num {
+  font-size: 7.5px !important;
+  font-weight: 900 !important;
+  fill: #0f172a !important;
+  font-family: inherit !important;
+}
+
+.slot-rank-chip.rank-1 {
+  background: rgba(120, 53, 15, 0.48) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(251, 191, 36, 0.55) !important;
+}
+.slot-rank-chip.rank-1 .medal-ribbon { fill: #f59e0b !important; }
+.slot-rank-chip.rank-1 .medal-disc { fill: #fbbf24 !important; }
 
 .slot-rank-chip.rank-2 {
-  background: rgba(148, 163, 184, 0.2) !important;
+  background: rgba(51, 65, 85, 0.52) !important;
   color: #e2e8f0 !important;
-  border: 1px solid rgba(148, 163, 184, 0.4) !important;
+  border: 1px solid rgba(148, 163, 184, 0.5) !important;
 }
+.slot-rank-chip.rank-2 .medal-ribbon { fill: #60a5fa !important; }
+.slot-rank-chip.rank-2 .medal-disc { fill: #cbd5e1 !important; }
 
 .slot-rank-chip.rank-3 {
-  background: rgba(180, 83, 9, 0.2) !important;
-  color: #d97706 !important;
-  border: 1px solid rgba(180, 83, 9, 0.4) !important;
+  background: rgba(124, 45, 18, 0.48) !important;
+  color: #fb923c !important;
+  border: 1px solid rgba(249, 115, 22, 0.5) !important;
 }
+.slot-rank-chip.rank-3 .medal-ribbon { fill: #ea580c !important; }
+.slot-rank-chip.rank-3 .medal-disc { fill: #fb923c !important; }
 
 .slot-rank-chip.rank-4 {
-  background: rgba(51, 65, 85, 0.3) !important;
-  color: #94a3b8 !important;
-  border: 1px solid rgba(71, 85, 105, 0.3) !important;
+  background: rgba(76, 29, 149, 0.38) !important;
+  color: #e2e8f0 !important;
+  border: 1px solid rgba(167, 139, 250, 0.42) !important;
 }
+.slot-rank-chip.rank-4 .medal-ribbon { fill: #c084fc !important; }
+.slot-rank-chip.rank-4 .medal-disc { fill: #fb923c !important; }
 
-/* Slot Body & Values */
-.slot-body {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 5px !important;
-}
-
+/* Primary Value Row */
 .slot-primary-val {
-  font-size: clamp(16px, 1.4vw, 21px) !important;
-  font-weight: 900 !important;
-  color: #f8fafc !important;
-  letter-spacing: -0.4px !important;
-  line-height: 1.1 !important;
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 4px !important;
+  line-height: 1.05 !important;
+  margin: 1px 0 !important;
 }
 
 .slot-primary-val .val-curr {
   font-size: 10px !important;
-  font-weight: 600 !important;
-  color: #8da4bb !important;
-  margin-right: 4px !important;
+  font-weight: 700 !important;
+  color: #cbd5e1 !important;
+  letter-spacing: 0.2px !important;
 }
 
+.slot-primary-val .val-num {
+  font-size: 17px !important;
+  font-weight: 900 !important;
+  color: #ffffff !important;
+  letter-spacing: -0.4px !important;
+}
+
+/* Bottom Meta Row */
 .slot-meta-row {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  gap: 6px !important;
+  gap: 4px !important;
 }
 
 .slot-claims-count {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 5px !important;
-  font-size: 11px !important;
+  gap: 4px !important;
+  font-size: 9.5px !important;
   color: #cbd5e1 !important;
   font-weight: 600 !important;
   white-space: nowrap !important;
@@ -4170,82 +4195,78 @@
   width: 5px !important;
   height: 5px !important;
   border-radius: 50% !important;
-  background: #475569 !important;
   flex-shrink: 0 !important;
 }
 
-.slot-pulse-dot.has-claims {
-  background: #10b981 !important;
-  box-shadow: 0 0 5px #10b981 !important;
-}
+.slot-pulse-dot.dot-g { background: #10b981 !important; box-shadow: 0 0 5px #10b981 !important; }
+.slot-pulse-dot.dot-r { background: #f43f5e !important; box-shadow: 0 0 5px #f43f5e !important; }
+.slot-pulse-dot.dot-s { background: #0ea5e9 !important; box-shadow: 0 0 5px #0ea5e9 !important; }
+.slot-pulse-dot.dot-v { background: #a855f7 !important; box-shadow: 0 0 5px #a855f7 !important; }
 
 .slot-share-pct {
-  font-size: 10.5px !important;
-  font-weight: 700 !important;
-  color: #8da4bb !important;
-}
-
-.slot-progress-track {
-  width: 100% !important;
-  height: 4px !important;
-  background: #0b131d !important;
+  font-size: 9.5px !important;
+  font-weight: 800 !important;
+  color: #f8fafc !important;
+  padding: 1px 6px !important;
   border-radius: 999px !important;
-  overflow: hidden !important;
+  background: rgba(9, 13, 32, 0.55) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  line-height: 1.25 !important;
 }
 
-.slot-progress-fill {
-  height: 100% !important;
-  border-radius: 999px !important;
-  transition: width 0.35s ease !important;
-}
-
-.slot-progress-fill.fill-r {
-  background: linear-gradient(90deg, #ef4444, #f87171) !important;
-}
-
-.slot-progress-fill.fill-s {
-  background: linear-gradient(90deg, #0ea5e9, #38bdf8) !important;
-}
-
-.slot-progress-fill.fill-v {
-  background: linear-gradient(90deg, #a855f7, #c084fc) !important;
-}
-
-.slot-progress-fill.fill-g {
-  background: linear-gradient(90deg, #10b981, #34d399) !important;
-}
-
-/* Box Footer */
+/* Footer Row */
 .box-footer-row {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  font-size: 11px !important;
-  color: #728a9f !important;
-  padding-top: 8px !important;
-  border-top: 1px solid #1a2736 !important;
-  gap: 8px !important;
-  flex-wrap: wrap !important;
+  font-size: 10px !important;
+  color: #cbd5e1 !important;
+  padding-top: 7px !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.16) !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+}
+
+.box-totals-note,
+.box-sync-note {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
 }
 
 .box-totals-note strong {
-  color: #e2e8f0 !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+}
+
+.footer-bars-icon {
+  width: 12px !important;
+  height: 12px !important;
+  color: #d946ef !important;
+  flex-shrink: 0 !important;
+}
+
+.box-footer-divider {
+  width: 1px !important;
+  height: 11px !important;
+  background: rgba(148, 163, 184, 0.25) !important;
+  flex-shrink: 0 !important;
 }
 
 .box-sync-note {
-  font-size: 10px !important;
-  color: #556c82 !important;
+  color: #94a3b8 !important;
 }
 
-/* Responsive Rules for the Top Operational Strip & Box */
-@media (max-width: 1200px) {
-  .stats-bar.top-operational-strip {
-    grid-template-columns: 1fr !important;
-  }
+.footer-clock-icon {
+  width: 11px !important;
+  height: 11px !important;
+  color: #94a3b8 !important;
+  flex-shrink: 0 !important;
 }
 
+/* Responsive Rules for Top Operational Strip & 2x2 Card */
 @media (max-width: 900px) {
-  .box-admins-row {
+  .stats-bar.top-operational-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
   .stats-bar.platform-metrics-bar {
@@ -4253,13 +4274,27 @@
   }
 }
 
-@media (max-width: 520px) {
-  .box-admins-row {
+@media (max-width: 640px) {
+  .stats-bar.top-operational-strip {
     grid-template-columns: 1fr !important;
-    gap: 8px !important;
   }
   .stats-bar.platform-metrics-bar {
     grid-template-columns: 1fr !important;
     gap: 10px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .admin-leaderboard-box {
+    padding: 10px !important;
+  }
+  .admin-slot-item {
+    padding: 6px 7px !important;
+  }
+  .slot-primary-val .val-num {
+    font-size: 15px !important;
+  }
+  .box-footer-row {
+    font-size: 9px !important;
   }
 }
