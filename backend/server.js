@@ -2148,7 +2148,7 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
       User.find(adminClientScope(req, 'id')).select('-password_hash -__v -_id').sort({ created_at: -1, id: -1 }).limit(100).lean(),
       Transaction.find({ ...adminClientScope(req, 'user_id'), admin_deleted_at: null }).select('id user_id client_phone type amount status reference created_at admin_tag').sort({ created_at: -1 }).limit(100).lean(),
       getDashboardTotals(),
-      AdminLog.find({}).sort({ created_at: -1 }).limit(50).lean()
+      AdminLog.find({ action: { $ne: 'DELETE_COMPLETED_TRANSACTION' } }).sort({ created_at: -1 }).limit(50).lean()
     ]);
 
     // Resolve the usernames for the transaction rows from the page of users we
@@ -2463,7 +2463,7 @@ app.delete('/api/admin/users/:id', authenticateAdminToken, async (req, res) => {
 // Admin Logs
 app.get('/api/admin/logs', authenticateAdminToken, async (req, res) => {
   try {
-    const logs = await AdminLog.find({})
+    const logs = await AdminLog.find({ action: { $ne: 'DELETE_COMPLETED_TRANSACTION' } })
       .sort({ created_at: -1 })
       .limit(100)
       .lean();
