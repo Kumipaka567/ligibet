@@ -242,6 +242,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.adminLogs = [];
     this.supportTickets = [];
     this.selectedTicket = null;
+    this.markedSupportTicketIds.clear();
+    this.markedSupportMessageIds.clear();
     this.selectedUserForNotif = null;
     this.selectedWithdrawalId = null;
     this.showNotifyModal = false;
@@ -1254,7 +1256,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       }),
       this.adminSocket.supportTicketUpdated$.subscribe(data => {
         if (!data || !data.ticket) return;
-        const updatedTicket = data.ticket;
+        if (data.deletedMessageIds?.length) this.rememberDeletedSupportMessages(data.ticket.id, data.deletedMessageIds);
+        const updatedTicket = this.visibleSupportTicket(data.ticket);
+        if (!updatedTicket) return;
         if (this.adminPin.tag && updatedTicket.client_admin_tag && updatedTicket.client_admin_tag !== this.adminPin.tag) {
           this.supportTickets = this.supportTickets.filter(ticket => ticket.id !== updatedTicket.id);
           if (this.selectedTicket?.id === updatedTicket.id) this.selectedTicket = null;
@@ -1273,10 +1277,13 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           if (this.selectedTicket && this.selectedTicket.id === updatedTicket.id) {
             this.selectedTicket = updatedTicket;
           }
-        } else {
+        } else if (!data.deletedMessageIds?.length) {
           this.unreadSupportCount++;
         }
         this.cdr.markForCheck();
+      }),
+      this.adminSocket.supportTicketsDeleted$.subscribe(data => {
+        if (data?.ticketIds) this.removeSupportConversations(data.ticketIds);
       }),
       this.adminSocket.timedCrashTimeoutUpdated$.subscribe(data => {
         if (data && typeof data.enabled === 'boolean') {
@@ -2897,6 +2904,127 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public isSendingReply: boolean = false;
   public isLoadingSupport: boolean = false;
   public supportCategoryFilter: 'all' | 'appeal' | 'deposit' | 'withdrawal' | 'general' = 'all';
+  public markedSupportTicketIds = new Set<number>();
+  public markedSupportMessageIds = new Set<string>();
+  public isDeletingSupport = false;
+  private deletedSupportTicketIds = new Set<number>();
+  private deletedSupportMessageIds = new Map<number, Set<string>>();
+
+  private visibleSupportTicket(ticket: any): any {
+    if (!ticket || this.deletedSupportTicketIds.has(ticket.id)) return null;
+    const deleted = this.deletedSupportMessageIds.get(ticket.id);
+    return { ...ticket, messages: (ticket.messages || []).filter((message: any) => !deleted?.has(String(message._id))) };
+  }
+
+  private rememberDeletedSupportMessages(ticketId: number, ids: string[]): void {
+    const deleted = this.deletedSupportMessageIds.get(ticketId) || new Set<string>();
+    for (const id of ids) deleted.add(id);
+    this.deletedSupportMessageIds.set(ticketId, deleted);
+    if (this.selectedTicket?.id === ticketId) for (const id of ids) this.markedSupportMessageIds.delete(id);
+  }
+
+  private removeSupportConversations(ids: number[]): void {
+    for (const id of ids) {
+      this.deletedSupportTicketIds.add(id);
+      this.markedSupportTicketIds.delete(id);
+    }
+    this.supportTickets = this.supportTickets.filter(ticket => !this.deletedSupportTicketIds.has(ticket.id));
+    if (this.selectedTicket && this.deletedSupportTicketIds.has(this.selectedTicket.id)) {
+      this.selectedTicket = null;
+      this.markedSupportMessageIds.clear();
+      this.supportReplyText = '';
+    }
+    this.unreadSupportCount = this.activeTab === 'support' ? 0 : this.supportTickets.filter(ticket => ticket.status === 'open').length;
+    this.cdr.markForCheck();
+  }
+
+  public get allSupportTicketsMarked(): boolean {
+    return this.filteredSupportTickets.length > 0 && this.filteredSupportTickets.every(ticket => this.markedSupportTicketIds.has(ticket.id));
+  }
+
+  public get allSupportMessagesMarked(): boolean {
+    const messages = (this.selectedTicket?.messages || []).filter((message: any) => message._id);
+    return messages.length > 0 && messages.every((message: any) => this.markedSupportMessageIds.has(String(message._id)));
+  }
+
+  public markSupportTicket(id: number): void {
+    if (!this.isSuperAdmin || this.isDeletingSupport) return;
+    if (this.markedSupportTicketIds.has(id)) this.markedSupportTicketIds.delete(id);
+    else this.markedSupportTicketIds.add(id);
+  }
+
+  public markSupportMessage(id: string): void {
+    if (!this.isSuperAdmin || this.isDeletingSupport) return;
+    if (this.markedSupportMessageIds.has(id)) this.markedSupportMessageIds.delete(id);
+    else if (this.markedSupportMessageIds.size < 1000) this.markedSupportMessageIds.add(id);
+  }
+
+  public markAllSupportTickets(): void {
+    if (!this.isSuperAdmin || this.isDeletingSupport) return;
+    const clear = this.allSupportTicketsMarked;
+    for (const ticket of this.filteredSupportTickets) {
+      if (clear) this.markedSupportTicketIds.delete(ticket.id);
+      else if (this.markedSupportTicketIds.size < 100) this.markedSupportTicketIds.add(ticket.id);
+    }
+  }
+
+  public markAllSupportMessages(): void {
+    if (!this.isSuperAdmin || this.isDeletingSupport) return;
+    if (this.allSupportMessagesMarked) this.markedSupportMessageIds.clear();
+    else this.markedSupportMessageIds = new Set<string>((this.selectedTicket?.messages || [])
+      .filter((message: any) => message._id).slice(0, 1000).map((message: any) => String(message._id)));
+  }
+
+  public deleteMarkedSupportConversations(): void {
+    if (!this.isSuperAdmin || this.isDeletingSupport || !this.markedSupportTicketIds.size) return;
+    const ids = [...this.markedSupportTicketIds];
+    this.openConfirmDialog({ title: 'Delete marked conversations', type: 'danger', confirmText: 'Delete conversations',
+      message: `Delete ${ids.length} marked Support conversations and all their messages? This cannot be undone.`,
+      onConfirm: () => {
+        const token = this.authService.getToken();
+        if (!token || !this.isSuperAdmin || this.isDeletingSupport) return;
+        this.isDeletingSupport = true;
+        this.http.delete<{ deletedIds: number[] }>(`${this.baseUrl}/api/admin/support/tickets`, {
+          body: { ticket_ids: ids }, headers: { Authorization: `Bearer ${token}` }
+        }).pipe(finalize(() => { this.isDeletingSupport = false; this.cdr.markForCheck(); })).subscribe({
+          next: result => {
+            this.removeSupportConversations(result.deletedIds);
+            this.showAdminToast('Marked Support conversations deleted.', 'success');
+          },
+          error: error => this.showAdminToast(error?.error?.error || 'Unable to delete conversations. Please retry.', 'error')
+        });
+      }
+    });
+  }
+
+  public deleteMarkedSupportMessages(): void {
+    if (!this.isSuperAdmin || this.isDeletingSupport || !this.selectedTicket || !this.markedSupportMessageIds.size) return;
+    const ticketId = this.selectedTicket.id;
+    const ids = [...this.markedSupportMessageIds];
+    this.openConfirmDialog({ title: 'Delete marked messages', type: 'danger', confirmText: 'Delete messages',
+      message: `Delete ${ids.length} marked messages from conversation #${ticketId}? This cannot be undone.`,
+      onConfirm: () => {
+        const token = this.authService.getToken();
+        if (!token || !this.isSuperAdmin || this.isDeletingSupport || this.selectedTicket?.id !== ticketId) return;
+        this.isDeletingSupport = true;
+        this.http.delete<{ ticket: any; deletedMessageIds: string[] }>(`${this.baseUrl}/api/admin/support/tickets/${ticketId}/messages`, {
+          body: { message_ids: ids }, headers: { Authorization: `Bearer ${token}` }
+        }).pipe(finalize(() => { this.isDeletingSupport = false; this.cdr.markForCheck(); })).subscribe({
+          next: result => {
+            this.rememberDeletedSupportMessages(ticketId, result.deletedMessageIds);
+            const ticket = this.visibleSupportTicket(result.ticket);
+            if (ticket) {
+              this.supportTickets = this.supportTickets.map(row => row.id === ticketId ? ticket : row);
+              if (this.selectedTicket?.id === ticketId) this.selectedTicket = ticket;
+            }
+            this.markedSupportMessageIds.clear();
+            this.showAdminToast('Marked Support messages deleted.', 'success');
+          },
+          error: error => this.showAdminToast(error?.error?.error || 'Unable to delete messages. Please retry.', 'error')
+        });
+      }
+    });
+  }
 
   public get filteredSupportTickets(): any[] {
     if (this.supportCategoryFilter === 'all') return this.supportTickets;
@@ -2913,12 +3041,14 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     ).subscribe({
       next: (res) => {
         this.isLoadingSupport = false;
-        this.supportTickets = res?.tickets || [];
+        this.supportTickets = (res?.tickets || []).map(ticket => this.visibleSupportTicket(ticket)).filter(Boolean);
+        for (const id of this.markedSupportTicketIds) if (!this.supportTickets.some(ticket => ticket.id === id)) this.markedSupportTicketIds.delete(id);
         if (this.activeTab === 'support') {
           this.unreadSupportCount = 0;
           if (this.selectedTicket) {
             const updated = this.supportTickets.find(t => t.id === this.selectedTicket?.id);
             if (updated) this.selectedTicket = updated;
+            else { this.selectedTicket = null; this.markedSupportMessageIds.clear(); }
           } else if (this.supportTickets.length > 0 && typeof window !== 'undefined' && window.innerWidth > 860) {
             this.selectedTicket = this.supportTickets[0];
           }
@@ -2936,6 +3066,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   public selectTicket(ticket: any): void {
     this.selectedTicket = ticket;
+    this.markedSupportMessageIds.clear();
     this.supportReplyText = '';
     this.cdr.markForCheck();
   }
@@ -2956,10 +3087,11 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.isSendingReply = false;
         this.supportReplyText = '';
-        if (res?.ticket) {
-          this.selectedTicket = res.ticket;
+        const ticket = this.visibleSupportTicket(res?.ticket);
+        if (ticket) {
+          if (this.selectedTicket?.id === ticketId) this.selectedTicket = ticket;
           const idx = this.supportTickets.findIndex(t => t.id === ticketId);
-          if (idx !== -1) this.supportTickets[idx] = res.ticket;
+          if (idx !== -1) this.supportTickets[idx] = ticket;
         }
         this.showAdminToast('Reply sent successfully', 'success');
         this.cdr.markForCheck();

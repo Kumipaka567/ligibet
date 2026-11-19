@@ -444,12 +444,13 @@ test('all HTTP admin response data fails closed if ownership lookup fails', asyn
   assert.ok(!JSON.stringify(payload).includes('0712345678'));
 });
 
-test('only the Support ticket list and reply routes reveal the ticket contact number', async () => {
+test('only Support ticket list, reply and message-deletion routes reveal the ticket contact number', async () => {
   const { service } = fixture();
   await service.claim(101, 'R', 1);
   for (const [method, originalUrl, visible] of [
     ['GET', '/api/admin/support/tickets?search=anything', true],
     ['POST', '/api/admin/support/reply', true],
+    ['DELETE', '/api/admin/support/tickets/100/messages', true],
     ['GET', '/api/admin/users?showSupportContactNumbers=true', false],
     ['GET', '/api/admin/logs', false],
     ['GET', '/api/admin/support/tickets/other', false],

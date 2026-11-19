@@ -51,6 +51,14 @@ describe('Admin socket live delivery', () => {
     expect(service.userUpdated$.value).toBeNull();
   });
 
+  it('delivers Support conversation deletions and clears them when replacing the connection', () => {
+    service.connect('token');
+    handlers.get('support_tickets_deleted')!({ ticketIds: [21, 22] });
+    expect(service.supportTicketsDeleted$.value).toEqual({ ticketIds: [21, 22] });
+    service.connect('new-token');
+    expect(service.supportTicketsDeleted$.value).toBeNull();
+  });
+
   it('enables alternate transports and removes obsolete listeners before replacing a connection', () => {
     service.connect('token');
     expect(vi.mocked(io).mock.lastCall?.[1]).toMatchObject({ transports: ['polling', 'websocket'], tryAllTransports: true });

@@ -34,7 +34,7 @@ describe('Admin dashboard live account management', () => {
       ...Object.fromEntries([
         'transactionUpdate$', 'dashboardStatsUpdated$', 'walletUpdated$',
         'transactionsUpdated$', 'depositsUpdated$', 'withdrawalsUpdated$',
-        'userUpdated$', 'activityUpdated$', 'predatorTextUpdate$', 'accessRevoked$', 'depositInitiated$', 'onlinePlayers$', 'supportTicketUpdated$', 'clientClaimed$', 'pinChanged$', 'timedCrashTimeoutUpdated$'
+        'userUpdated$', 'activityUpdated$', 'predatorTextUpdate$', 'accessRevoked$', 'depositInitiated$', 'onlinePlayers$', 'supportTicketUpdated$', 'supportTicketsDeleted$', 'clientClaimed$', 'pinChanged$', 'timedCrashTimeoutUpdated$'
       ].map(key => [key, new BehaviorSubject(null)]))
     };
     auth = {
@@ -112,6 +112,96 @@ describe('Admin dashboard live account management', () => {
     http.expectOne(request => request.url.endsWith('/api/admin/stats')).flush({ totalDeposits: 2500 });
     http.expectOne(request => request.url.includes('/api/admin/users?')).flush({ users: [user()] });
     expect(component.stats.totalDeposits).toBe(2500);
+  });
+
+  it('deletes only marked Support conversations after confirmation and closes a removed conversation', () => {
+    const first = { id: 21, category: 'general', status: 'open', messages: [] };
+    const keep = { id: 22, category: 'general', status: 'open', messages: [] };
+    component.supportTickets = [first, keep];
+    component.selectTicket(first);
+    component.markSupportTicket(21);
+    const confirm = vi.spyOn(component as any, 'openConfirmDialog');
+    component.deleteMarkedSupportConversations();
+    http.expectNone(req => req.method === 'DELETE');
+    (confirm.mock.calls[0][0] as { onConfirm: () => void }).onConfirm();
+    const request = http.expectOne(req => req.method === 'DELETE' && req.url.endsWith('/support/tickets'));
+    expect(request.request.body).toEqual({ ticket_ids: [21] });
+    request.flush({ deletedIds: [21] });
+    expect(component.supportTickets.map(ticket => ticket.id)).toEqual([22]);
+    expect(component.selectedTicket).toBeNull();
+    expect(component.markedSupportTicketIds.size).toBe(0);
+    expect(component.isDeletingSupport).toBe(false);
+  });
+
+  it('deletes marked individual Support messages and preserves the other messages and conversation', () => {
+    const removed = '000000000000000000000001', kept = '000000000000000000000002';
+    const ticket = { id: 21, messages: [{ _id: removed, text: 'Delete' }, { _id: kept, text: 'Keep' }] };
+    component.supportTickets = [ticket];
+    component.selectTicket(ticket);
+    component.markSupportMessage(removed);
+    const confirm = vi.spyOn(component as any, 'openConfirmDialog');
+    component.deleteMarkedSupportMessages();
+    (confirm.mock.calls[0][0] as { onConfirm: () => void }).onConfirm();
+    const request = http.expectOne(req => req.method === 'DELETE' && req.url.endsWith('/support/tickets/21/messages'));
+    expect(request.request.body).toEqual({ message_ids: [removed] });
+    request.flush({ ticket: { ...ticket, messages: [ticket.messages[1]] }, deletedMessageIds: [removed] });
+    expect(component.selectedTicket.messages.map((message: any) => message._id)).toEqual([kept]);
+    expect(component.supportTickets.length).toBe(1);
+    expect(component.markedSupportMessageIds.size).toBe(0);
+  });
+
+  it('limits Support selection and deletion to superadmin and clears message marks when switching conversations', () => {
+    component.supportTickets = [{ id: 21, category: 'general', messages: [{ _id: 'first' }] }, { id: 22, category: 'appeal', messages: [] }];
+    component.selectTicket(component.supportTickets[0]);
+    auth.currentUser$.next({ id: 1, role: 'admin' });
+    const confirm = vi.spyOn(component as any, 'openConfirmDialog');
+    component.markAllSupportTickets();
+    component.markAllSupportMessages();
+    component.markSupportTicket(21);
+    component.markSupportMessage('first');
+    component.deleteMarkedSupportConversations();
+    component.deleteMarkedSupportMessages();
+    expect(component.markedSupportTicketIds.size).toBe(0);
+    expect(component.markedSupportMessageIds.size).toBe(0);
+    expect(confirm).not.toHaveBeenCalled();
+    auth.currentUser$.next({ id: 1, role: 'superadmin' });
+    component.supportCategoryFilter = 'general';
+    component.markAllSupportTickets();
+    expect([...component.markedSupportTicketIds]).toEqual([21]);
+    component.markAllSupportMessages();
+    expect(component.allSupportMessagesMarked).toBe(true);
+    component.selectTicket(component.supportTickets[1]);
+    expect(component.markedSupportMessageIds.size).toBe(0);
+  });
+
+  it('retains Support messages and marks when deletion is rejected', () => {
+    const ticket = { id: 21, messages: [{ _id: '000000000000000000000001', text: 'Keep on failure' }] };
+    component.selectTicket(ticket);
+    component.markSupportMessage(ticket.messages[0]._id);
+    const confirm = vi.spyOn(component as any, 'openConfirmDialog');
+    component.deleteMarkedSupportMessages();
+    (confirm.mock.calls[0][0] as { onConfirm: () => void }).onConfirm();
+    http.expectOne(req => req.method === 'DELETE').flush({ error: 'Unavailable' }, { status: 503, statusText: 'Unavailable' });
+    expect(component.selectedTicket.messages).toEqual(ticket.messages);
+    expect(component.markedSupportMessageIds.size).toBe(1);
+    expect(component.isDeletingSupport).toBe(false);
+  });
+
+  it('applies live Support deletions and prevents stale fetches from restoring removed conversations or messages', () => {
+    const removed = '000000000000000000000001', kept = '000000000000000000000002';
+    const oldTicket = { id: 21, messages: [{ _id: removed, text: 'Old' }, { _id: kept, text: 'Keep' }] };
+    component.supportTickets = [oldTicket, { id: 22, messages: [] }];
+    component.selectTicket(oldTicket);
+    component.activeTab = 'support';
+    component.fetchSupportTickets();
+    const request = http.expectOne(req => req.url.endsWith('/support/tickets'));
+    socket.supportTicketUpdated$.next({ ticket: { ...oldTicket, messages: [oldTicket.messages[1]] }, deletedMessageIds: [removed] });
+    socket.supportTicketsDeleted$.next({ ticketIds: [22] });
+    request.flush({ tickets: [oldTicket, { id: 22, messages: [] }] });
+    expect(component.supportTickets.map(ticket => ticket.id)).toEqual([21]);
+    expect(component.selectedTicket.messages.map((message: any) => message._id)).toEqual([kept]);
+    socket.supportTicketUpdated$.next({ ticket: { id: 22, messages: [] } });
+    expect(component.supportTickets.length).toBe(1);
   });
 
   it('deletes a completed transaction only after confirmation and leaves balances and totals unchanged', () => {

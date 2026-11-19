@@ -382,7 +382,8 @@ function createAdminPrivacy(models) {
     const accountToken = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
     req.adminAccountToken = accountToken;
     const supportResponse = (req.method === 'GET' && (req.originalUrl || '').split('?')[0] === '/api/admin/support/tickets')
-      || (req.method === 'POST' && (req.originalUrl || '').split('?')[0] === '/api/admin/support/reply');
+      || (req.method === 'POST' && (req.originalUrl || '').split('?')[0] === '/api/admin/support/reply')
+      || (req.method === 'DELETE' && /^\/api\/admin\/support\/tickets\/\d+\/messages$/.test((req.originalUrl || '').split('?')[0]));
     const controlRequest = req.method === 'POST' && /^\/api\/admin\/(?:pin\/(?:unlock|lock|configure)|transactions\/\d+\/claim-tag)$/.test((req.originalUrl || '').split('?')[0]) || (['GET', 'PUT'].includes(req.method) && (req.originalUrl || '').split('?')[0] === '/api/admin/payment-gateway');
     (controlRequest ? Promise.resolve(null) : identity(req.headers['x-admin-pin'], accountToken)).then(async pinIdentity => {
       req.pinIdentity = pinIdentity;

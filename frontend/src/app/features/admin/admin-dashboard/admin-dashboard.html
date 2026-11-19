@@ -1807,6 +1807,12 @@
       <div class="support-desk-grid margin-top">
         <!-- Tickets list on the left (on mobile, hidden when a ticket is selected) -->
         <div class="support-tickets-column" [class.hidden-on-mobile]="selectedTicket">
+          <div *ngIf="isSuperAdmin && supportTickets.length" class="support-selection-bar">
+            <label class="support-mark"><input type="checkbox" [checked]="allSupportTicketsMarked" [disabled]="isDeletingSupport"
+              (change)="markAllSupportTickets()" /> Mark all shown</label>
+            <button type="button" class="sm-btn danger" [disabled]="!markedSupportTicketIds.size || isDeletingSupport"
+              (click)="deleteMarkedSupportConversations()">Delete marked ({{ markedSupportTicketIds.size }})</button>
+          </div>
           <div *ngIf="filteredSupportTickets.length === 0" class="panel text-muted support-empty-tickets">
             No support tickets or appeals found in this category.
           </div>
@@ -1815,6 +1821,10 @@
                [class.active-ticket]="selectedTicket?.id === t.id"
                (click)="selectTicket(t)">
             <div class="support-ticket-header">
+              <label *ngIf="isSuperAdmin" class="support-mark" (click)="$event.stopPropagation()">
+                <input type="checkbox" [checked]="markedSupportTicketIds.has(t.id)" [disabled]="isDeletingSupport"
+                  [attr.aria-label]="'Mark conversation ' + t.id" (change)="markSupportTicket(t.id)" /> Mark
+              </label>
               <span class="role-badge" [class.admin]="t.category === 'appeal'">{{ t.category | uppercase }}</span>
               <span class="status-badge" [class.completed]="t.status === 'answered'" [class.pending]="t.status === 'open'">{{ t.status | uppercase }}</span>
             </div>
@@ -1840,12 +1850,22 @@
             <span class="status-badge" [class.completed]="selectedTicket.status === 'answered'" [class.pending]="selectedTicket.status === 'open'">{{ selectedTicket.status | uppercase }}</span>
           </div>
 
+          <div *ngIf="isSuperAdmin && selectedTicket.messages?.length" class="support-selection-bar">
+            <label class="support-mark"><input type="checkbox" [checked]="allSupportMessagesMarked" [disabled]="isDeletingSupport"
+              (change)="markAllSupportMessages()" /> Mark all messages</label>
+            <button type="button" class="sm-btn danger" [disabled]="!markedSupportMessageIds.size || isDeletingSupport"
+              (click)="deleteMarkedSupportMessages()">Delete marked ({{ markedSupportMessageIds.size }})</button>
+          </div>
           <div class="support-chat-messages">
             <div *ngFor="let m of selectedTicket.messages" 
                  class="support-msg-wrapper"
                  [class.from-admin]="m.sender === 'admin'"
                  [class.from-player]="m.sender !== 'admin'">
               <div class="support-msg-bubble" [class.admin-bubble]="m.sender === 'admin'" [class.player-bubble]="m.sender !== 'admin'">
+                <label *ngIf="isSuperAdmin && m._id" class="support-mark support-message-mark">
+                  <input type="checkbox" [checked]="markedSupportMessageIds.has(m._id)" [disabled]="isDeletingSupport"
+                    aria-label="Mark message" (change)="markSupportMessage(m._id)" /> Mark
+                </label>
                 <div class="support-msg-meta">
                   <span>{{ m.sender === 'admin' ? 'Support Desk' : ('Player: ' + selectedTicket.phone_number) }}</span>
                   <span class="mono">{{ m.created_at | date:'shortTime' }}</span>

@@ -21,6 +21,7 @@ const { createPaymentService } = require('./payment-service');
 const { createOnlinePlayers } = require('./online-players');
 const { createDashboardStats } = require('./dashboard-stats');
 const { createDeleteAdminTransaction } = require('./delete-admin-transaction');
+const { createSupportDeletion } = require('./delete-support');
 const { createAdminPrivacy, ADMIN_TAGS, adminClientScope, adminTicketScope } = require('./admin-privacy');
 const privacyModels = require('./models');
 const adminPrivacy = createAdminPrivacy(privacyModels);
@@ -3651,6 +3652,10 @@ app.get('/api/admin/support/tickets', authenticateAdminToken, async (req, res) =
     return res.status(500).json({ error: 'Failed to fetch support tickets' });
   }
 });
+
+const supportDeletion = createSupportDeletion({ SupportTicket, AdminLog }, adminNamespace);
+app.delete('/api/admin/support/tickets', authenticateSuperAdminToken, supportDeletion.conversations);
+app.delete('/api/admin/support/tickets/:id/messages', authenticateSuperAdminToken, supportDeletion.messages);
 
 // POST /api/admin/support/reply - Admin replies to a ticket
 app.post('/api/admin/support/reply', authenticateAdminToken, async (req, res) => {

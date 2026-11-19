@@ -235,7 +235,8 @@ export class AdminSocketService {
   public onlinePlayers$ = new BehaviorSubject<AdminOnlinePlayersSummary | null>(null);
   public accessRevoked$ = new BehaviorSubject<{ userId: number; reason: string } | null>(null);
   public predatorTextUpdate$ = new BehaviorSubject<string | null>(null);
-  public supportTicketUpdated$ = new BehaviorSubject<{ ticket: any } | null>(null);
+  public supportTicketUpdated$ = new BehaviorSubject<{ ticket: any; deletedMessageIds?: string[] } | null>(null);
+  public supportTicketsDeleted$ = new BehaviorSubject<{ ticketIds: number[] } | null>(null);
   public clientClaimed$ = new BehaviorSubject<{ userId: number; tag: string; transactionId?: number } | null>(null);
   public leaderboardUpdated$ = new BehaviorSubject<{ date?: string; tag?: string; transactionId?: number } | null>(null);
   public pinChanged$ = new BehaviorSubject<{ tags: string[] } | null>(null);
@@ -382,8 +383,11 @@ export class AdminSocketService {
       }
     });
 
-    this.listen('support_ticket_update', (data: { ticket: any }) => {
+    this.listen('support_ticket_update', (data: { ticket: any; deletedMessageIds?: string[] }) => {
       this.supportTicketUpdated$.next(data);
+    });
+    this.listen('support_tickets_deleted', (data: { ticketIds: number[] }) => {
+      this.supportTicketsDeleted$.next(data);
     });
 
     this.listen('timed_crash_timeout_status', (data: { enabled: boolean }) => {
@@ -467,6 +471,7 @@ export class AdminSocketService {
     this.onlinePlayers$.next(null);
     this.accessRevoked$.next(null);
     this.supportTicketUpdated$.next(null);
+    this.supportTicketsDeleted$.next(null);
     this.leaderboardUpdated$.next(null);
     this.clientClaimed$.next(null);
     this.pinChanged$.next(null);

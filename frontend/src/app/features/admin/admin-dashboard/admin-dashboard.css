@@ -3283,6 +3283,19 @@
   margin-bottom: 12px;
 }
 
+.support-selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 12px;
+}
+.support-mark { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; }
+.support-mark input { width: 16px; height: 16px; accent-color: #38bdf8; }
+.support-message-mark { margin-bottom: 8px; }
+
 .support-msg-wrapper {
   display: flex;
   width: 100%;
