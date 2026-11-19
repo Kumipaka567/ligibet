@@ -1297,7 +1297,11 @@
                   <button class="sm-btn success" (click)="openWithdrawalModalFromTx(tx, 'complete')" title="Approve Withdrawal">Approve</button>
                   <button class="sm-btn danger" (click)="openWithdrawalModalFromTx(tx, 'reject')" title="Decline Withdrawal">Decline</button>
                 </div>
-                <span *ngIf="tx.type !== 'withdrawal' || tx.status !== 'pending'" class="text-muted text-xs">--</span>
+                <button *ngIf="isSuperAdmin && tx.status === 'completed'" type="button" class="sm-btn danger"
+                        [disabled]="deletingTransactionId !== null" (click)="deleteCompletedTransaction(tx)">
+                  {{ deletingTransactionId === tx.id ? 'Deleting…' : 'Delete' }}
+                </button>
+                <span *ngIf="(tx.type !== 'withdrawal' || tx.status !== 'pending') && !(isSuperAdmin && tx.status === 'completed')" class="text-muted text-xs">--</span>
               </td>
             </tr>
             <tr *ngIf="transactionsList.length === 0">

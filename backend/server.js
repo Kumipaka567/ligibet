@@ -20,6 +20,7 @@ const { createPayHeroBalanceFetcher } = require('./payhero-balance');
 const { createPaymentService } = require('./payment-service');
 const { createOnlinePlayers } = require('./online-players');
 const { createDashboardStats } = require('./dashboard-stats');
+const { createDeleteAdminTransaction } = require('./delete-admin-transaction');
 const { createAdminPrivacy, ADMIN_TAGS, adminClientScope, adminTicketScope } = require('./admin-privacy');
 const privacyModels = require('./models');
 const adminPrivacy = createAdminPrivacy(privacyModels);
@@ -2145,7 +2146,7 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
   try {
     const [users, transactions, totals, logs] = await Promise.all([
       User.find(adminClientScope(req, 'id')).select('-password_hash -__v -_id').sort({ created_at: -1, id: -1 }).limit(100).lean(),
-      Transaction.find(adminClientScope(req, 'user_id')).select('id user_id client_phone type amount status reference created_at admin_tag').sort({ created_at: -1 }).limit(100).lean(),
+      Transaction.find({ ...adminClientScope(req, 'user_id'), admin_deleted_at: null }).select('id user_id client_phone type amount status reference created_at admin_tag').sort({ created_at: -1 }).limit(100).lean(),
       getDashboardTotals(),
       AdminLog.find({}).sort({ created_at: -1 }).limit(50).lean()
     ]);
@@ -2502,7 +2503,7 @@ app.get('/api/admin/transactions', authenticateAdminToken, async (req, res) => {
       userIds = users.map(u => u.id);
     }
 
-    const filter = { ...adminClientScope(req, 'user_id') };
+    const filter = { ...adminClientScope(req, 'user_id'), admin_deleted_at: null };
     if (userIds !== null) filter.user_id = { $in: userIds.filter(id => !req.blockedClientIds.includes(id)) };
     if (typeFilter !== 'all') filter.type = typeFilter;
     if (statusFilter !== 'all') filter.status = statusFilter;
@@ -2541,6 +2542,9 @@ app.get('/api/admin/transactions', authenticateAdminToken, async (req, res) => {
     return res.status(500).json({ error: 'Failed to fetch admin transactions' });
   }
 });
+
+app.delete('/api/admin/transactions/:id', authenticateSuperAdminToken,
+  createDeleteAdminTransaction({ Transaction, AdminLog }, adminNamespace));
 
 // Claims use the selected initial. PIN verification is only needed to reveal client phones.
 app.post('/api/admin/transactions/:id/claim-tag', authenticateAdminToken, async (req, res) => {

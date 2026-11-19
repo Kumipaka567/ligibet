@@ -638,6 +638,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   // Transactions State
   public transactionsList: AdminTransaction[] = [];
+  public deletingTransactionId: number | null = null;
+  private deletedTransactionIds = new Set<number>();
   public txTypeFilter: 'deposit' | 'withdrawal' = 'deposit';
   public txSearchQuery: string = '';
   public txStatusFilter: string = 'all';
@@ -1209,6 +1211,10 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.queueOnlinePlayerRefresh();
       }),
       this.adminSocket.transactionsUpdated$.subscribe(event => {
+        if (event?.action === 'transaction_deleted' && event.transactionId) {
+          this.removeDeletedTransaction(event.transactionId);
+          return;
+        }
         if (event) this.queueRealtimeRefresh({ transactions: true, dashboard: true, users: true, activeUsers: true });
       }),
       this.adminSocket.depositsUpdated$.subscribe(event => {
@@ -1353,6 +1359,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   private applyTransactionUpdate(event: AdminTransactionUpdate): void {
     if (!event.id || (event.type !== 'deposit' && event.type !== 'withdrawal')) return;
+    if (this.deletedTransactionIds.has(event.id)) return;
     this.latestTransactionUpdates.set(event.type + ':' + event.id, { version: ++this.realtimeVersion, transaction: event });
     const matches = event.type === this.txTypeFilter &&
       (this.txStatusFilter === 'all' || event.status === this.txStatusFilter) &&
@@ -2213,7 +2220,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
             this.markLoaded('logs');
           }
           if (Array.isArray(res?.transactions) && !this.txSearchQuery && this.txStatusFilter === 'all') {
-            const initialTxs = res.transactions.filter((t: any) => t.type === this.txTypeFilter);
+            const initialTxs = res.transactions.filter((t: any) => t.type === this.txTypeFilter && !this.deletedTransactionIds.has(t.id));
             if (!this.transactionsList.length || this.isStale('transactions')) {
               this.transactionsList = initialTxs;
               this.markLoaded('transactions');
@@ -2300,11 +2307,42 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
             } as AdminTransaction, ...rows];
           }
         }
-        this.transactionsList = rows.filter(transaction => requestedStatus === 'all' || transaction.status === requestedStatus);
+        this.transactionsList = rows.filter(transaction => !this.deletedTransactionIds.has(transaction.id) &&
+          (requestedStatus === 'all' || transaction.status === requestedStatus));
         this.markLoaded('transactions');
         this.cdr.markForCheck();
       },
       error: () => {}
+    });
+  }
+
+  private removeDeletedTransaction(id: number): void {
+    this.deletedTransactionIds.add(id);
+    this.transactionsList = this.transactionsList.filter(tx => tx.id !== id);
+    this.txPage = Math.min(this.txPage, this.totalTxPages);
+    this.cdr.markForCheck();
+  }
+
+  public deleteCompletedTransaction(tx: AdminTransaction): void {
+    if (!this.isSuperAdmin || tx.status !== 'completed' || this.deletingTransactionId !== null) return;
+    this.openConfirmDialog({
+      title: 'Delete completed transaction',
+      message: `Delete transaction #${tx.id} from the admin list? Player balance and total deposits will stay unchanged.`,
+      confirmText: 'Delete transaction', type: 'danger',
+      onConfirm: () => {
+        const token = this.authService.getToken();
+        if (!token || !this.isSuperAdmin || this.deletingTransactionId !== null) return;
+        this.deletingTransactionId = tx.id;
+        this.http.delete(`${this.baseUrl}/api/admin/transactions/${tx.id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).pipe(finalize(() => { this.deletingTransactionId = null; this.cdr.markForCheck(); })).subscribe({
+          next: () => {
+            this.removeDeletedTransaction(tx.id);
+            this.showAdminToast('Transaction deleted. Balance and deposit totals are unchanged.', 'success');
+          },
+          error: err => this.showAdminToast(err?.error?.error || 'Unable to delete transaction. Please retry.', 'error')
+        });
+      }
     });
   }
 

@@ -97,6 +97,7 @@ export interface AdminSnapshot {
 
 export interface AdminRealtimeEvent {
   action: string;
+  transactionId?: number;
   userId: number | null;
   occurredAt: string;
   balance?: number;

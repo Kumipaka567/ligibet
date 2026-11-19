@@ -140,6 +140,8 @@ const TransactionSchema = new mongoose.Schema({
   },
   admin_tagged_by: { type: Number, default: null },
   admin_tagged_at: { type: Date, default: null },
+  admin_deleted_at: { type: Date, default: null },
+  admin_deleted_by: { type: Number, default: null },
   created_at: { type: Date, default: Date.now, index: true }
 }, {
   toJSON: { virtuals: true, transform: (doc, ret) => { delete ret._id; delete ret.__v; return ret; } },

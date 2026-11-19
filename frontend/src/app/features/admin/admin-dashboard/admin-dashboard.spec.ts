@@ -114,6 +114,50 @@ describe('Admin dashboard live account management', () => {
     expect(component.stats.totalDeposits).toBe(2500);
   });
 
+  it('deletes a completed transaction only after confirmation and leaves balances and totals unchanged', () => {
+    const tx: any = { id: 91, user_id: 7, type: 'deposit', status: 'completed', amount: 500 };
+    component.transactionsList = [tx];
+    component.userList = [user({ balance: 650 })];
+    component.stats.totalDeposits = 500;
+    const confirm = vi.spyOn(component as any, 'openConfirmDialog');
+    component.deleteCompletedTransaction(tx);
+    http.expectNone(req => req.method === 'DELETE');
+    (confirm.mock.calls[0][0] as { onConfirm: () => void }).onConfirm();
+    expect(component.deletingTransactionId).toBe(91);
+    http.expectOne(req => req.method === 'DELETE' && req.url.endsWith('/transactions/91')).flush({ transactionId: 91 });
+    expect(component.transactionsList).toEqual([]);
+    expect(component.userList[0].balance).toBe(650);
+    expect(component.stats.totalDeposits).toBe(500);
+    expect(component.deletingTransactionId).toBeNull();
+  });
+
+  it('does not allow ordinary admins or pending transactions to enter the delete flow and retains a rejected row', () => {
+    const tx: any = { id: 91, user_id: 7, type: 'deposit', status: 'completed', amount: 500 };
+    const confirm = vi.spyOn(component as any, 'openConfirmDialog');
+    auth.currentUser$.next({ id: 1, role: 'admin' });
+    component.deleteCompletedTransaction(tx);
+    auth.currentUser$.next({ id: 1, role: 'superadmin' });
+    component.deleteCompletedTransaction({ ...tx, status: 'pending' });
+    expect(confirm).not.toHaveBeenCalled();
+    component.transactionsList = [tx];
+    component.deleteCompletedTransaction(tx);
+    (confirm.mock.calls[0][0] as { onConfirm: () => void }).onConfirm();
+    http.expectOne(req => req.method === 'DELETE').flush({ error: 'Not permitted' }, { status: 403, statusText: 'Forbidden' });
+    expect(component.transactionsList).toEqual([tx]);
+    expect(component.deletingTransactionId).toBeNull();
+  });
+
+  it('removes live deletions and prevents an older in-flight response from restoring the row', () => {
+    const tx: any = { id: 91, user_id: 7, type: 'deposit', status: 'completed', amount: 500 };
+    component.transactionsList = [tx];
+    component.fetchTransactions();
+    const request = http.expectOne(req => req.url.includes('/api/admin/transactions?'));
+    socket.transactionsUpdated$.next({ action: 'transaction_deleted', transactionId: 91, userId: null });
+    expect(component.transactionsList).toEqual([]);
+    request.flush({ transactions: [tx] });
+    expect(component.transactionsList).toEqual([]);
+  });
+
   it('keeps a recent wallet event when an older user request finishes', () => {
     component.userList = [user()];
     component.fetchUsers();
