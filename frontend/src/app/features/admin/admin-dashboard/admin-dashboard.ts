@@ -268,6 +268,11 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       if (this.activeTab === 'online-users') this.fetchOnlinePlayers(true);
       if (this.activeTab === 'admins') this.fetchAdmins();
       if (this.activeTab === 'logs') this.fetchLogs();
+      if (this.activeTab === 'prompt') {
+        this.fetchUsers();
+        this.fetchTransactions();
+        this.fetchPromptGatewaySettings();
+      }
     }
     this.cdr.markForCheck();
   }
@@ -281,17 +286,18 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     );
   }
 
-  public activeTab: 'game' | 'monitor' | 'predator' | 'withdrawal-settings' | 'active-users' | 'online-users' | 'transactions' | 'users' | 'admins' | 'logs' | 'support' = 'monitor';
+  public activeTab: 'game' | 'monitor' | 'prompt' | 'predator' | 'withdrawal-settings' | 'active-users' | 'online-users' | 'transactions' | 'users' | 'admins' | 'logs' | 'support' = 'monitor';
   public mobileMenuOpen: boolean = false;
   public selectedMiniRoom: number = 1;
   public readonly tabLabels: Record<AdminDashboardComponent['activeTab'], string> = {
-    game: 'Game monitor', monitor: 'Overview', 'active-users': 'Player activity', 'online-users': 'Online players',
+    game: 'Game monitor', monitor: 'Overview', prompt: 'M-Pesa Prompt', 'active-users': 'Player activity', 'online-users': 'Online players',
     transactions: 'Transactions', users: 'Users', admins: 'Administrators',
     logs: 'Audit log', 'withdrawal-settings': 'Payment settings', predator: 'Predator', support: 'Support & Appeals'
   };
   public readonly tabDescriptions: Record<AdminDashboardComponent['activeTab'], string> = {
     game: 'Live flight radar and next crash controls for all rooms on one screen.',
     monitor: 'Platform overview, metrics and settlement audit.',
+    prompt: 'Prompt a customer on their existing M-Pesa number or a changed number using the active payment gateway.',
     'active-users': 'Online players, account activity and withdrawal requests.',
     'online-users': 'Connected players across all game rooms, counted once per account.',
     transactions: 'Track deposits and withdrawals as they happen.',
@@ -1103,8 +1109,11 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.statsRequest?.unsubscribe();
     this.payHeroRequest?.unsubscribe();
     this.leaderboardRequest?.unsubscribe();
+    this.promptCustomerSearchRequest?.unsubscribe();
     if (this.payHeroPollTimer !== null) clearInterval(this.payHeroPollTimer);
     if (this.leaderboardPollTimer !== null) clearInterval(this.leaderboardPollTimer);
+    if (this.adminPromptPollTimer !== null) clearInterval(this.adminPromptPollTimer);
+    if (this.promptCustomerSearchTimer !== null) clearTimeout(this.promptCustomerSearchTimer);
     this.realtimeSubscriptions.forEach(subscription => subscription.unsubscribe());
     if (this.realtimeRefreshTimer !== null) clearTimeout(this.realtimeRefreshTimer);
     if (this.userSearchTimer !== null) clearTimeout(this.userSearchTimer);
@@ -1177,6 +1186,18 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         if (!event) return;
         if (event.type === 'deposit') {
           this.fetchPayHeroBalance(true);
+          if (this.adminPromptStatus === 'waiting' && (this.lastPromptedUserId === event.user_id || this.promptTargetUser?.id === event.user_id)) {
+            if (event.status === 'completed') {
+              this.stopAdminPromptPolling();
+              this.adminPromptStatus = 'completed';
+              this.adminPromptReceipt = (event.reference || '').replace(/^MPESA-/, '');
+              this.adminPromptMessage = `M-Pesa deposit of KES ${Number(event.amount || this.lastPromptedAmount).toLocaleString()} confirmed and credited!`;
+            } else if (event.status === 'failed') {
+              this.stopAdminPromptPolling();
+              this.adminPromptStatus = 'failed';
+              this.adminPromptMessage = 'Payment failed or was cancelled on the customer phone.';
+            }
+          }
           if (event.status === 'completed') {
             this.lastDepositCompletedToastTime = Date.now();
             const username = event.username || (event.user_id ? `User #${event.user_id}` : 'Player');
@@ -1196,6 +1217,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       }),
       this.adminSocket.dashboardStatsUpdated$.subscribe(event => {
         if (event?.action === 'user_online' || event?.action === 'user_offline') return;
+        if (event?.action === 'payment_gateway_changed') {
+          this.fetchPromptGatewaySettings();
+        }
         if (event?.action === 'payhero_service_wallet_changed') {
           this.fetchPayHeroBalance(true);
           return;
@@ -1353,6 +1377,10 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         }
       }
     }
+    if (this.promptTargetUser && this.promptTargetUser.id === userId) {
+      this.promptTargetUser = { ...this.promptTargetUser, ...patch };
+    }
+    this.promptSearchedUsers = this.promptSearchedUsers.map(user => user.id === userId ? { ...user, ...patch } : user);
     this.cdr.markForCheck();
   }
 
@@ -1495,6 +1523,19 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (tab === 'support') {
       this.unreadSupportCount = 0;
       this.fetchSupportTickets();
+    }
+    if (tab === 'prompt') {
+      this.fetchPromptGatewaySettings();
+      this.fetchDepositSettings();
+      if (this.promptActiveGateway === 'payhero') this.fetchPayHeroBalance();
+      if (!this.userList.length || this.isStale('users') || this.pendingRealtimeRefresh.users) {
+        this.pendingRealtimeRefresh.users = false;
+        this.fetchUsers();
+      }
+      if (!this.transactionsList.length || this.isStale('transactions') || this.pendingRealtimeRefresh.transactions) {
+        this.pendingRealtimeRefresh.transactions = false;
+        this.fetchTransactions();
+      }
     }
     this.cdr.markForCheck();
   }
@@ -3225,6 +3266,435 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       this.leaderboardData.leaderboard.forEach((item, idx) => item.rank = idx + 1);
       this.cdr.markForCheck();
     }
+  }
+
+  // ─── ADMIN M-PESA PROMPT CONSOLE STATE & METHODS ─────────────────────────
+  public promptActiveGateway: 'payhero' | 'nexuspay' = 'payhero';
+  public promptGateways: { id: 'payhero' | 'nexuspay'; name: string; configured: boolean }[] = [
+    { id: 'payhero', name: 'PayHero', configured: true },
+    { id: 'nexuspay', name: 'Nexus Pay', configured: true }
+  ];
+  public isLoadingPromptGateway = false;
+  public promptTargetUser: { id: number; username: string; phone_number?: string; balance?: number; is_online?: boolean } | null = null;
+  public promptPhoneMode: 'existing' | 'custom' = 'existing';
+  public promptPhoneInput: string = '';
+  public promptAmount: number = 199;
+  public promptSelectedPreset: number | null = null;
+  public promptPresetTapCount: number = 0;
+  public promptCustomerSearch: string = '';
+  public promptCustomerPresenceFilter: 'all' | 'online' = 'all';
+  public promptSearchedUsers: AdminUser[] = [];
+  public isSearchingPromptCustomers = false;
+  private promptCustomerSearchTimer: ReturnType<typeof setTimeout> | null = null;
+  private promptCustomerSearchRequest?: Subscription;
+
+  public adminPromptStatus: 'idle' | 'sending' | 'waiting' | 'completed' | 'failed' = 'idle';
+  public adminPromptMessage: string = '';
+  public adminPromptCheckoutId: string = '';
+  public adminPromptReceipt: string = '';
+  public lastPromptedPhone: string = '';
+  public lastPromptedAmount: number = 0;
+  public lastPromptedUserId: number | null = null;
+  public lastPromptedUsername: string = '';
+  private adminPromptPollTimer: ReturnType<typeof setInterval> | null = null;
+
+  public get promptPresets(): number[] {
+    const min = Math.max(199, Math.round(Number(this.minimumDepositAmount) || 199));
+    const candidates = [min, 300, 500, 1000, 2000, 5000, 10000];
+    return [...new Set(candidates.filter(v => v >= min))].slice(0, 6);
+  }
+
+  public get promptCustomerCandidates(): AdminUser[] {
+    const byId = new Map<number, AdminUser>();
+    for (const u of this.userList) {
+      if (u && typeof u.id === 'number') byId.set(u.id, u);
+    }
+    for (const u of this.promptSearchedUsers) {
+      if (u && typeof u.id === 'number' && !byId.has(u.id)) byId.set(u.id, u);
+    }
+    for (const u of this.onlinePlayerRows) {
+      if (u && typeof u.id === 'number' && !byId.has(u.id)) {
+        byId.set(u.id, {
+          id: u.id,
+          username: u.username,
+          phone_number: u.phone_number || undefined,
+          balance: u.balance,
+          role: 'user',
+          is_suspended: false,
+          is_online: true,
+          created_at: u.created_at || ''
+        });
+      }
+    }
+    const query = this.promptCustomerSearch.trim();
+    const onlyOnline = this.promptCustomerPresenceFilter === 'online';
+    return [...byId.values()]
+      .filter(u => (!onlyOnline || Boolean(u.is_online)) && this.matchesUserSearch(u, query))
+      .sort((a, b) => (Number(Boolean(b.is_online)) - Number(Boolean(a.is_online))) || ((Date.parse(b.created_at) || 0) - (Date.parse(a.created_at) || 0)) || (b.id - a.id))
+      .slice(0, 15);
+  }
+
+  public get recentDepositPrompts(): AdminTransaction[] {
+    return this.transactionsList
+      .filter(tx => tx.type === 'deposit' && !this.deletedTransactionIds.has(tx.id))
+      .slice(0, 10);
+  }
+
+  public get matchedCustomerByPhoneInput(): AdminUser | null {
+    if (this.promptTargetUser) return null;
+    const raw = (this.promptPhoneInput || '').trim();
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length < 7) return null;
+    const pool = [...this.userList, ...this.promptSearchedUsers];
+    return pool.find(u => this.matchesUserSearch(u, raw)) || null;
+  }
+
+  public fetchPromptGatewaySettings(): void {
+    const token = this.authService.getToken();
+    if (!token || this.isLoadingPromptGateway) return;
+    this.isLoadingPromptGateway = true;
+    this.http.get<{ activeGateway: 'payhero' | 'nexuspay'; gateways?: { id: 'payhero' | 'nexuspay'; name: string; configured: boolean }[] }>(
+      `${this.baseUrl}/api/admin/payment-gateway`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).pipe(
+      timeout(8000),
+      finalize(() => {
+        this.isLoadingPromptGateway = false;
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: res => {
+        if (res?.activeGateway === 'payhero' || res?.activeGateway === 'nexuspay') {
+          this.promptActiveGateway = res.activeGateway;
+        }
+        if (Array.isArray(res?.gateways) && res.gateways.length) {
+          this.promptGateways = res.gateways;
+        }
+        this.cdr.markForCheck();
+      },
+      error: () => {}
+    });
+  }
+
+  public selectCustomerForPrompt(user: { id: number; username: string; phone_number?: string; balance?: number; is_online?: boolean }, keepAmount = false): void {
+    const full = this.userList.find(u => u.id === user.id) || this.promptSearchedUsers.find(u => u.id === user.id);
+    this.promptTargetUser = {
+      id: user.id,
+      username: user.username || full?.username || `Player #${user.id}`,
+      phone_number: user.phone_number || full?.phone_number || user.username,
+      balance: user.balance ?? full?.balance ?? 0,
+      is_online: user.is_online ?? full?.is_online ?? false
+    };
+    this.promptPhoneMode = 'existing';
+    this.promptPhoneInput = (this.promptTargetUser.phone_number || this.promptTargetUser.username || '').trim();
+    const min = Math.max(199, Math.round(Number(this.minimumDepositAmount) || 199));
+    if (!keepAmount && (!Number.isFinite(this.promptAmount) || this.promptAmount < min)) {
+      this.promptAmount = min;
+    }
+    if (this.adminPromptStatus === 'completed' || this.adminPromptStatus === 'failed') {
+      this.adminPromptStatus = 'idle';
+      this.adminPromptMessage = '';
+      this.adminPromptReceipt = '';
+    }
+    this.cdr.markForCheck();
+  }
+
+  public openPromptForCustomer(user: { id: number; username: string; phone_number?: string; balance?: number; is_online?: boolean }, suggestedAmount?: number): void {
+    const min = Math.max(199, Math.round(Number(this.minimumDepositAmount) || 199));
+    const hasSuggested = typeof suggestedAmount === 'number' && Number.isFinite(suggestedAmount) && suggestedAmount >= min;
+    this.selectCustomerForPrompt(user, hasSuggested);
+    if (hasSuggested) {
+      this.promptAmount = Math.round(suggestedAmount!);
+      this.promptSelectedPreset = null;
+      this.promptPresetTapCount = 0;
+    }
+    this.setTab('prompt');
+  }
+
+  public openPromptFromTransaction(tx: AdminTransaction): void {
+    const existing = this.userList.find(u => u.id === tx.user_id) || this.promptSearchedUsers.find(u => u.id === tx.user_id);
+    const target = existing || {
+      id: tx.user_id,
+      username: tx.username || `Player #${tx.user_id}`,
+      phone_number: tx.phone_number || tx.username
+    };
+    this.openPromptForCustomer(target, tx.type === 'deposit' ? Number(tx.amount) : undefined);
+  }
+
+  public clearPromptCustomer(): void {
+    this.promptTargetUser = null;
+    this.promptPhoneMode = 'custom';
+    this.cdr.markForCheck();
+  }
+
+  public setPromptPhoneMode(mode: 'existing' | 'custom'): void {
+    this.promptPhoneMode = mode;
+    if (mode === 'existing' && this.promptTargetUser) {
+      this.promptPhoneInput = (this.promptTargetUser.phone_number || this.promptTargetUser.username || '').trim();
+    }
+    this.cdr.markForCheck();
+  }
+
+  public onPromptPhoneInputChange(value: string): void {
+    this.promptPhoneInput = value;
+    if (this.promptTargetUser) {
+      const existing = (this.promptTargetUser.phone_number || this.promptTargetUser.username || '').trim();
+      this.promptPhoneMode = (!value.trim() || value.trim() === existing) ? 'existing' : 'custom';
+    }
+    this.cdr.markForCheck();
+  }
+
+  public selectPromptPreset(preset: number): void {
+    if (this.promptSelectedPreset === preset) {
+      this.promptPresetTapCount += 1;
+      this.promptAmount = preset * this.promptPresetTapCount;
+    } else {
+      this.promptSelectedPreset = preset;
+      this.promptPresetTapCount = 1;
+      this.promptAmount = preset;
+    }
+    this.cdr.markForCheck();
+  }
+
+  public adjustPromptAmount(delta: number): void {
+    const min = Math.max(199, Math.round(Number(this.minimumDepositAmount) || 199));
+    const current = Math.round(Number(this.promptAmount) || min);
+    this.promptAmount = Math.max(min, Math.min(1000000, current + delta));
+    this.promptSelectedPreset = null;
+    this.promptPresetTapCount = 0;
+    this.cdr.markForCheck();
+  }
+
+  public onPromptCustomerSearch(): void {
+    if (this.promptCustomerSearchTimer !== null) clearTimeout(this.promptCustomerSearchTimer);
+    this.promptCustomerSearchRequest?.unsubscribe();
+    const query = this.promptCustomerSearch.trim();
+    if (!query) {
+      this.isSearchingPromptCustomers = false;
+      this.cdr.markForCheck();
+      return;
+    }
+    this.isSearchingPromptCustomers = true;
+    this.promptCustomerSearchTimer = setTimeout(() => {
+      this.promptCustomerSearchTimer = null;
+      const token = this.authService.getToken();
+      if (!token) {
+        this.isSearchingPromptCustomers = false;
+        this.cdr.markForCheck();
+        return;
+      }
+      this.promptCustomerSearchRequest = this.http.get<{ users: AdminUser[] }>(
+        `${this.baseUrl}/api/admin/users?search=${encodeURIComponent(query)}&role=all`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      ).pipe(
+        timeout(8000),
+        finalize(() => {
+          this.isSearchingPromptCustomers = false;
+          this.cdr.markForCheck();
+        })
+      ).subscribe({
+        next: res => {
+          this.promptSearchedUsers = this.mergeRealtimeUsers(res?.users || [], this.realtimeVersion);
+          this.cdr.markForCheck();
+        },
+        error: () => {}
+      });
+    }, 220);
+    this.cdr.markForCheck();
+  }
+
+  public submitAdminPrompt(): void {
+    if (this.adminPromptStatus === 'sending' || this.adminPromptStatus === 'waiting') return;
+    const token = this.authService.getToken();
+    if (!token) {
+      this.showAdminToast('Authentication token missing. Please sign in again.', 'error');
+      return;
+    }
+
+    const min = Math.max(199, Math.round(Number(this.minimumDepositAmount) || 199));
+    const amount = Math.round(Number(this.promptAmount));
+    if (!Number.isFinite(amount) || amount < min || amount > 1000000) {
+      this.showAdminToast(`Prompt amount must be a whole number between KES ${min.toLocaleString()} and 1,000,000.`, 'error');
+      return;
+    }
+
+    const trimmedPhone = (this.promptPhoneInput || '').trim();
+    if (!this.promptTargetUser && !trimmedPhone) {
+      this.showAdminToast('Select a customer account or enter an M-Pesa phone number to prompt.', 'error');
+      return;
+    }
+    if (this.promptTargetUser && this.promptPhoneMode === 'custom' && !trimmedPhone) {
+      this.showAdminToast('Enter the custom M-Pesa phone number to prompt, or switch back to the customer\'s existing number.', 'error');
+      return;
+    }
+
+    const phoneToSend = this.promptTargetUser && this.promptPhoneMode === 'existing'
+      ? (trimmedPhone && !trimmedPhone.includes('*') ? trimmedPhone : '')
+      : trimmedPhone;
+
+    this.stopAdminPromptPolling();
+    this.adminPromptStatus = 'sending';
+    this.adminPromptReceipt = '';
+    this.adminPromptCheckoutId = '';
+    this.lastPromptedAmount = amount;
+    this.lastPromptedUserId = this.promptTargetUser?.id ?? null;
+    this.lastPromptedUsername = this.promptTargetUser?.username || '';
+    this.lastPromptedPhone = trimmedPhone || this.promptTargetUser?.phone_number || '';
+    const gatewayLabel = this.promptActiveGateway === 'nexuspay' ? 'Nexus Pay' : 'PayHero';
+    this.adminPromptMessage = `Sending M-Pesa STK Push prompt via ${gatewayLabel}...`;
+    this.cdr.markForCheck();
+
+    this.http.post<{
+      success: boolean;
+      message: string;
+      checkoutRequestId: string;
+      activeGateway?: 'payhero' | 'nexuspay';
+      amount?: number;
+      promptedPhone?: string;
+      targetUserId?: number;
+      targetUsername?: string;
+    }>(
+      `${this.baseUrl}/api/admin/payment-prompt`,
+      {
+        ...(this.promptTargetUser ? { userId: this.promptTargetUser.id } : {}),
+        ...(phoneToSend ? { phone: phoneToSend } : {}),
+        amount
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).pipe(timeout(20000)).subscribe({
+      next: res => {
+        this.adminPromptCheckoutId = res?.checkoutRequestId || '';
+        if (res?.activeGateway) this.promptActiveGateway = res.activeGateway;
+        this.lastPromptedPhone = res?.promptedPhone || this.lastPromptedPhone;
+        this.lastPromptedAmount = res?.amount || amount;
+        this.lastPromptedUserId = res?.targetUserId ?? this.lastPromptedUserId;
+        this.lastPromptedUsername = res?.targetUsername || this.lastPromptedUsername;
+        this.adminPromptStatus = 'waiting';
+        this.adminPromptMessage = res?.message || `STK push sent! Waiting for M-Pesa PIN confirmation for KES ${amount.toLocaleString()}.`;
+        this.playDepositInitiatedSound();
+        this.showAdminToast(
+          `STK push of KES ${amount.toLocaleString()} sent to ${this.lastPromptedPhone || this.lastPromptedUsername || 'customer'} via ${this.promptActiveGateway === 'nexuspay' ? 'Nexus Pay' : 'PayHero'}.`,
+          'success',
+          'M-Pesa Prompt Sent'
+        );
+        this.startAdminPromptPolling();
+        this.fetchTransactions();
+        if (this.promptActiveGateway === 'payhero') this.fetchPayHeroBalance(true);
+        this.cdr.markForCheck();
+      },
+      error: err => {
+        this.adminPromptStatus = 'failed';
+        this.adminPromptMessage = err?.error?.error || 'The payment prompt could not be confirmed. Check before retrying.';
+        this.showAdminToast(this.adminPromptMessage, 'error', 'Prompt Rejected');
+        this.fetchTransactions();
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  private startAdminPromptPolling(): void {
+    this.stopAdminPromptPolling();
+    const reqId = this.adminPromptCheckoutId;
+    if (!reqId) return;
+    const deadline = Date.now() + 75000;
+    let checking = false;
+
+    this.adminPromptPollTimer = setInterval(() => {
+      if (checking || this.destroyed) return;
+      if (this.adminPromptStatus !== 'waiting' || Date.now() >= deadline) {
+        this.stopAdminPromptPolling();
+        if (Date.now() >= deadline && this.adminPromptStatus === 'waiting') {
+          this.adminPromptMessage = 'Confirmation is still pending in the background. Balance and transactions will update automatically once the customer enters their PIN.';
+          this.fetchTransactions();
+          this.cdr.markForCheck();
+        }
+        return;
+      }
+      checking = true;
+      this.pollAdminPromptStatusNow(() => { checking = false; });
+    }, 4000);
+  }
+
+  public pollAdminPromptStatusNow(onDone?: () => void): void {
+    const reqId = this.adminPromptCheckoutId;
+    const token = this.authService.getToken();
+    if (!reqId || !token) {
+      if (onDone) onDone();
+      return;
+    }
+    this.http.post<{
+      status: string;
+      receiptNumber?: string | null;
+      balance?: number;
+      targetUserId?: number;
+      targetUsername?: string | null;
+      failure_reason?: string | null;
+      reason?: string | null;
+    }>(
+      `${this.baseUrl}/api/admin/payment-prompt/status`,
+      { checkoutRequestId: reqId },
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).pipe(
+      timeout(10000),
+      finalize(() => {
+        if (onDone) onDone();
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: res => {
+        if (reqId !== this.adminPromptCheckoutId) return;
+        if (res.status === 'completed') {
+          this.stopAdminPromptPolling();
+          this.adminPromptStatus = 'completed';
+          this.adminPromptReceipt = res.receiptNumber || '';
+          const targetId = res.targetUserId ?? this.lastPromptedUserId;
+          if (targetId && typeof res.balance === 'number') {
+            this.applyUserUpdate(targetId, { balance: res.balance });
+          }
+          this.adminPromptMessage = `M-Pesa deposit confirmed!${res.receiptNumber ? ' Receipt: ' + res.receiptNumber + '.' : ''} Customer wallet has been credited.`;
+          this.playDepositCompletedSound();
+          this.showAdminToast(this.adminPromptMessage, 'success', 'Prompt Paid & Credited');
+          this.fetchTransactions();
+          this.fetchOverviewStats();
+        } else if (res.status === 'failed') {
+          this.stopAdminPromptPolling();
+          this.adminPromptStatus = 'failed';
+          this.adminPromptMessage = res.failure_reason || res.reason || 'Payment failed or was cancelled on the customer phone.';
+          this.showAdminToast(this.adminPromptMessage, 'error', 'Prompt Not Completed');
+          this.fetchTransactions();
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  public stopAdminPromptPolling(): void {
+    if (this.adminPromptPollTimer !== null) {
+      clearInterval(this.adminPromptPollTimer);
+      this.adminPromptPollTimer = null;
+    }
+  }
+
+  public resetAdminPromptState(): void {
+    this.stopAdminPromptPolling();
+    this.adminPromptStatus = 'idle';
+    this.adminPromptMessage = '';
+    this.adminPromptReceipt = '';
+    this.adminPromptCheckoutId = '';
+    this.cdr.markForCheck();
+  }
+
+  public dismissAdminPromptWait(): void {
+    const reqId = this.adminPromptCheckoutId;
+    const token = this.authService.getToken();
+    if (reqId && token) {
+      this.http.post(
+        `${this.baseUrl}/api/admin/payment-prompt/cancel`,
+        { checkoutRequestId: reqId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      ).subscribe({ error: () => {} });
+    }
+    this.resetAdminPromptState();
   }
 
   public logout(): void {

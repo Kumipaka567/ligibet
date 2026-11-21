@@ -6,6 +6,7 @@
 <div class="workspace-badge"><span class="workspace-avatar">{{ isSuperAdmin ? 'SA' : 'AD' }}</span><div><strong>{{ isSuperAdmin ? 'Super administrator' : 'Administrator' }}</strong><span>Platform management</span></div><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m8 12 3 3 5-6"/></svg></div>
 <nav class="sidebar-nav" aria-label="Dashboard sections"><span class="nav-section-label">Workspace</span><button type="button" [class.active]="activeTab === 'game'" [attr.aria-current]="activeTab === 'game' ? 'page' : null" (click)="setTab('game')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/></svg><span>Game monitor</span></button>
 <button type="button"  [class.active]="activeTab === 'monitor'" [attr.aria-current]="activeTab === 'monitor' ? 'page' : null" (click)="setTab('monitor')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>Overview</span></button>
+<button type="button" [class.active]="activeTab === 'prompt'" [attr.aria-current]="activeTab === 'prompt' ? 'page' : null" (click)="setTab('prompt')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01M9 7h6m-6 4h6"/></svg><span>M-Pesa Prompt</span><span *ngIf="adminPromptStatus === 'waiting' || adminPromptStatus === 'sending'" class="badge-count">LIVE</span></button>
 <button type="button" [class.active]="activeTab === 'online-users'" [attr.aria-current]="activeTab === 'online-users' ? 'page' : null" (click)="openOnlinePlayers()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg><span>Online players</span></button>
 <button type="button"  [class.active]="activeTab === 'active-users'" [attr.aria-current]="(activeTab === 'active-users') ? 'page' : null" (click)="setTab('active-users')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Player activity</span><span *ngIf="pendingWithdrawalsList.length" class="badge-count">{{ pendingWithdrawalsList.length }}</span></button>
 <button type="button"  [class.active]="activeTab === 'transactions'" [attr.aria-current]="(activeTab === 'transactions') ? 'page' : null" (click)="setTab('transactions')"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></svg><span>Transactions</span></button>
@@ -21,7 +22,7 @@
 <div class="topbar-left"><button type="button" class="menu-toggle" (click)="toggleMobileMenu()" [attr.aria-expanded]="mobileMenuOpen" aria-controls="admin-navigation" aria-label="Toggle navigation"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><div class="topbar-breadcrumb"><span>Workspace</span><span class="breadcrumb-divider">/</span><strong>{{ tabLabels[activeTab] }}</strong></div></div>
 <div class="topbar-actions"><button type="button" class="staged-timeout-toggle-btn" [class.is-active]="isTimedCrashTimeoutEnabled" (click)="toggleTimedCrashTimeout()" [disabled]="isTogglingTimedCrashTimeout" [attr.aria-pressed]="isTimedCrashTimeoutEnabled" [attr.aria-label]="'Timed Crash Timeout ' + (isTimedCrashTimeoutEnabled ? 'ON' : 'OFF')" title="Timed Crash Timeout: Block cashouts with 'staged timed out'"><svg class="timeout-topbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 6 12 12 15 15"/></svg><span class="timeout-pulse-dot" [class.is-active]="isTimedCrashTimeoutEnabled"></span><span class="timeout-btn-text"><span class="timeout-full-label">Timeout: </span><strong class="timeout-state-word">{{ isTimedCrashTimeoutEnabled ? 'ON' : 'OFF' }}</strong></span></button><button type="button" class="action-btn outline-sm admin-pin-button" (click)="openPinDialog()" [attr.aria-label]="adminPin.tag ? 'Switch admin PIN identity' : 'Unlock my clients'">{{ adminPin.tag ? 'Admin ' + adminPin.tag : 'Unlock my clients' }}</button><button *ngIf="adminPin.tag" type="button" class="action-btn outline-sm" (click)="lockAdminPin()">Lock</button><span class="connection-pill" [class.connected]="isConnected$ | async" role="status"><span class="indicator-dot"></span>{{ (isConnected$ | async) ? 'Live sync' : 'Reconnecting' }}</span><button type="button" class="sanitized-toggle-btn" [class.is-sanitized]="sanitizedMode.isSanitizedMode()" (click)="toggleSanitizedMode()" [attr.aria-pressed]="sanitizedMode.isSanitizedMode()" title="Toggle sanitized view"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m8 12 3 3 5-6"/></svg><span class="view-mode-label">Sanitized view</span><span class="sanitized-pill-indicator"></span></button><button type="button" class="topbar-logout" (click)="logout()" aria-label="Sign out" title="Sign out"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 2 5 5-5 5m5-5H9"/></svg></button></div>
 </header><div class="admin-workspace" id="admin-content" tabindex="-1">
-<section class="workspace-heading" *ngIf="activeTab !== 'game'"><div><span class="workspace-kicker">Control center</span><h1>{{ tabLabels[activeTab] }}<span class="heading-dot">.</span></h1><p>{{ tabDescriptions[activeTab] }}</p></div><div class="heading-actions" *ngIf="activeTab === 'monitor'"><button type="button" class="action-btn outline" (click)="setTab('users')"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg>Manage users</button><button type="button" class="action-btn primary" (click)="setTab('transactions')">View transactions<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button></div></section>
+<section class="workspace-heading" *ngIf="activeTab !== 'game'"><div><span class="workspace-kicker">Control center</span><h1>{{ tabLabels[activeTab] }}<span class="heading-dot">.</span></h1><p>{{ tabDescriptions[activeTab] }}</p></div><div class="heading-actions" *ngIf="activeTab === 'monitor'"><button type="button" class="action-btn outline" (click)="setTab('prompt')"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01M9 7h6"/></svg>Prompt customer</button><button type="button" class="action-btn outline" (click)="setTab('users')"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6"/></svg>Manage users</button><button type="button" class="action-btn primary" (click)="setTab('transactions')">View transactions<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button></div></section>
 <section class="stats-bar top-operational-strip" *ngIf="activeTab === 'monitor'" aria-label="Live treasury and claimed deposits">
 <article class="stat-card payhero-card"
   [class.balance-safe]="payHeroBalance !== null && payHeroBalance >= 200"
@@ -900,6 +901,397 @@
 
   </ng-container>
 
+  <!-- TAB: ADMIN M-PESA STK PROMPT CONSOLE -->
+  <ng-container *ngIf="activeTab === 'prompt'">
+    <!-- TOP ACTIVE GATEWAY & STATUS STRIP -->
+    <section class="stats-bar prompt-gateway-strip" aria-label="Active payment gateway and prompt configuration">
+      <article class="stat-card green prompt-gateway-stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">Active Deposit Gateway</span>
+          <button type="button" class="micro-refresh-btn" (click)="fetchPromptGatewaySettings()" [disabled]="isLoadingPromptGateway" title="Refresh active gateway" aria-label="Refresh active payment gateway">
+            <svg class="refresh-icon" [class.spinning]="isLoadingPromptGateway" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+          </button>
+        </div>
+        <strong class="stat-val">{{ promptActiveGateway === 'nexuspay' ? 'Nexus Pay' : 'PayHero' }}</strong>
+        <div class="stat-card-footer">
+          <span class="payhero-status-pill pill-green">STK Push Ready</span>
+          <button type="button" class="micro-reset-btn" (click)="setTab('withdrawal-settings')">Change gateway ↗</button>
+        </div>
+      </article>
+
+      <article class="stat-card blue prompt-gateway-stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">Minimum Deposit Rule</span>
+          <span class="stat-icon-wrapper"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+        </div>
+        <strong class="stat-val"><span class="stat-currency">KES</span>{{ minimumDepositAmount | number:'1.0-0' }}</strong>
+        <div class="stat-card-footer">
+          <span>Enforced for every STK prompt</span>
+          <span class="stat-footnote">Max 1,000,000 KES</span>
+        </div>
+      </article>
+
+      <article class="stat-card payhero-card prompt-gateway-stat-card" *ngIf="promptActiveGateway === 'payhero'"
+        [class.balance-safe]="payHeroBalance !== null && payHeroBalance >= 200"
+        [class.balance-warning]="payHeroBalance !== null && payHeroBalance >= 100 && payHeroBalance < 200"
+        [class.balance-danger]="payHeroBalance !== null && payHeroBalance < 100">
+        <div class="stat-card-top">
+          <span class="stat-label">PayHero Service Tokens</span>
+          <button type="button" class="micro-refresh-btn" (click)="fetchPayHeroBalance(true)" [disabled]="isLoadingPayHeroBalance" title="Refresh PayHero tokens" aria-label="Refresh PayHero service tokens">
+            <svg class="refresh-icon" [class.spinning]="isLoadingPayHeroBalance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+          </button>
+        </div>
+        <strong class="stat-val payhero-balance-val"
+          [class.text-green]="payHeroBalance !== null && payHeroBalance >= 200"
+          [class.text-yellow]="payHeroBalance !== null && payHeroBalance >= 100 && payHeroBalance < 200"
+          [class.text-red]="payHeroBalance !== null && payHeroBalance < 100">
+          <span class="stat-currency">Tokens</span>{{ payHeroBalance !== null ? (payHeroBalance | number:'1.2-2') : 'Available' }}
+        </strong>
+        <div class="stat-card-footer">
+          <span>{{ payHeroBalance !== null && payHeroBalance < 100 ? 'Low tokens — top up soon' : 'PayHero channel online' }}</span>
+        </div>
+      </article>
+    </section>
+
+    <div class="prompt-workspace-grid">
+      <!-- LEFT COLUMN: MAIN M-PESA STK PROMPT FORM -->
+      <section class="panel prompt-console-panel" aria-labelledby="admin-mpesa-prompt-heading">
+        <div class="panel-title-row">
+          <div>
+            <span class="panel-kicker">Direct Customer STK Push</span>
+            <h2 id="admin-mpesa-prompt-heading">M-Pesa Deposit Prompt</h2>
+            <p class="panel-desc">
+              Prompt a customer using their existing registered number or change the number if needed. The prompt is dispatched through <strong>{{ promptActiveGateway === 'nexuspay' ? 'Nexus Pay' : 'PayHero' }}</strong> and credits the customer's wallet automatically upon M-Pesa PIN confirmation.
+            </p>
+          </div>
+          <span class="prompt-gateway-badge">
+            <span class="small-live-dot"></span>
+            {{ promptActiveGateway === 'nexuspay' ? 'Nexus Pay Active' : 'PayHero Active' }}
+          </span>
+        </div>
+
+        <!-- SELECTED CUSTOMER CARD OR DIRECT PHONE MODE -->
+        <div class="prompt-customer-card" *ngIf="promptTargetUser as target; else noCustomerSelectedTpl">
+          <div class="prompt-customer-card-left">
+            <div class="prompt-customer-avatar">{{ (target.username || 'U')[0].toUpperCase() }}</div>
+            <div class="prompt-customer-meta">
+              <div class="prompt-customer-name-row">
+                <strong>{{ target.username }}</strong>
+                <span class="mono text-xs text-muted">#{{ target.id }}</span>
+                <span class="online-indicator" [class.online]="target.is_online">
+                  <span class="indicator-dot"></span>{{ target.is_online ? 'Online' : 'Offline' }}
+                </span>
+              </div>
+              <div class="prompt-customer-sub-row">
+                <span>Account Phone: <strong class="mono">{{ target.phone_number || target.username || '--' }}</strong></span>
+                <span class="prompt-meta-dot">&bull;</span>
+                <span>Balance: <strong class="text-green mono">KES {{ (target.balance || 0) | number:'1.2-2' }}</strong></span>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="action-btn outline-sm" (click)="clearPromptCustomer()">
+            Change / Clear Customer
+          </button>
+        </div>
+
+        <ng-template #noCustomerSelectedTpl>
+          <div class="prompt-no-customer-banner">
+            <div class="prompt-no-customer-text">
+              <strong>No customer selected from directory yet</strong>
+              <span>Pick a customer from the right panel to use their existing number, or type any customer's M-Pesa phone number below.</span>
+            </div>
+            <div *ngIf="matchedCustomerByPhoneInput as matched" class="prompt-auto-match-chip">
+              <span>Matched account: <strong>{{ matched.username }}</strong> (#{{ matched.id }})</span>
+              <button type="button" class="sm-btn success" (click)="selectCustomerForPrompt(matched, true)">Link Customer</button>
+            </div>
+          </div>
+        </ng-template>
+
+        <!-- PHONE NUMBER MODE SWITCHER (EXISTING NUMBER VS CHANGE NUMBER) -->
+        <div class="prompt-field-block margin-top">
+          <div class="prompt-field-header">
+            <label for="admin-prompt-phone">M-Pesa Phone Number to Prompt</label>
+            <div class="prompt-phone-mode-pills" *ngIf="promptTargetUser">
+              <button
+                type="button"
+                class="prompt-mode-pill"
+                [class.active]="promptPhoneMode === 'existing'"
+                (click)="setPromptPhoneMode('existing')"
+              >
+                Use Customer's Existing Number
+              </button>
+              <button
+                type="button"
+                class="prompt-mode-pill"
+                [class.active]="promptPhoneMode === 'custom'"
+                (click)="setPromptPhoneMode('custom')"
+              >
+                Change Number for This Prompt
+              </button>
+            </div>
+          </div>
+
+          <span id="admin-prompt-phone-hint" class="prompt-input-hint">
+            <ng-container *ngIf="promptTargetUser && promptPhoneMode === 'existing'">
+              Using <strong>{{ promptTargetUser.username }}</strong>'s existing account phone number ({{ promptTargetUser.phone_number || promptTargetUser.username }}). Edit below if you need to prompt a different number.
+            </ng-container>
+            <ng-container *ngIf="promptTargetUser && promptPhoneMode === 'custom'">
+              Enter the alternate M-Pesa number to receive the STK prompt. Once paid, the deposit still credits <strong>{{ promptTargetUser.username }}</strong> (#{{ promptTargetUser.id }}).
+            </ng-container>
+            <ng-container *ngIf="!promptTargetUser">
+              Format: 07XXXXXXXX, 01XXXXXXXX, or +2547XXXXXXXX. Automatically matches the customer account if registered.
+            </ng-container>
+          </span>
+
+          <div class="prompt-phone-input-row">
+            <input
+              id="admin-prompt-phone"
+              type="tel"
+              class="styled-input mono prompt-phone-input"
+              [ngModel]="promptPhoneInput"
+              (ngModelChange)="onPromptPhoneInputChange($event)"
+              placeholder="e.g. 0712345678 or +254712345678"
+              aria-describedby="admin-prompt-phone-hint"
+              autocomplete="tel"
+            />
+            <button
+              *ngIf="promptTargetUser && promptPhoneMode === 'custom'"
+              type="button"
+              class="action-btn outline-sm"
+              (click)="setPromptPhoneMode('existing')"
+              title="Restore customer's registered phone number"
+            >
+              Reset to Existing Number
+            </button>
+          </div>
+        </div>
+
+        <!-- AMOUNT & QUICK PRESETS -->
+        <div class="prompt-field-block margin-top">
+          <div class="prompt-field-header">
+            <label for="admin-prompt-amount">Deposit Prompt Amount (KES)</label>
+            <span class="text-xs text-muted mono">Min: KES {{ minimumDepositAmount | number:'1.0-0' }}</span>
+          </div>
+
+          <span id="admin-prompt-amount-hint" class="prompt-input-hint">
+            Enter a whole number amount in KES or tap a preset below (tap the same preset again to multiply).
+          </span>
+
+          <div class="prompt-amount-input-row">
+            <button type="button" class="action-btn outline-sm mono" (click)="adjustPromptAmount(-100)" [disabled]="promptAmount <= minimumDepositAmount">-100</button>
+            <input
+              id="admin-prompt-amount"
+              type="number"
+              [min]="minimumDepositAmount"
+              max="1000000"
+              step="1"
+              class="styled-input mono prompt-amount-input"
+              [(ngModel)]="promptAmount"
+              aria-describedby="admin-prompt-amount-hint"
+              placeholder="Enter amount in KES"
+            />
+            <button type="button" class="action-btn outline-sm mono" (click)="adjustPromptAmount(100)">+100</button>
+            <button type="button" class="action-btn outline-sm mono" (click)="adjustPromptAmount(500)">+500</button>
+          </div>
+
+          <!-- 6 PRESET PILLS GRID (MATCHING EXISTING DEPOSIT PROMPT CODES) -->
+          <div class="prompt-preset-grid" role="group" aria-label="Quick deposit amount presets">
+            <button
+              type="button"
+              *ngFor="let preset of promptPresets"
+              class="prompt-preset-pill mono"
+              [class.active]="promptSelectedPreset === preset || promptAmount === preset"
+              (click)="selectPromptPreset(preset)"
+            >
+              KES {{ preset | number:'1.0-0' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- SUBMIT PROMPT ACTION BUTTON -->
+        <button
+          type="button"
+          class="prompt-submit-btn margin-top"
+          [disabled]="adminPromptStatus === 'sending' || adminPromptStatus === 'waiting'"
+          (click)="submitAdminPrompt()"
+        >
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01M9 7h6m-6 4h6"/>
+          </svg>
+          <span>
+            {{ adminPromptStatus === 'sending'
+              ? 'Sending M-Pesa Prompt...'
+              : (adminPromptStatus === 'waiting'
+                ? 'Prompt Sent — Waiting for Customer PIN...'
+                : 'Prompt Customer via ' + (promptActiveGateway === 'nexuspay' ? 'Nexus Pay' : 'PayHero') + ' (KES ' + ((promptAmount || 0) | number:'1.0-0') + ')') }}
+          </span>
+        </button>
+
+        <!-- LIVE STK PUSH STATUS & PROGRESS TRACKER -->
+        <div *ngIf="adminPromptStatus !== 'idle'" class="prompt-live-status-card margin-top"
+             [class.is-waiting]="adminPromptStatus === 'sending' || adminPromptStatus === 'waiting'"
+             [class.is-completed]="adminPromptStatus === 'completed'"
+             [class.is-failed]="adminPromptStatus === 'failed'"
+             role="status">
+          <div class="prompt-status-top">
+            <div class="prompt-status-indicator">
+              <span class="prompt-pulse-pip" *ngIf="adminPromptStatus === 'sending' || adminPromptStatus === 'waiting'"></span>
+              <strong *ngIf="adminPromptStatus === 'sending'">Dispatching M-Pesa STK Push…</strong>
+              <strong *ngIf="adminPromptStatus === 'waiting'">M-Pesa STK Push Sent — Awaiting PIN</strong>
+              <strong *ngIf="adminPromptStatus === 'completed'">✓ Deposit Confirmed &amp; Wallet Credited</strong>
+              <strong *ngIf="adminPromptStatus === 'failed'">✕ Prompt Not Completed</strong>
+            </div>
+            <span class="mono text-xs" *ngIf="lastPromptedAmount">KES {{ lastPromptedAmount | number:'1.2-2' }}</span>
+          </div>
+
+          <p class="prompt-status-msg">{{ adminPromptMessage }}</p>
+
+          <div class="prompt-status-meta mono text-xs">
+            <span *ngIf="lastPromptedUsername">Account: <strong>{{ lastPromptedUsername }}</strong></span>
+            <span *ngIf="lastPromptedPhone">Phone: <strong>{{ lastPromptedPhone }}</strong></span>
+            <span *ngIf="adminPromptReceipt">M-Pesa Receipt: <strong class="text-green">{{ adminPromptReceipt }}</strong></span>
+          </div>
+
+          <div class="prompt-status-actions">
+            <button
+              *ngIf="adminPromptStatus === 'waiting'"
+              type="button"
+              class="sm-btn primary"
+              (click)="pollAdminPromptStatusNow()"
+            >
+              Check Status Now
+            </button>
+            <button
+              *ngIf="adminPromptStatus === 'waiting'"
+              type="button"
+              class="sm-btn warning"
+              (click)="dismissAdminPromptWait()"
+            >
+              New Prompt / Dismiss Wait
+            </button>
+            <button
+              *ngIf="adminPromptStatus === 'completed' || adminPromptStatus === 'failed'"
+              type="button"
+              class="sm-btn primary"
+              (click)="resetAdminPromptState()"
+            >
+              {{ adminPromptStatus === 'failed' ? 'Ready to Retry Prompt' : 'Send Another Prompt' }}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN: QUICK CUSTOMER PICKER & RECENT PROMPTS -->
+      <div class="prompt-side-column">
+        <!-- QUICK CUSTOMER PICKER -->
+        <section class="panel prompt-directory-panel" aria-labelledby="prompt-customer-finder-heading">
+          <div class="panel-title-row">
+            <div>
+              <h3 id="prompt-customer-finder-heading">Select Customer Account</h3>
+              <p class="panel-desc">Click any customer to pre-fill their existing phone number.</p>
+            </div>
+            <div class="prompt-presence-pills">
+              <button type="button" class="sm-btn" [class.primary]="promptCustomerPresenceFilter === 'all'" (click)="promptCustomerPresenceFilter = 'all'">All</button>
+              <button type="button" class="sm-btn" [class.primary]="promptCustomerPresenceFilter === 'online'" (click)="promptCustomerPresenceFilter = 'online'">Online</button>
+            </div>
+          </div>
+
+          <div class="user-search-wrap full-width margin-top-xs">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg>
+            <input
+              type="search"
+              class="styled-input full-width"
+              [(ngModel)]="promptCustomerSearch"
+              (ngModelChange)="onPromptCustomerSearch()"
+              placeholder="Search customer phone, username, or #ID..."
+              aria-label="Search customer to prompt"
+              autocomplete="off"
+            />
+          </div>
+
+          <div class="prompt-customer-list margin-top">
+            <div
+              *ngFor="let cust of promptCustomerCandidates; trackBy: trackById"
+              class="prompt-customer-row"
+              [class.is-selected]="promptTargetUser?.id === cust.id"
+              (click)="selectCustomerForPrompt(cust)"
+            >
+              <div class="prompt-row-info">
+                <div class="prompt-row-top">
+                  <strong>{{ cust.username }}</strong>
+                  <span class="mono text-xs text-muted">#{{ cust.id }}</span>
+                  <span class="online-indicator" [class.online]="cust.is_online">
+                    <span class="indicator-dot"></span>{{ cust.is_online ? 'Online' : 'Offline' }}
+                  </span>
+                </div>
+                <div class="prompt-row-sub mono text-xs">
+                  <span>{{ cust.phone_number || cust.username || '--' }}</span>
+                  <span>&bull;</span>
+                  <span class="text-green">KES {{ cust.balance | number:'1.2-2' }}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                class="sm-btn"
+                [class.success]="promptTargetUser?.id !== cust.id"
+                [class.primary]="promptTargetUser?.id === cust.id"
+                (click)="selectCustomerForPrompt(cust); $event.stopPropagation()"
+              >
+                {{ promptTargetUser?.id === cust.id ? 'Selected ✓' : 'Use Number' }}
+              </button>
+            </div>
+
+            <div *ngIf="promptCustomerCandidates.length === 0" class="text-center text-muted padding-lg">
+              {{ isSearchingPromptCustomers || isLoadingUsers ? 'Searching customers...' : 'No matching customer accounts found.' }}
+            </div>
+          </div>
+        </section>
+
+        <!-- RECENT DEPOSIT PROMPTS FEED -->
+        <section class="panel prompt-recent-panel margin-top" aria-labelledby="recent-prompts-heading">
+          <div class="panel-title-row">
+            <div>
+              <h3 id="recent-prompts-heading">Recent M-Pesa Prompts</h3>
+              <p class="panel-desc">Live feed of recent STK push deposit requests.</p>
+            </div>
+            <button type="button" class="action-btn outline-sm" (click)="fetchTransactions()" [disabled]="isLoadingTransactions">Refresh</button>
+          </div>
+
+          <div class="prompt-recent-list margin-top-xs">
+            <div *ngFor="let tx of recentDepositPrompts; trackBy: trackById" class="prompt-recent-row">
+              <div class="prompt-recent-info">
+                <div class="prompt-row-top">
+                  <strong>{{ tx.username }}</strong>
+                  <span class="mono text-xs">{{ tx.phone_number || '--' }}</span>
+                  <span class="status-badge" [class.completed]="tx.status === 'completed'" [class.failed]="tx.status === 'failed'" [class.pending]="tx.status === 'pending'">
+                    {{ tx.status | uppercase }}
+                  </span>
+                </div>
+                <div class="prompt-row-sub mono text-xs">
+                  <strong>KES {{ tx.amount | number:'1.2-2' }}</strong>
+                  <span>&bull;</span>
+                  <span>{{ tx.reference || '--' }}</span>
+                  <span>&bull;</span>
+                  <span>{{ tx.created_at | date:'shortTime' }}</span>
+                </div>
+              </div>
+              <button type="button" class="sm-btn success" (click)="openPromptFromTransaction(tx)" title="Load customer and amount into prompt form">
+                Prompt
+              </button>
+            </div>
+            <div *ngIf="recentDepositPrompts.length === 0" class="text-center text-muted padding-lg">
+              No recent deposit prompts recorded yet.
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </ng-container>
+
   <!-- TAB: PREDATOR SCREEN & WRITINGS CONFIGURATION -->
   <ng-container *ngIf="activeTab === 'predator'">
     <section class="panel predator-dashboard-tab-panel">
@@ -1293,15 +1685,17 @@
               </td>
               <td class="mono text-xs" data-label="Timestamp">{{ tx.created_at | date:'medium' }}</td>
               <td data-label="Actions" class="action-cell">
-                <div *ngIf="tx.type === 'withdrawal' && tx.status === 'pending'" class="btn-group-row">
-                  <button class="sm-btn success" (click)="openWithdrawalModalFromTx(tx, 'complete')" title="Approve Withdrawal">Approve</button>
-                  <button class="sm-btn danger" (click)="openWithdrawalModalFromTx(tx, 'reject')" title="Decline Withdrawal">Decline</button>
+                <div class="btn-group-row">
+                  <button type="button" class="sm-btn success prompt-row-btn" (click)="openPromptFromTransaction(tx)" title="Send M-Pesa STK Push prompt to this customer">Prompt</button>
+                  <ng-container *ngIf="tx.type === 'withdrawal' && tx.status === 'pending'">
+                    <button class="sm-btn success" (click)="openWithdrawalModalFromTx(tx, 'complete')" title="Approve Withdrawal">Approve</button>
+                    <button class="sm-btn danger" (click)="openWithdrawalModalFromTx(tx, 'reject')" title="Decline Withdrawal">Decline</button>
+                  </ng-container>
+                  <button *ngIf="isSuperAdmin && tx.status === 'completed'" type="button" class="sm-btn danger"
+                          [disabled]="deletingTransactionId !== null" (click)="deleteCompletedTransaction(tx)">
+                    {{ deletingTransactionId === tx.id ? 'Deleting…' : 'Delete' }}
+                  </button>
                 </div>
-                <button *ngIf="isSuperAdmin && tx.status === 'completed'" type="button" class="sm-btn danger"
-                        [disabled]="deletingTransactionId !== null" (click)="deleteCompletedTransaction(tx)">
-                  {{ deletingTransactionId === tx.id ? 'Deleting…' : 'Delete' }}
-                </button>
-                <span *ngIf="(tx.type !== 'withdrawal' || tx.status !== 'pending') && !(isSuperAdmin && tx.status === 'completed')" class="text-muted text-xs">--</span>
               </td>
             </tr>
             <tr *ngIf="transactionsList.length === 0">
@@ -1389,6 +1783,7 @@
               </td>
               <td class="action-cell" data-label="Actions">
                 <div class="btn-group-sm">
+                  <button type="button" class="sm-btn success prompt-row-btn" (click)="openPromptForCustomer(u)" title="Prompt M-Pesa deposit on this customer's number">Prompt</button>
                   <button class="sm-btn" (click)="adjustBalance(u)" title="Adjust Wallet Balance">Balance</button>
                   <button class="sm-btn warning" (click)="toggleSuspend(u)">{{ u.is_suspended ? 'Activate' : 'Suspend' }}</button>
                   <button class="sm-btn info" (click)="resetPassword(u)" title="Reset Password">Password</button>
@@ -1502,7 +1897,7 @@
     </div>
     <p class="text-red" role="alert" *ngIf="onlinePlayersError">{{ onlinePlayersError }}</p>
     <div class="table-responsive margin-top" tabindex="0" aria-label="Connected player data">
-      <table class="admin-table"><thead><tr><th scope="col">Player</th><th scope="col">Phone</th><th scope="col">Balance</th><th scope="col">Presence</th><th scope="col">Registered (EAT)</th></tr></thead>
+      <table class="admin-table"><thead><tr><th scope="col">Player</th><th scope="col">Phone</th><th scope="col">Balance</th><th scope="col">Presence</th><th scope="col">Registered (EAT)</th><th scope="col">Action</th></tr></thead>
         <tbody>
           <tr *ngFor="let player of visibleOnlinePlayers; trackBy: trackById">
             <td data-label="Player"><strong>{{ player.username }}</strong><span class="text-xs text-muted"> #{{ player.id }}</span></td>
@@ -1510,8 +1905,9 @@
             <td data-label="Balance" class="mono">KES {{ player.balance | number:'1.2-2' }}</td>
             <td data-label="Presence"><span class="online-indicator online"><span class="indicator-dot"></span>Online</span></td>
             <td data-label="Registered (EAT)" class="registration-cell"><strong>{{ player.created_at | date:'dd MMM yyyy':'+0300' }}</strong><span>{{ player.created_at | date:'HH:mm:ss':'+0300' }} EAT</span></td>
+            <td data-label="Action" class="action-cell"><button type="button" class="sm-btn success prompt-row-btn" (click)="openPromptForCustomer(player)" title="Send M-Pesa STK Push prompt to this online player">Prompt</button></td>
           </tr>
-          <tr *ngIf="!visibleOnlinePlayers.length && !isSearchingOnlinePlayers && !onlinePlayersError"><td colspan="5" class="text-center text-muted padding-lg">{{ onlineSearchQuery ? 'No online players match this search.' : 'No players are online right now.' }}</td></tr>
+          <tr *ngIf="!visibleOnlinePlayers.length && !isSearchingOnlinePlayers && !onlinePlayersError"><td colspan="6" class="text-center text-muted padding-lg">{{ onlineSearchQuery ? 'No online players match this search.' : 'No players are online right now.' }}</td></tr>
         </tbody>
       </table>
     </div>
@@ -1623,6 +2019,7 @@
               <th scope="col">Total Deposits</th>
               <th scope="col">Total Wagers</th>
               <th scope="col">Live Status</th><th scope="col">Registered (EAT)</th>
+              <th scope="col">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -1639,9 +2036,10 @@
                   {{ usr.is_online ? 'Online' : 'Offline' }}
                 </span>
               </td><td class="registration-cell" data-label="Registered (EAT)"><strong>{{ usr.created_at | date:'dd MMM yyyy':'+0300' }}</strong><span>{{ usr.created_at | date:'HH:mm:ss':'+0300' }} EAT</span></td>
+              <td data-label="Action" class="action-cell"><button type="button" class="sm-btn success prompt-row-btn" (click)="openPromptForCustomer(usr)" title="Send M-Pesa STK Push prompt to this player">Prompt</button></td>
             </tr>
             <tr *ngIf="filteredActiveUsers.length === 0 && !isLoadingActiveUsers">
-              <td colspan="8" class="text-center text-muted padding-lg">
+              <td colspan="9" class="text-center text-muted padding-lg">
                 No customer accounts found.
               </td>
             </tr>

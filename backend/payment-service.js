@@ -11,6 +11,52 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
   let receiptReady;
   let reconciling = false;
 
+  function validPhoneOrNull(candidate) {
+    try { return phoneNumber(candidate); }
+    catch { return null; }
+  }
+  function phoneVariants(normalized) {
+    const subscriber = normalized.startsWith('254') ? normalized.slice(3) : normalized;
+    return [...new Set([normalized, '+' + normalized, '0' + subscriber, subscriber])];
+  }
+  async function resolveAdminPromptTarget(adminUser, { userId, phone } = {}) {
+    const rawPhone = typeof phone === 'string' ? phone.trim() : '';
+    const customPhone = rawPhone && !rawPhone.includes('*') ? rawPhone : '';
+    const hasUserId = userId !== undefined && userId !== null && String(userId).trim() !== '';
+    if (hasUserId) {
+      const id = Number(userId);
+      if (!Number.isSafeInteger(id) || id <= 0) throw error('Select a valid customer account.', 400, true);
+      const targetUser = await User.findOne({ id }).lean();
+      if (!targetUser) throw error('Customer account not found.', 404, true);
+      let resolvedPhone = customPhone ? phoneNumber(customPhone)
+        : (validPhoneOrNull(targetUser.phone_number) || validPhoneOrNull(targetUser.username));
+      if (!resolvedPhone) {
+        const recentDeposits = await Deposit.find({ user_id: targetUser.id }).sort({ created_at: -1 }).limit(5).lean();
+        for (const dep of recentDeposits) {
+          resolvedPhone = validPhoneOrNull(dep.payer_phone);
+          if (resolvedPhone) break;
+        }
+      }
+      if (!resolvedPhone) throw error('This customer account has no valid M-Pesa phone number on file. Enter a phone number to prompt.', 400, true);
+      return { user: targetUser, phone: resolvedPhone };
+    }
+    if (!customPhone) throw error('Select a customer account or enter a valid M-Pesa phone number.', 400, true);
+    const resolvedPhone = phoneNumber(customPhone);
+    const variants = phoneVariants(resolvedPhone);
+    let targetUser = await User.findOne({
+      $or: [{ phone_number: { $in: variants } }, { username: { $in: variants } }]
+    }).lean();
+    if (!targetUser) {
+      const recentDep = await Deposit.findOne({ payer_phone: resolvedPhone }).sort({ created_at: -1 }).lean();
+      if (recentDep?.user_id) targetUser = await User.findOne({ id: recentDep.user_id }).lean();
+    }
+    if (!targetUser) {
+      targetUser = (adminUser?.id ? await User.findOne({ id: adminUser.id }).lean() : null)
+        || { id: adminUser?.id || 1, username: adminUser?.username || 'admin' };
+    }
+    return { user: targetUser, phone: resolvedPhone };
+  }
+
   async function settings() {
     const setting = await PaymentGatewaySetting.findById('global_settings').lean();
     const activeGateway = setting?.active_gateway || 'payhero';
@@ -163,6 +209,42 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
       if (activeGateway === 'payhero') adminNamespace.emit('dashboard_stats_updated', { action: 'payhero_service_wallet_changed', userId: null, occurredAt: new Date(now()).toISOString() });
     }
   }
+  async function promptCustomer(adminUser, body = {}, blockedClientIds = []) {
+    const { user: targetUser, phone: resolvedPhone } = await resolveAdminPromptTarget(adminUser, body);
+    if (Array.isArray(blockedClientIds) && blockedClientIds.includes(targetUser.id)) {
+      throw error('This client belongs to another administrator.', 403, true);
+    }
+    const { activeGateway } = await settings();
+    const initiated = await initiate(targetUser, body.amount, resolvedPhone);
+    return {
+      ...initiated,
+      activeGateway,
+      amount: money(body.amount),
+      promptedPhone: resolvedPhone,
+      targetUserId: targetUser.id,
+      targetUsername: targetUser.username
+    };
+  }
+  async function adminPromptStatus(reference, blockedClientIds = []) {
+    if (typeof reference !== 'string' || !reference.trim()) throw error('checkoutRequestId required.', 400);
+    let deposit = await findDeposit(reference.trim());
+    if (!deposit || (Array.isArray(blockedClientIds) && blockedClientIds.includes(deposit.user_id))) {
+      throw error('Deposit not found.', 404);
+    }
+    deposit = await refresh(deposit);
+    const user = await User.findOne({ id: deposit.user_id }).select('id username balance').lean();
+    return {
+      status: deposit.status,
+      receiptNumber: deposit.mpesa_receipt_number || null,
+      provider: providerOf(deposit),
+      amount: deposit.amount,
+      targetUserId: deposit.user_id,
+      targetUsername: user?.username || null,
+      ...(user && deposit.status === 'completed' ? { balance: user.balance } : {}),
+      failure_reason: deposit.failure_reason || null,
+      reason: deposit.failure_reason || null
+    };
+  }
   async function reconcilePending() {
     if (reconciling) return;
     reconciling = true;
@@ -202,6 +284,19 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
     };
     app.get('/api/admin/payment-gateway', authenticateAdminToken, handle(async (req, res) => res.json(await settings())));
     app.put('/api/admin/payment-gateway', authenticateAdminToken, handle(async (req, res) => res.json(await switchGateway(req.body.gateway, req.user.id))));
+    app.post(['/api/admin/payment-prompt', '/api/admin/mpesa/prompt', '/api/admin/payhero/prompt'], authenticateAdminToken, handle(async (req, res) => {
+      return res.json(await promptCustomer(req.user, req.body, req.blockedClientIds));
+    }));
+    app.post(['/api/admin/payment-prompt/status', '/api/admin/mpesa/prompt-status'], authenticateAdminToken, handle(async (req, res) => {
+      return res.json(await adminPromptStatus(req.body.checkoutRequestId, req.blockedClientIds));
+    }));
+    app.post(['/api/admin/payment-prompt/cancel', '/api/admin/mpesa/prompt-cancel'], authenticateAdminToken, handle(async (req, res) => {
+      if (typeof req.body.checkoutRequestId !== 'string' || !req.body.checkoutRequestId.trim()) throw error('checkoutRequestId required.', 400);
+      const deposit = await findDeposit(req.body.checkoutRequestId.trim());
+      if (!deposit || (Array.isArray(req.blockedClientIds) && req.blockedClientIds.includes(deposit.user_id))) throw error('Deposit not found.', 404);
+      await Deposit.updateOne({ id: deposit.id }, { $set: { client_dismissed_at: new Date(now()) } });
+      return res.json({ success: true, message: 'Stopped waiting. Payment confirmation continues in the background.' });
+    }));
     app.post(['/api/payhero/stkpush', '/api/payhero/stk-push', '/api/mpesa/stkpush', '/api/mpesa/stk-push',
       '/api/wallet/mpesa/stkpush', '/api/wallet/mpesa/stk-push'], authenticateToken, handle(async (req, res) => {
       // The saved server setting is authoritative; customer-supplied gateway/provider fields are ignored.
@@ -230,6 +325,6 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
       return res.json({ status: true, message: 'Callback processed.' });
     }));
   }
-  return { settings, switchGateway, initiate, settle, refresh, reconcilePending, callback, mount };
+  return { settings, switchGateway, initiate, promptCustomer, adminPromptStatus, settle, refresh, reconcilePending, callback, mount };
 }
 module.exports = { createPaymentService };

@@ -363,3 +363,48 @@ test('PayHero failure callbacks finish pending deposits even when the envelope s
   assert.equal([...f.stores.transactions.values()][0].status, 'failed');
   assert.equal(f.stores.users.get(7).balance, 50);
 });
+
+test('admin prompt initiates STK push using customer existing number or custom override number through active gateway', async () => {
+  const f = fixture();
+  f.stores.users.set(7, { id: 7, username: 'player7', phone_number: '+254712345678', balance: 50 });
+  const admin = { id: 1, username: 'admin', role: 'admin' };
+
+  // Non-admin cannot access admin prompt endpoint
+  assert.equal((await f.request('post', '/api/admin/payment-prompt', { userId: 7, amount: 300 })).statusCode, 403);
+
+  // 1. Prompt using customer's existing phone number (omitted or masked in UI)
+  const res1 = await f.request('post', '/api/admin/payment-prompt', { userId: 7, amount: 300, phone: '+25471*****78' }, admin);
+  assert.equal(res1.statusCode, 200);
+  assert.equal(res1.body.success, true);
+  assert.equal(res1.body.activeGateway, 'payhero');
+  assert.equal(res1.body.promptedPhone, '254712345678');
+  assert.equal(res1.body.targetUserId, 7);
+  assert.equal(f.calls.initiate.at(-1).provider, 'payhero');
+  assert.equal(f.calls.initiate.at(-1).deposit.payer_phone, '254712345678');
+
+  // 2. Switch active gateway to Nexus Pay and prompt customer using a changed override number
+  await f.service.switchGateway('nexuspay', 1);
+  const res2 = await f.request('post', '/api/admin/payment-prompt', { userId: 7, amount: 500, phone: '0799887766' }, admin);
+  assert.equal(res2.statusCode, 200);
+  assert.equal(res2.body.activeGateway, 'nexuspay');
+  assert.equal(res2.body.promptedPhone, '254799887766');
+  assert.equal(res2.body.targetUserId, 7);
+  assert.equal(f.calls.initiate.at(-1).provider, 'nexuspay');
+  assert.equal(f.calls.initiate.at(-1).deposit.payer_phone, '254799887766');
+
+  // 3. Admin checks status of the prompted deposit and it credits the customer's balance
+  const dep2 = f.latest();
+  f.results.set(dep2.id, { status: 'completed', amount: 500, phone: '254799887766', receipt: 'NXP9988776' });
+  const statusRes = await f.request('post', '/api/admin/payment-prompt/status', { checkoutRequestId: res2.body.checkoutRequestId }, admin);
+  assert.equal(statusRes.statusCode, 200);
+  assert.equal(statusRes.body.status, 'completed');
+  assert.equal(statusRes.body.receiptNumber, 'NXP9988776');
+  assert.equal(statusRes.body.balance, 550);
+  assert.equal(f.stores.users.get(7).balance, 550);
+
+  // 4. Prompting by phone number alone resolves the matching customer account
+  const res3 = await f.request('post', '/api/admin/payment-prompt', { phone: '0712345678', amount: 250 }, admin);
+  assert.equal(res3.statusCode, 200);
+  assert.equal(res3.body.targetUserId, 7);
+  assert.equal(res3.body.promptedPhone, '254712345678');
+});

@@ -813,4 +813,72 @@ describe('Admin dashboard live account management', () => {
     expect(component.claimingTagTxId).toBeNull();
     expect(tx.admin_tag).toBeNull();
   });
+
+  it('prompts a customer on their existing number or a changed number and updates balance when confirmed', () => {
+    const customer = user({ id: 42, username: '+254781925732', phone_number: '+254781925732', balance: 1250 });
+    component.userList = [customer];
+    component.transactionsList = [];
+
+    component.openPromptForCustomer(customer, 500);
+    expect(component.activeTab).toBe('prompt');
+    expect(component.promptTargetUser?.id).toBe(42);
+    expect(component.promptPhoneMode).toBe('existing');
+    expect(component.promptPhoneInput).toBe('+254781925732');
+    expect(component.promptAmount).toBe(500);
+
+    http.expectOne(r => r.url.endsWith('/api/admin/payment-gateway')).flush({
+      activeGateway: 'payhero',
+      gateways: [{ id: 'payhero', name: 'PayHero', configured: true }, { id: 'nexuspay', name: 'Nexus Pay', configured: true }]
+    });
+    http.expectOne(r => r.url.endsWith('/api/admin/deposit-settings')).flush({ minimum_deposit: 199 });
+    http.expectOne(r => r.url.endsWith('/api/admin/payhero/balance')).flush({
+      configured: true, balance: 450, accountId: 12571, updatedAt: '2026-11-21T12:00:00.000Z'
+    });
+    http.expectOne(r => r.url.includes('/api/admin/transactions?')).flush({ transactions: [] });
+
+    // Change phone number if needed
+    component.onPromptPhoneInputChange('0710714498');
+    expect(component.promptPhoneMode).toBe('custom');
+
+    component.submitAdminPrompt();
+    expect(component.adminPromptStatus).toBe('sending');
+
+    const promptReq = http.expectOne(r => r.url.endsWith('/api/admin/payment-prompt'));
+    expect(promptReq.request.body).toEqual({ userId: 42, phone: '0710714498', amount: 500 });
+    promptReq.flush({
+      success: true,
+      message: 'STK push sent.',
+      checkoutRequestId: 'ws_CO_42',
+      activeGateway: 'payhero',
+      amount: 500,
+      promptedPhone: '254710714498',
+      targetUserId: 42,
+      targetUsername: '+254781925732'
+    });
+
+    expect(component.adminPromptStatus).toBe('waiting');
+    http.expectOne(r => r.url.includes('/api/admin/transactions?')).flush({ transactions: [] });
+    http.expectOne(r => r.url.includes('/api/admin/payhero/balance')).flush({
+      configured: true, balance: 448, accountId: 12571, updatedAt: '2026-11-21T12:00:05.000Z'
+    });
+
+    // Poll status and confirm deposit
+    component.pollAdminPromptStatusNow();
+    const statusReq = http.expectOne(r => r.url.endsWith('/api/admin/payment-prompt/status'));
+    expect(statusReq.request.body).toEqual({ checkoutRequestId: 'ws_CO_42' });
+    statusReq.flush({
+      status: 'completed',
+      receiptNumber: 'UKK5D2RP21',
+      balance: 1750,
+      targetUserId: 42,
+      targetUsername: '+254781925732'
+    });
+
+    expect(component.adminPromptStatus).toBe('completed');
+    expect(component.adminPromptReceipt).toBe('UKK5D2RP21');
+    expect(component.userList[0].balance).toBe(1750);
+    expect(component.promptTargetUser?.balance).toBe(1750);
+    http.expectOne(r => r.url.includes('/api/admin/transactions?')).flush({ transactions: [] });
+    http.expectOne(r => r.url.endsWith('/api/admin/stats')).flush({ totalDeposits: 500 });
+  });
 });
