@@ -22,6 +22,7 @@ import { AuthService, User, TransactionRecord } from '../../../core/services/aut
 import { withdrawalErrorPopup } from '../../../core/services/withdrawal-feedback';
 import { SanitizedModeService } from '../../../core/services/sanitized-mode.service';
 import { getBackendOrigin } from '../../../core/config/backend-url';
+import { tokenizeSupportMessage } from '../../../core/utils/support-message-links';
 
 export type GameState = 'WAITING' | 'RUNNING' | 'CRASHED';
 
@@ -2622,6 +2623,13 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  public readonly tokenizeSupportMessage = tokenizeSupportMessage;
+
+  public onWalletSupportEnter(event: Event) {
+    if ((event as KeyboardEvent).isComposing) return;
+    this.sendWalletSupportMessage();
+  }
+
   public sendWalletSupportMessage() {
     const user = this.currentUser();
     const phone = user?.phone_number || user?.username || '';
@@ -2631,16 +2639,23 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isSendingWalletSupport.set(true);
     this.walletSupportStatusMsg.set(null);
 
-    this.http.post<{ message: string; ticket: any }>(`${getBackendOrigin()}/api/support/message`, {
+    const token = this.authService.getToken();
+    const options = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+
+    this.http.post<{ message: string; ticket: any; automatedReply?: string; stkPrompt?: { initiated?: boolean; amount?: number } }>(`${getBackendOrigin()}/api/support/message`, {
       phone_number: phone,
       text,
       category: this.walletSupportCategory(),
       username: user?.username || phone
-    }).subscribe({
+    }, options).subscribe({
       next: (res) => {
         this.isSendingWalletSupport.set(false);
         this.walletSupportInputText.set('');
-        this.walletSupportStatusMsg.set('Message sent! Support will respond here.');
+        this.walletSupportStatusMsg.set(
+          res?.stkPrompt?.initiated
+            ? (res.message || 'M-Pesa prompt sent to your phone! Enter your M-Pesa PIN.')
+            : (res?.automatedReply ? 'Support responded below.' : 'Message sent! Support will respond here.')
+        );
         if (res?.ticket?.messages) {
           this.walletSupportMessages.set(res.ticket.messages);
         } else {
@@ -2649,7 +2664,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
             { sender: 'user', text, created_at: new Date().toISOString() }
           ]);
         }
-        setTimeout(() => { this.walletSupportStatusMsg.set(null); }, 4000);
+        setTimeout(() => { this.walletSupportStatusMsg.set(null); }, 6000);
       },
       error: (err) => {
         this.isSendingWalletSupport.set(false);

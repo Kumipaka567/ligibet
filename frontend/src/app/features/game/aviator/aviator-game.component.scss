@@ -4903,6 +4903,21 @@
         margin-bottom: 3px;
         opacity: 0.85;
       }
+
+      .wallet-msg-body {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .support-chat-link {
+        color: #38bdf8;
+        text-decoration: underline;
+        word-break: break-all;
+      }
+
+      &.user .support-chat-link {
+        color: #e0f2fe;
+      }
     }
   }
 

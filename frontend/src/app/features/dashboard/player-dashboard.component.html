@@ -539,12 +539,12 @@
             <strong>{{ msg.sender === 'admin' ? 'LigiBet Support' : 'You' }}</strong>
             <span>{{ msg.created_at | date:'shortTime' }}</span>
           </div>
-          <div class="support-bubble-text">{{ msg.text }}</div>
+          <div class="support-bubble-text"><ng-container *ngFor="let seg of tokenizeSupportMessage(msg.text)"><a *ngIf="seg.url; else plainSupportText" class="support-chat-link" [href]="seg.url" target="_blank" rel="noopener noreferrer">{{ seg.text }}</a><ng-template #plainSupportText>{{ seg.text }}</ng-template></ng-container></div>
         </div>
       </div>
 
       <div class="support-input-row">
-        <input type="text" [ngModel]="supportInputText()" (ngModelChange)="supportInputText.set($event)" (keyup.enter)="sendSupportMessage()" placeholder="Type your message..." class="support-text-input" [disabled]="isSendingSupport()" />
+        <input type="text" [ngModel]="supportInputText()" (ngModelChange)="supportInputText.set($event)" (keyup.enter)="onSupportInputEnter($event)" placeholder="Type your message..." class="support-text-input" [disabled]="isSendingSupport()" />
         <button type="button" class="deposit-submit-btn support-btn" [disabled]="isSendingSupport() || !supportInputText().trim()" (click)="sendSupportMessage()">
           {{ isSendingSupport() ? 'Sending...' : 'Send' }}
         </button>

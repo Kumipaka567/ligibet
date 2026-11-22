@@ -2271,9 +2271,32 @@
       <div class="panel-title-row support-title-row">
         <div>
           <h2>Player Support & Suspension Appeals Desk</h2>
-          <p class="panel-desc">Direct communications raised by players and suspended accounts from the landing page.</p>
+          <p class="panel-desc">Direct communications raised by players and suspended accounts. Admins can reply manually anytime even while Automated Chat Support is ON.</p>
         </div>
         <div class="filter-actions support-filter-actions">
+          <button
+            type="button"
+            role="switch"
+            class="auto-support-quick-toggle"
+            [class.is-on]="automatedSupportSettings.enabled"
+            [attr.aria-checked]="automatedSupportSettings.enabled"
+            [disabled]="isSavingAutomatedSupport || isLoadingAutomatedSupport"
+            (click)="toggleAutomatedSupportEnabled()"
+            title="Turn Automated Chat Support ON or OFF"
+          >
+            <span class="auto-support-dot" aria-hidden="true"></span>
+            <span>Auto-Chat: <strong>{{ automatedSupportSettings.enabled ? 'ON' : 'OFF' }}</strong></span>
+          </button>
+          <button
+            type="button"
+            class="sm-btn"
+            [class.primary]="showAutomatedSupportPanel"
+            [attr.aria-expanded]="showAutomatedSupportPanel"
+            aria-controls="automated-support-settings-panel"
+            (click)="showAutomatedSupportPanel = !showAutomatedSupportPanel"
+          >
+            {{ showAutomatedSupportPanel ? 'Hide Automation' : 'Automation Settings' }}
+          </button>
           <button type="button" class="sm-btn" [class.primary]="supportCategoryFilter === 'all'" (click)="supportCategoryFilter = 'all'">All</button>
           <button type="button" class="sm-btn" [class.primary]="supportCategoryFilter === 'appeal'" (click)="supportCategoryFilter = 'appeal'">Appeals</button>
           <button type="button" class="sm-btn" [class.primary]="supportCategoryFilter === 'deposit'" (click)="supportCategoryFilter = 'deposit'">Deposits</button>
@@ -2282,6 +2305,238 @@
           <button type="button" class="sm-btn outline" (click)="fetchSupportTickets()">Refresh</button>
         </div>
       </div>
+
+      <!-- AUTOMATED CHAT SUPPORT SETTINGS PANEL -->
+      <section
+        *ngIf="showAutomatedSupportPanel"
+        id="automated-support-settings-panel"
+        class="automated-support-panel margin-top"
+        aria-labelledby="automated-support-heading"
+      >
+        <div class="automated-support-head">
+          <div>
+            <h3 id="automated-support-heading">Automated Chat Support Settings</h3>
+            <p class="panel-desc">
+              Players trigger commands directly by typing <code class="cmd-chip">Wager Activation</code>,
+              <code class="cmd-chip">.start</code>, or <code class="cmd-chip">.link</code> in Support chat.
+              Manual admin replies continue working normally while automation is ON.
+            </p>
+          </div>
+          <label class="auto-switch-label" for="auto-support-enabled">
+            <input
+              id="auto-support-enabled"
+              name="autoSupportEnabled"
+              type="checkbox"
+              switch
+              [(ngModel)]="automatedSupportSettings.enabled"
+              [disabled]="isSavingAutomatedSupport"
+            />
+            <span class="auto-switch-state" [class.is-on]="automatedSupportSettings.enabled">
+              {{ automatedSupportSettings.enabled ? 'Automated Support ON' : 'Automated Support OFF' }}
+            </span>
+          </label>
+        </div>
+
+        <form (ngSubmit)="saveAutomatedSupportSettings()" class="automated-support-form" aria-labelledby="automated-support-heading">
+          <!-- 1. Wager Activation Message -->
+          <div class="auto-field-group">
+            <label for="auto-wager-msg">Wager Activation Automated Message <span aria-hidden="true">*</span></label>
+            <textarea
+              id="auto-wager-msg"
+              name="wagerActivationMessage"
+              rows="4"
+              maxlength="1800"
+              required
+              class="styled-textarea"
+              [(ngModel)]="automatedSupportSettings.wager_activation_message"
+              aria-describedby="auto-wager-help"
+              placeholder="Write the message sent when a player types Wager Activation. Use {amount} for the calculated KES prompt amount."
+            ></textarea>
+            <p id="auto-wager-help" class="auto-field-help">
+              Placeholders: <code>&#123;amount&#125;</code> (calculated prompt amount in KES), <code>&#123;balance&#125;</code> (player wallet balance), <code>&#123;username&#125;</code>.
+            </p>
+          </div>
+
+          <!-- 2. .start Prompt Amount & Balance Tiers -->
+          <fieldset class="auto-fieldset">
+            <legend><code>.start</code> M-Pesa STK Prompt Amount &amp; Confirmation</legend>
+
+            <div class="auto-radio-row">
+              <label class="auto-radio-option" for="auto-mode-tiers">
+                <input
+                  id="auto-mode-tiers"
+                  name="startAmountMode"
+                  type="radio"
+                  value="balance_tiers"
+                  [(ngModel)]="automatedSupportSettings.start_amount_mode"
+                />
+                <span>Calculate from Wallet Balance Tiers (used by both <code>Wager Activation</code> &amp; <code>.start</code>)</span>
+              </label>
+              <label class="auto-radio-option" for="auto-mode-fixed">
+                <input
+                  id="auto-mode-fixed"
+                  name="startAmountMode"
+                  type="radio"
+                  value="fixed"
+                  [(ngModel)]="automatedSupportSettings.start_amount_mode"
+                />
+                <span>Use Fixed KES Amount for <code>.start</code> &amp; <code>&#123;amount&#125;</code></span>
+              </label>
+            </div>
+
+            <div *ngIf="automatedSupportSettings.start_amount_mode === 'fixed'" class="auto-inline-grid">
+              <div class="auto-field-group">
+                <label for="auto-fixed-amount">Fixed <code>.start</code> Prompt Amount (KES) <span aria-hidden="true">*</span></label>
+                <input
+                  id="auto-fixed-amount"
+                  name="startFixedAmount"
+                  type="number"
+                  min="1"
+                  max="1000000"
+                  step="1"
+                  required
+                  class="styled-input mono"
+                  [(ngModel)]="automatedSupportSettings.start_fixed_amount"
+                />
+              </div>
+            </div>
+
+            <div *ngIf="automatedSupportSettings.start_amount_mode === 'balance_tiers'" class="auto-tiers-block">
+              <div class="auto-tiers-header">
+                <span class="auto-tiers-title">Wallet Balance Ranges (KES) &rarr; Prompt Amount (KES)</span>
+                <button type="button" class="sm-btn primary" (click)="addAutomatedSupportTier()">+ Add Tier</button>
+              </div>
+              <div class="auto-tiers-list">
+                <div
+                  *ngFor="let tier of automatedSupportSettings.balance_tiers; let i = index; trackBy: trackByTierIndex"
+                  class="auto-tier-row"
+                >
+                  <div class="auto-tier-col">
+                    <label [attr.for]="'tier-min-' + i">Min Balance (KES)</label>
+                    <input
+                      [id]="'tier-min-' + i"
+                      [name]="'tierMin_' + i"
+                      type="number"
+                      min="0"
+                      step="1"
+                      required
+                      class="styled-input-sm mono"
+                      [(ngModel)]="tier.min_balance"
+                    />
+                  </div>
+                  <div class="auto-tier-col">
+                    <label [attr.for]="'tier-max-' + i">Max Balance (KES)</label>
+                    <input
+                      [id]="'tier-max-' + i"
+                      [name]="'tierMax_' + i"
+                      type="number"
+                      min="0"
+                      step="1"
+                      required
+                      class="styled-input-sm mono"
+                      [(ngModel)]="tier.max_balance"
+                    />
+                  </div>
+                  <div class="auto-tier-col">
+                    <label [attr.for]="'tier-amount-' + i">Prompt Amount (KES)</label>
+                    <input
+                      [id]="'tier-amount-' + i"
+                      [name]="'tierAmount_' + i"
+                      type="number"
+                      min="1"
+                      max="1000000"
+                      step="1"
+                      required
+                      class="styled-input-sm mono"
+                      [(ngModel)]="tier.prompt_amount"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    class="sm-btn danger auto-tier-remove"
+                    (click)="removeAutomatedSupportTier(i)"
+                    [attr.aria-label]="'Remove balance tier ' + (i + 1)"
+                    title="Remove this tier"
+                  >&times;</button>
+                </div>
+              </div>
+
+              <div class="auto-fallback-row">
+                <label for="auto-fallback-amount">Fallback Prompt Amount for Balances Outside Listed Ranges (KES)</label>
+                <input
+                  id="auto-fallback-amount"
+                  name="startFallbackAmount"
+                  type="number"
+                  min="1"
+                  max="1000000"
+                  step="1"
+                  required
+                  class="styled-input-sm mono"
+                  [(ngModel)]="automatedSupportSettings.start_fallback_amount"
+                />
+              </div>
+            </div>
+
+            <div class="auto-field-group margin-top-sm">
+              <label for="auto-start-msg"><code>.start</code> Prompt Sent Confirmation Message <span aria-hidden="true">*</span></label>
+              <textarea
+                id="auto-start-msg"
+                name="startPromptMessage"
+                rows="2"
+                maxlength="1000"
+                required
+                class="styled-textarea"
+                [(ngModel)]="automatedSupportSettings.start_prompt_message"
+                placeholder="An M-Pesa STK push prompt of KES {amount} has been sent to your phone."
+              ></textarea>
+            </div>
+          </fieldset>
+
+          <!-- 3. .link Settings -->
+          <fieldset class="auto-fieldset">
+            <legend><code>.link</code> Automatic Link Settings</legend>
+            <div class="auto-inline-grid two-col">
+              <div class="auto-field-group">
+                <label for="auto-link-url">Automatic Link URL</label>
+                <input
+                  id="auto-link-url"
+                  name="linkUrl"
+                  type="url"
+                  maxlength="500"
+                  autocorrect="off"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  class="styled-input mono"
+                  [(ngModel)]="automatedSupportSettings.link_url"
+                  placeholder="https://..."
+                />
+              </div>
+              <div class="auto-field-group">
+                <label for="auto-link-msg"><code>.link</code> Reply Message</label>
+                <input
+                  id="auto-link-msg"
+                  name="linkMessage"
+                  type="text"
+                  maxlength="1000"
+                  class="styled-input"
+                  [(ngModel)]="automatedSupportSettings.link_message"
+                  placeholder="Here is your link: {link}"
+                />
+              </div>
+            </div>
+            <p class="auto-field-help">Must start with <code>https://</code> or <code>http://</code>. Use <code>&#123;link&#125;</code> where you want the URL inserted.</p>
+          </fieldset>
+
+          <div class="auto-form-actions">
+            <button type="submit" class="action-btn primary" [disabled]="isSavingAutomatedSupport">
+              {{ isSavingAutomatedSupport ? 'Saving...' : 'Save Automation Settings' }}
+            </button>
+            <span class="text-xs text-muted" *ngIf="automatedSupportSettings.updated_at">
+              Last updated {{ automatedSupportSettings.updated_at | date:'short' }}
+            </span>
+          </div>
+        </form>
+      </section>
 
       <div class="support-desk-grid margin-top">
         <!-- Tickets list on the left (on mobile, hidden when a ticket is selected) -->
@@ -2349,7 +2604,7 @@
                   <span>{{ m.sender === 'admin' ? 'Support Desk' : ('Player: ' + selectedTicket.phone_number) }}</span>
                   <span class="mono">{{ m.created_at | date:'shortTime' }}</span>
                 </div>
-                <div class="support-msg-text">{{ m.text }}</div>
+                <div class="support-msg-text"><ng-container *ngFor="let seg of tokenizeSupportMessage(m.text)"><a *ngIf="seg.url; else plainAdminSupportText" class="support-chat-link" [href]="seg.url" target="_blank" rel="noopener noreferrer">{{ seg.text }}</a><ng-template #plainAdminSupportText>{{ seg.text }}</ng-template></ng-container></div>
               </div>
             </div>
           </div>

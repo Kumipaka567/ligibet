@@ -23,6 +23,7 @@ const { createOnlinePlayers } = require('./online-players');
 const { createDashboardStats } = require('./dashboard-stats');
 const { createDeleteAdminTransaction } = require('./delete-admin-transaction');
 const { createSupportDeletion } = require('./delete-support');
+const { createAutomatedSupport } = require('./automated-support');
 const { createAdminPrivacy, ADMIN_TAGS, adminClientScope, adminTicketScope } = require('./admin-privacy');
 const privacyModels = require('./models');
 const adminPrivacy = createAdminPrivacy(privacyModels);
@@ -52,6 +53,7 @@ const {
   Notification,
   ChatMessage,
   SupportTicket,
+  AutomatedSupportSetting,
   Counter
 } = require('./models');
 
@@ -1569,6 +1571,15 @@ app.get('/api/user/sessions', authenticateToken, async (req, res) => {
 // A single admin-selected gateway handles new deposits. Each deposit keeps its provider.
 const paymentService = createPaymentService({ models: privacyModels, emitRealtimeMutation,
   adminNamespace, getMinimumDeposit, brand: 'LIGI' });
+const automatedSupport = createAutomatedSupport({
+  AutomatedSupportSetting,
+  User,
+  AdminLog,
+  paymentService,
+  adminNamespace,
+  supportSenderName: 'LigiBet Support',
+  isMongoConnected: () => mongoose.connection.readyState === 1
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CHAT SERVICE & SIMULATOR ENGINE (SPRIBE / BETIKA REAL-TIME CHAT)
@@ -3563,10 +3574,27 @@ app.get('/api/admin/rounds', authenticateAdminToken, async (req, res) => {
 
 const localDevSupportTickets = [];
 
-// POST /api/support/message - Public endpoint for landing page visitors and suspended accounts
+function resolveOptionalAuthUser(req) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return null;
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (!decoded || !decoded.id) return null;
+    if (isSuspendedUser(decoded.id)) {
+      return { ...decoded, is_suspended: true };
+    }
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+// POST /api/support/message - Public endpoint for landing page visitors and logged-in players
 app.post('/api/support/message', async (req, res) => {
   try {
     const { phone_number, text, category, username } = req.body || {};
+    const authUser = resolveOptionalAuthUser(req);
     const cleanPhone = String(phone_number || '').trim();
     const cleanText = String(text || '').trim();
     const validCategory = ['appeal', 'deposit', 'withdrawal', 'general'].includes(category)
@@ -3636,6 +3664,32 @@ app.post('/api/support/message', async (req, res) => {
       ticket.updated_at = new Date();
     }
 
+    let autoResult = null;
+    try {
+      autoResult = await automatedSupport.handlePlayerMessage({
+        text: cleanText,
+        authenticatedUser: authUser,
+        fallbackPhone: cleanPhone
+      });
+    } catch (autoErr) {
+      console.error('Automated support handler error:', autoErr);
+    }
+
+    if (autoResult && autoResult.replyText) {
+      const botMessage = {
+        sender: 'admin',
+        sender_name: autoResult.senderName || 'LigiBet Support',
+        text: autoResult.replyText,
+        created_at: new Date()
+      };
+      ticket.messages.push(botMessage);
+      if (isMongoConnected && typeof ticket.save === 'function') {
+        await ticket.save();
+      } else {
+        ticket.updated_at = new Date();
+      }
+    }
+
     const payload = typeof ticket.toJSON === 'function' ? ticket.toJSON() : ticket;
     try {
       adminNamespace.emit('support_ticket_update', { ticket: payload });
@@ -3644,8 +3698,16 @@ app.post('/api/support/message', async (req, res) => {
     }
 
     return res.json({
-      message: 'Support message received. An administrator will reply shortly.',
-      ticket: sanitizeTicketForPlayer(payload)
+      message: autoResult?.stkPrompt?.initiated
+        ? `M-Pesa prompt of KES ${Number(autoResult.stkPrompt.amount).toLocaleString()} sent to your phone.`
+        : (autoResult?.replyText ? 'Automated support responded.' : 'Support message received. An administrator will reply shortly.'),
+      ticket: sanitizeTicketForPlayer(payload),
+      ...(autoResult ? {
+        automatedReply: autoResult.replyText,
+        command: autoResult.command,
+        ...(autoResult.stkPrompt ? { stkPrompt: autoResult.stkPrompt } : {}),
+        ...(autoResult.linkUrl ? { linkUrl: autoResult.linkUrl } : {})
+      } : {})
     });
   } catch (err) {
     console.error('Support message error:', err);
@@ -3713,6 +3775,31 @@ app.get('/api/admin/support/tickets', authenticateAdminToken, async (req, res) =
 const supportDeletion = createSupportDeletion({ SupportTicket, AdminLog }, adminNamespace);
 app.delete('/api/admin/support/tickets', authenticateSuperAdminToken, supportDeletion.conversations);
 app.delete('/api/admin/support/tickets/:id/messages', authenticateSuperAdminToken, supportDeletion.messages);
+
+// GET /api/admin/support/automation - View automated support chat settings (any admin or superadmin)
+app.get('/api/admin/support/automation', authenticateAdminToken, async (req, res) => {
+  try {
+    const settings = await automatedSupport.getSettings();
+    return res.json({ settings });
+  } catch (err) {
+    console.error('Automated support settings fetch error:', err);
+    return res.status(500).json({ error: 'Failed to load automated support settings.' });
+  }
+});
+
+// PUT /api/admin/support/automation - Update automated support chat settings (any admin or superadmin)
+app.put('/api/admin/support/automation', authenticateAdminToken, async (req, res) => {
+  try {
+    const settings = await automatedSupport.saveSettings(req.body || {}, req.user);
+    return res.json({
+      message: `Automated chat support ${settings.enabled ? 'enabled' : 'disabled'} and settings saved.`,
+      settings
+    });
+  } catch (err) {
+    const status = err?.status || 500;
+    return res.status(status).json({ error: err?.message || 'Failed to update automated support settings.' });
+  }
+});
 
 // POST /api/admin/support/reply - Admin replies to a ticket
 app.post('/api/admin/support/reply', authenticateAdminToken, async (req, res) => {

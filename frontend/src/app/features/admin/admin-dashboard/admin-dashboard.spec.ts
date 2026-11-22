@@ -928,4 +928,54 @@ describe('Admin dashboard live account management', () => {
     component.removeClaimAdminTag('V');
     http.expectNone(r => r.url.includes('/api/admin/claim-tags'));
   });
+
+  it('loads, toggles, and saves automated chat support settings and tokenizes links safely', () => {
+    // Ordinary admins can also manage automated chat support
+    auth.currentUser$.next({ id: 2, username: 'ordinary-admin', balance: 0, role: 'admin' });
+    component.setTab('support');
+
+    http.expectOne(r => r.url.endsWith('/api/admin/support/tickets')).flush({ tickets: [] });
+    const getReq = http.expectOne(r => r.method === 'GET' && r.url.endsWith('/api/admin/support/automation'));
+    getReq.flush({
+      settings: {
+        enabled: false,
+        wager_activation_message: 'Deposit KES {amount}. Type .start.',
+        start_amount_mode: 'balance_tiers',
+        start_fixed_amount: 999,
+        start_fallback_amount: 999,
+        start_prompt_message: 'Prompt of KES {amount} sent.',
+        balance_tiers: [
+          { min_balance: 10000, max_balance: 20000, prompt_amount: 999 },
+          { min_balance: 20001, max_balance: 40000, prompt_amount: 1500 },
+          { min_balance: 50000, max_balance: 100000, prompt_amount: 3500 }
+        ],
+        link_url: 'https://t.me/help',
+        link_message: 'Open: {link}'
+      }
+    });
+    expect(component.automatedSupportSettings.enabled).toBe(false);
+    expect(component.automatedSupportSettings.balance_tiers.length).toBe(3);
+
+    component.addAutomatedSupportTier();
+    expect(component.automatedSupportSettings.balance_tiers.length).toBe(4);
+    component.removeAutomatedSupportTier(3);
+    expect(component.automatedSupportSettings.balance_tiers.length).toBe(3);
+
+    component.toggleAutomatedSupportEnabled();
+    const putReq = http.expectOne(r => r.method === 'PUT' && r.url.endsWith('/api/admin/support/automation'));
+    expect(putReq.request.body.enabled).toBe(true);
+    expect(putReq.request.body.link_url).toBe('https://t.me/help');
+    putReq.flush({
+      message: 'Automated chat support enabled and settings saved.',
+      settings: { ...putReq.request.body }
+    });
+    expect(component.automatedSupportSettings.enabled).toBe(true);
+
+    const segments = component.tokenizeSupportMessage('Visit https://example.com/help now.');
+    expect(segments).toEqual([
+      { text: 'Visit ' },
+      { text: 'https://example.com/help', url: 'https://example.com/help' },
+      { text: ' now.' }
+    ]);
+  });
 });

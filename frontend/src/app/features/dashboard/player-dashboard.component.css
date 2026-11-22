@@ -1300,3 +1300,15 @@ button { font-family: inherit; }
   height: 42px;
   margin-top: 0;
 }
+.support-bubble-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.support-chat-link {
+  color: #38bdf8;
+  text-decoration: underline;
+  word-break: break-all;
+}
+.support-bubble.user .support-chat-link {
+  color: #e0f2fe;
+}

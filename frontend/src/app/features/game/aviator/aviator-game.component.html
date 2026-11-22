@@ -1306,7 +1306,7 @@
                 <strong>{{ msg.sender === 'admin' ? 'LigiBet Support' : 'You' }}</strong>
                 <span class="mono">{{ msg.created_at | date:'shortTime' }}</span>
               </div>
-              <div class="wallet-msg-body">{{ msg.text }}</div>
+              <div class="wallet-msg-body"><ng-container *ngFor="let seg of tokenizeSupportMessage(msg.text)"><a *ngIf="seg.url; else plainWalletText" class="support-chat-link" [href]="seg.url" target="_blank" rel="noopener noreferrer">{{ seg.text }}</a><ng-template #plainWalletText>{{ seg.text }}</ng-template></ng-container></div>
             </div>
           </div>
 
@@ -1315,7 +1315,7 @@
             <input type="text" 
                    [ngModel]="walletSupportInputText()" 
                    (ngModelChange)="walletSupportInputText.set($event)" 
-                   (keyup.enter)="sendWalletSupportMessage()"
+                   (keyup.enter)="onWalletSupportEnter($event)"
                    placeholder="Describe your deposit or withdrawal issue..." 
                    class="custom-dark-input wallet-support-input"
                    [disabled]="isSendingWalletSupport()" />

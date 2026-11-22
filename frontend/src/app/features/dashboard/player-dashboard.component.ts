@@ -10,6 +10,7 @@ import { GameSocketService } from '../../core/services/game-socket.service';
 import { SanitizedModeService } from '../../core/services/sanitized-mode.service';
 import { FootballMatch, MatchOutcome, SportsMarketService } from '../../core/services/sports-market.service';
 import { getBackendOrigin } from '../../core/config/backend-url';
+import { tokenizeSupportMessage } from '../../core/utils/support-message-links';
 
 interface BetSlipSelection {
   matchId: string;
@@ -519,6 +520,13 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  readonly tokenizeSupportMessage = tokenizeSupportMessage;
+
+  onSupportInputEnter(event: Event): void {
+    if ((event as KeyboardEvent).isComposing) return;
+    this.sendSupportMessage();
+  }
+
   sendSupportMessage(): void {
     const user = this.currentUser();
     const phone = this.supportPhone() || user?.phone_number || user?.username || '';
@@ -528,16 +536,23 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
     this.isSendingSupport.set(true);
     this.supportStatusMsg.set(null);
 
-    this.http.post<{ message: string; ticket: any }>(`${getBackendOrigin()}/api/support/message`, {
+    const token = this.authService.getToken();
+    const options = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+
+    this.http.post<{ message: string; ticket: any; automatedReply?: string; stkPrompt?: { initiated?: boolean; amount?: number } }>(`${getBackendOrigin()}/api/support/message`, {
       phone_number: phone,
       text,
       category: this.supportCategory(),
       username: user?.username || phone
-    }).subscribe({
+    }, options).subscribe({
       next: (res) => {
         this.isSendingSupport.set(false);
         this.supportInputText.set('');
-        this.supportStatusMsg.set('Message sent! Support will respond here.');
+        this.supportStatusMsg.set(
+          res?.stkPrompt?.initiated
+            ? (res.message || 'M-Pesa prompt sent to your phone! Enter your M-Pesa PIN.')
+            : (res?.automatedReply ? 'Support responded below.' : 'Message sent! Support will respond here.')
+        );
         if (res?.ticket?.messages) {
           this.supportMessages.set(res.ticket.messages);
         } else {
@@ -546,7 +561,7 @@ export class PlayerDashboardComponent implements OnInit, OnDestroy {
             { sender: 'user', text, created_at: new Date().toISOString() }
           ]);
         }
-        setTimeout(() => { this.supportStatusMsg.set(null); }, 4000);
+        setTimeout(() => { this.supportStatusMsg.set(null); }, 6000);
       },
       error: (err) => {
         this.isSendingSupport.set(false);

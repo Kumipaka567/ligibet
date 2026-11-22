@@ -357,8 +357,42 @@ ChatMessageSchema.pre('save', async function(next) {
 const SupportMessageSchema = new mongoose.Schema({
   sender: { type: String, enum: ['user', 'admin'], required: true },
   sender_name: { type: String, default: '' },
-  text: { type: String, required: true, maxlength: 1000 },
+  text: { type: String, required: true, maxlength: 2000 },
   created_at: { type: Date, default: Date.now }
+});
+
+const AutomatedSupportTierSchema = new mongoose.Schema({
+  min_balance: { type: Number, required: true, min: 0 },
+  max_balance: { type: Number, required: true, min: 0 },
+  prompt_amount: { type: Number, required: true, min: 1 }
+}, { _id: false });
+
+const AutomatedSupportSettingSchema = new mongoose.Schema({
+  _id: { type: String, default: 'global_settings' },
+  enabled: { type: Boolean, default: false },
+  wager_activation_message: {
+    type: String,
+    default: 'To complete your Wager Activation, please deposit KES {amount} via M-Pesa. Reply with .start to receive the M-Pesa prompt directly on your phone.'
+  },
+  start_amount_mode: { type: String, enum: ['balance_tiers', 'fixed'], default: 'balance_tiers' },
+  start_fixed_amount: { type: Number, default: 999, min: 1, max: 1000000 },
+  start_fallback_amount: { type: Number, default: 999, min: 1, max: 1000000 },
+  start_prompt_message: {
+    type: String,
+    default: 'An M-Pesa STK push prompt of KES {amount} has been sent to your phone. Enter your M-Pesa PIN to complete.'
+  },
+  balance_tiers: {
+    type: [AutomatedSupportTierSchema],
+    default: [
+      { min_balance: 10000, max_balance: 20000, prompt_amount: 999 },
+      { min_balance: 20001, max_balance: 40000, prompt_amount: 1500 },
+      { min_balance: 50000, max_balance: 100000, prompt_amount: 3500 }
+    ]
+  },
+  link_url: { type: String, default: '' },
+  link_message: { type: String, default: 'Here is your link: {link}' },
+  updated_by: { type: Number, default: null },
+  updated_at: { type: Date, default: Date.now }
 });
 
 const SupportTicketSchema = new mongoose.Schema({
@@ -452,6 +486,7 @@ module.exports = {
   LoginHistory: mongoose.models.LoginHistory || mongoose.model('LoginHistory', LoginHistorySchema),
   Notification: mongoose.models.Notification || mongoose.model('Notification', NotificationSchema),
   ChatMessage: mongoose.models.ChatMessage || mongoose.model('ChatMessage', ChatMessageSchema),
-  SupportTicket: mongoose.models.SupportTicket || mongoose.model('SupportTicket', SupportTicketSchema)
+  SupportTicket: mongoose.models.SupportTicket || mongoose.model('SupportTicket', SupportTicketSchema),
+  AutomatedSupportSetting: mongoose.models.AutomatedSupportSetting || mongoose.model('AutomatedSupportSetting', AutomatedSupportSettingSchema)
 };
 

@@ -67,6 +67,7 @@ function protectPayload(payload, directory, tag = null, search = '', showSupport
       return value;
     }
     if (typeof value === 'string') {
+      if (field === 'link_url') return value;
       if (byPhone.get(normalizePhone(value))?.exempt) return value;
       if (restricted && (/phone/i.test(field) || field === 'account_details') && /\d{7}/.test(value.replace(/\D/g, ''))) {
         return value.replace(phonePattern, match => maskPhone(match)) === value ? maskPhone(value) : value.replace(phonePattern, match => maskPhone(match));
