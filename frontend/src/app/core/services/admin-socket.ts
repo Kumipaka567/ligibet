@@ -156,7 +156,7 @@ export interface AdminTransactionUpdate {
   status: string;
   admin_deposit_diagnostic?: AdminDepositDiagnostic | null;
   reference?: string;
-  admin_tag?: 'S' | 'G' | 'R' | 'V' | null;
+  admin_tag?: string | null;
   admin_tagged_by?: number | null;
   admin_tagged_at?: string | null;
   created_at?: string;
@@ -248,6 +248,7 @@ export class AdminSocketService {
   public supportTicketsDeleted$ = new BehaviorSubject<{ ticketIds: number[] } | null>(null);
   public clientClaimed$ = new BehaviorSubject<{ userId: number; tag: string; transactionId?: number } | null>(null);
   public leaderboardUpdated$ = new BehaviorSubject<{ date?: string; tag?: string; transactionId?: number } | null>(null);
+  public claimTagsUpdated$ = new BehaviorSubject<{ tags: string[] } | null>(null);
   public pinChanged$ = new BehaviorSubject<{ tags: string[] } | null>(null);
   public timedCrashTimeoutUpdated$ = new BehaviorSubject<{ enabled: boolean } | null>(null);
 
@@ -288,6 +289,9 @@ export class AdminSocketService {
     });
     this.listen('admin_leaderboard_updated', (data: { date?: string; tag?: string; transactionId?: number }) => {
       this.leaderboardUpdated$.next(data);
+    });
+    this.listen('admin_claim_tags_updated', (data: { tags: string[] }) => {
+      this.claimTagsUpdated$.next(data);
     });
     this.listen('admin_pin_changed', (data: { tags: string[] }) => this.pinChanged$.next(data));
 
@@ -482,6 +486,7 @@ export class AdminSocketService {
     this.supportTicketUpdated$.next(null);
     this.supportTicketsDeleted$.next(null);
     this.leaderboardUpdated$.next(null);
+    this.claimTagsUpdated$.next(null);
     this.clientClaimed$.next(null);
     this.pinChanged$.next(null);
     this.timedCrashTimeoutUpdated$.next(null);

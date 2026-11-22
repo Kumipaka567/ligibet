@@ -34,7 +34,7 @@ describe('Admin dashboard live account management', () => {
       ...Object.fromEntries([
         'transactionUpdate$', 'dashboardStatsUpdated$', 'walletUpdated$',
         'transactionsUpdated$', 'depositsUpdated$', 'withdrawalsUpdated$',
-        'userUpdated$', 'activityUpdated$', 'predatorTextUpdate$', 'accessRevoked$', 'depositInitiated$', 'onlinePlayers$', 'supportTicketUpdated$', 'supportTicketsDeleted$', 'clientClaimed$', 'pinChanged$', 'timedCrashTimeoutUpdated$'
+        'userUpdated$', 'activityUpdated$', 'predatorTextUpdate$', 'accessRevoked$', 'depositInitiated$', 'onlinePlayers$', 'supportTicketUpdated$', 'supportTicketsDeleted$', 'clientClaimed$', 'leaderboardUpdated$', 'claimTagsUpdated$', 'pinChanged$', 'timedCrashTimeoutUpdated$'
       ].map(key => [key, new BehaviorSubject(null)]))
     };
     auth = {
@@ -880,5 +880,49 @@ describe('Admin dashboard live account management', () => {
     expect(component.promptTargetUser?.balance).toBe(1750);
     http.expectOne(r => r.url.includes('/api/admin/transactions?')).flush({ transactions: [] });
     http.expectOne(r => r.url.endsWith('/api/admin/stats')).flush({ totalDeposits: 500 });
+  });
+
+  it('adds and removes claiming admin initials and formats failed deposit diagnostics for admins', () => {
+    expect(component.allowedAdminTags).toEqual(['S', 'G', 'R', 'V']);
+
+    component.newClaimAdminTag = 'm';
+    component.addClaimAdminTag();
+    const addReq = http.expectOne(r => r.url.endsWith('/api/admin/claim-tags') && r.method === 'POST');
+    expect(addReq.request.body).toEqual({ tag: 'M' });
+    addReq.flush({ tag: 'M', tags: ['S', 'G', 'R', 'V', 'M'], message: 'Admin initial M added.' });
+    expect(component.allowedAdminTags).toEqual(['S', 'G', 'R', 'V', 'M']);
+    expect(component.newClaimAdminTag).toBe('');
+    const lbReqs1 = http.match(r => r.url.includes('/api/admin/leaderboard'));
+    lbReqs1[lbReqs1.length - 1].flush({
+      success: true, date: '2026-11-22', startDate: '2026-11-07', serverTime: 'now',
+      adminTags: ['S', 'G', 'R', 'V', 'M'], totalDayClaims: 0, totalDayVolume: 0, overallAvgTicket: 0, leadingAdmin: null, scoringFormula: '', leaderboard: []
+    });
+
+    component.removeClaimAdminTag('M');
+    const delReq = http.expectOne(r => r.url.endsWith('/api/admin/claim-tags/M') && r.method === 'DELETE');
+    delReq.flush({ tag: 'M', tags: ['S', 'G', 'R', 'V'], message: 'Admin initial M removed.' });
+    expect(component.allowedAdminTags).toEqual(['S', 'G', 'R', 'V']);
+    const lbReqs2 = http.match(r => r.url.includes('/api/admin/leaderboard'));
+    lbReqs2[lbReqs2.length - 1].flush({
+      success: true, date: '2026-11-22', startDate: '2026-11-07', serverTime: 'now',
+      adminTags: ['S', 'G', 'R', 'V'], totalDayClaims: 0, totalDayVolume: 0, overallAvgTicket: 0, leadingAdmin: null, scoringFormula: '', leaderboard: []
+    });
+
+    expect(component.getDepositDiagnosticTitle({
+      category: 'provider_funds', label: 'Insufficient provider wallet funds', provider: 'payhero', code: null, detail: 'Low service wallet balance'
+    })).toBe('Insufficient PayHero wallet funds');
+    expect(component.getDepositDiagnosticTitle({
+      category: 'customer_blocked', label: 'Customer blocked by provider', provider: 'nexuspay', code: null, detail: 'Blacklisted'
+    })).toBe('Customer blocked by Nexus Pay');
+    expect(component.getDepositDiagnosticTitle({
+      category: 'wrong_pin', label: 'Incorrect M-Pesa PIN', provider: 'payhero', code: '2001', detail: 'Wrong PIN'
+    })).toBe('Incorrect M-Pesa PIN');
+
+    // Ordinary admins cannot add or remove claiming admin initials
+    auth.currentUser$.next({ id: 2, username: 'ordinary-admin', balance: 0, role: 'admin' });
+    component.newClaimAdminTag = 'Z';
+    component.addClaimAdminTag();
+    component.removeClaimAdminTag('V');
+    http.expectNone(r => r.url.includes('/api/admin/claim-tags'));
   });
 });

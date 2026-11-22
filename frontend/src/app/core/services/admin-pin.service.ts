@@ -3,7 +3,8 @@ import { HttpErrorResponse, HttpEvent, HttpInterceptorFn, HttpResponse } from '@
 import { BehaviorSubject, EMPTY, catchError, filter, map } from 'rxjs';
 import { getBackendOrigin } from '../config/backend-url';
 
-export type AdminInitial = 'R' | 'G' | 'S' | 'V';
+export type AdminInitial = string;
+const isValidAdminTag = (val: unknown): val is string => typeof val === 'string' && /^[A-Z0-9]{1,3}$/.test(val.trim().toUpperCase());
 
 // Keep table rows visible while ownership changes; new server responses restore authorized numbers.
 export function maskClientPhoneNumbers<T>(payload: T): T {
@@ -82,12 +83,15 @@ export const adminPinInterceptor: HttpInterceptorFn = (request, next) => {
           .map((item: any) => ({ id: item.id, name: item.id === 'payhero' ? 'PayHero' : 'Nexus Pay', configured: item.configured === true })) : [],
         updatedAt: typeof body?.updatedAt === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(body.updatedAt) ? body.updatedAt : null
       } });
-      if (claim) return event.clone({ body: {
-        message: 'Client claimed.', transactionId: Number(body?.transactionId ?? body?.transaction?.id),
-        tag: ['R', 'G', 'S', 'V'].includes(body?.tag ?? body?.transaction?.admin_tag) ? body.tag ?? body.transaction.admin_tag : undefined
-      } });
+      if (claim) {
+        const rawTag = String(body?.tag ?? body?.transaction?.admin_tag ?? '').trim().toUpperCase();
+        return event.clone({ body: {
+          message: 'Client claimed.', transactionId: Number(body?.transactionId ?? body?.transaction?.id),
+          tag: isValidAdminTag(rawTag) ? rawTag : undefined
+        } });
+      }
       return event.clone({ body: { message: 'PINs saved.', configuredTags: Array.isArray(body?.configuredTags)
-        ? body.configuredTags.filter((tag: string) => ['R', 'G', 'S', 'V'].includes(tag)) : [] } });
+        ? body.configuredTags.map((t: string) => String(t || '').trim().toUpperCase()).filter(isValidAdminTag) : [] } });
     }),
     filter((event: HttpEvent<unknown>) => !(event instanceof HttpResponse) || acknowledgement || epoch === pin.epoch),
     catchError(error => {

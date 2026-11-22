@@ -49,7 +49,7 @@ export interface AdminTransaction {
   status: 'completed' | 'failed' | 'pending';
   admin_deposit_diagnostic?: AdminTransactionUpdate['admin_deposit_diagnostic'];
   reference?: string;
-  admin_tag?: 'S' | 'G' | 'R' | 'V' | null;
+  admin_tag?: AdminInitial | null;
   admin_tagged_by?: number | null;
   admin_tagged_at?: string | null;
   created_at: string;
@@ -83,6 +83,7 @@ export interface AdminLeaderboardData {
   date: string;
   startDate: string;
   serverTime: string;
+  adminTags?: AdminInitial[];
   totalDayClaims: number;
   totalDayVolume: number;
   totalAllTimeClaims?: number;
@@ -176,7 +177,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.pinSetupOpen = false;
     this.pinInput = '';
     this.ownerKeyInput = '';
-    this.setupPins = { R: '', G: '', S: '', V: '' };
+    const resetPins: Record<AdminInitial, string> = {};
+    for (const tag of this.allowedAdminTags) resetPins[tag] = '';
+    this.setupPins = resetPins;
     this.pinError = '';
   }
 
@@ -1072,6 +1075,12 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (this.adminSocket.leaderboardUpdated$) this.realtimeSubscriptions.push(this.adminSocket.leaderboardUpdated$.subscribe(event => {
       if (event) this.fetchAdminLeaderboard();
     }));
+    if (this.adminSocket.claimTagsUpdated$) this.realtimeSubscriptions.push(this.adminSocket.claimTagsUpdated$.subscribe(event => {
+      if (event?.tags?.length) {
+        this.applyAllowedAdminTags(event.tags);
+        this.fetchAdminLeaderboard();
+      }
+    }));
     if (this.adminSocket.pinChanged$) this.realtimeSubscriptions.push(this.adminSocket.pinChanged$.subscribe(event => {
       if (event && this.adminPin.tag && event.tags.includes(this.adminPin.tag)) {
         this.closePinDialogs();
@@ -1191,11 +1200,13 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
             if (event.status === 'completed') {
               this.stopAdminPromptPolling();
               this.adminPromptStatus = 'completed';
+              this.adminPromptDiagnostic = null;
               this.adminPromptReceipt = (event.reference || '').replace(/^MPESA-/, '');
               this.adminPromptMessage = `M-Pesa deposit of KES ${Number(event.amount || this.lastPromptedAmount).toLocaleString()} confirmed and credited!`;
             } else if (event.status === 'failed') {
               this.stopAdminPromptPolling();
               this.adminPromptStatus = 'failed';
+              this.adminPromptDiagnostic = event.admin_deposit_diagnostic || null;
               this.adminPromptMessage = this.promptDiagnosticMessage(event.admin_deposit_diagnostic) || 'The provider did not specify a reason.';
             }
           }
@@ -2255,6 +2266,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.http.get<any>(this.baseUrl + '/api/admin/overview', { headers: { Authorization: 'Bearer ' + token } })
       .pipe(timeout(15000)).subscribe({
         next: res => {
+          if (Array.isArray(res?.adminTags) && res.adminTags.length > 0) {
+            this.applyAllowedAdminTags(res.adminTags);
+          }
           if (res?.stats && statsVersion === this.statsRequestVersion) {
             this.stats = { ...this.stats, ...res.stats };
             if (this.onlinePlayersSummary) this.stats = { ...this.stats, onlineUsers: this.onlinePlayersSummary.onlineUsers, connectedPlayers: this.onlinePlayersSummary.connectedPlayers };
@@ -2405,7 +2419,117 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   public claimingTagTxId: number | null = null;
   private readonly seenClaimTransactions = new Set<number>();
-  public readonly allowedAdminTags: ('S' | 'G' | 'R' | 'V')[] = ['S', 'G', 'R', 'V'];
+  public allowedAdminTags: AdminInitial[] = ['S', 'G', 'R', 'V'];
+  public newClaimAdminTag: string = '';
+  public isSavingClaimAdminTag: boolean = false;
+  public removingClaimAdminTag: string | null = null;
+  public showClaimAdminsManager: boolean = false;
+
+  public applyAllowedAdminTags(rawTags: unknown): void {
+    if (!Array.isArray(rawTags)) return;
+    const seen = new Set<string>();
+    const nextTags: AdminInitial[] = [];
+    for (const raw of rawTags) {
+      const t = String(raw || '').trim().toUpperCase();
+      if (/^[A-Z0-9]{1,3}$/.test(t) && !seen.has(t)) {
+        seen.add(t);
+        nextTags.push(t);
+      }
+    }
+    if (!nextTags.length) return;
+    this.allowedAdminTags = nextTags;
+    const nextSetupPins: Record<AdminInitial, string> = {};
+    for (const tag of nextTags) {
+      nextSetupPins[tag] = this.setupPins[tag] || '';
+    }
+    this.setupPins = nextSetupPins;
+    if (!nextTags.includes(this.pinInitial)) {
+      this.pinInitial = nextTags[0] || 'R';
+    }
+    if (this.adminPin.tag && !nextTags.includes(this.adminPin.tag)) {
+      this.adminPin.clear();
+    }
+    this.cdr.markForCheck();
+  }
+
+  public addClaimAdminTag(): void {
+    if (!this.isSuperAdmin) return;
+    const tag = (this.newClaimAdminTag || '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{1,3}$/.test(tag)) {
+      this.showAdminToast('Enter a valid admin initial (1 to 3 letters or numbers, e.g. R, K, M).', 'error');
+      return;
+    }
+    if (this.allowedAdminTags.includes(tag)) {
+      this.showAdminToast(`Admin initial [${tag}] is already active.`, 'error');
+      return;
+    }
+    const token = this.authService.getToken();
+    if (!token || this.isSavingClaimAdminTag) return;
+    this.isSavingClaimAdminTag = true;
+    this.cdr.markForCheck();
+
+    this.http.post<{ tag: string; tags: string[]; message: string }>(
+      `${this.baseUrl}/api/admin/claim-tags`,
+      { tag },
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).pipe(
+      timeout(10000),
+      finalize(() => {
+        this.isSavingClaimAdminTag = false;
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: res => {
+        this.newClaimAdminTag = '';
+        if (Array.isArray(res?.tags)) {
+          this.applyAllowedAdminTags(res.tags);
+        } else {
+          this.applyAllowedAdminTags([...this.allowedAdminTags, tag]);
+        }
+        this.showAdminToast(res?.message || `Admin initial [${tag}] added for transaction claiming.`, 'success', 'Admin Initial Added');
+        this.fetchAdminLeaderboard();
+      },
+      error: err => {
+        this.showAdminToast(err?.error?.error || 'Failed to add admin initial.', 'error');
+      }
+    });
+  }
+
+  public removeClaimAdminTag(tag: AdminInitial): void {
+    if (!this.isSuperAdmin) return;
+    if (this.allowedAdminTags.length <= 1) {
+      this.showAdminToast('At least one claiming admin initial must remain active.', 'error');
+      return;
+    }
+    const token = this.authService.getToken();
+    if (!token || this.removingClaimAdminTag !== null) return;
+    this.removingClaimAdminTag = tag;
+    this.cdr.markForCheck();
+
+    this.http.delete<{ tag: string; tags: string[]; message: string }>(
+      `${this.baseUrl}/api/admin/claim-tags/${encodeURIComponent(tag)}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).pipe(
+      timeout(10000),
+      finalize(() => {
+        this.removingClaimAdminTag = null;
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: res => {
+        if (Array.isArray(res?.tags)) {
+          this.applyAllowedAdminTags(res.tags);
+        } else {
+          this.applyAllowedAdminTags(this.allowedAdminTags.filter(item => item !== tag));
+        }
+        this.showAdminToast(res?.message || `Admin initial [${tag}] removed.`, 'info', 'Admin Initial Removed');
+        this.fetchAdminLeaderboard();
+      },
+      error: err => {
+        this.showAdminToast(err?.error?.error || 'Failed to remove admin initial.', 'error');
+      }
+    });
+  }
 
   private refreshClientClaim(userId: number, tag: string, transactionId?: number): void {
     if (transactionId && this.seenClaimTransactions.has(transactionId)) return;
@@ -2420,7 +2544,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.fetchAdminLeaderboard();
   }
 
-  public claimTransactionTag(tx: AdminTransaction, tag: 'S' | 'G' | 'R' | 'V'): void {
+  public claimTransactionTag(tx: AdminTransaction, tag: AdminInitial): void {
     if (tx.type !== 'deposit' || tx.status !== 'completed') return;
     if (tx.admin_tag || tx.ownership_exempt) return;
     if (this.claimingTagTxId === tx.id) return; // Prevent double submit
@@ -3178,6 +3302,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       next: (res) => {
         if (res && res.success) {
           this.leaderboardData = res;
+          if (Array.isArray(res.adminTags) && res.adminTags.length > 0) {
+            this.applyAllowedAdminTags(res.adminTags);
+          }
           this.leaderboardSelectedDate = res.date;
           this.leaderboardLastRefreshed = new Date();
         }
@@ -3225,14 +3352,39 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
   public get sortedDailyAdmins(): AdminLeaderboardAdmin[] {
-    const fallback: AdminLeaderboardAdmin[] = [
-      { tag: 'R', name: 'Admin R', role: 'Operations', badgeColor: '#ef4444', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 1 },
-      { tag: 'S', name: 'Admin S', role: 'Settlements', badgeColor: '#0ea5e9', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 2 },
-      { tag: 'V', name: 'Admin V', role: 'Verification', badgeColor: '#a855f7', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 3 },
-      { tag: 'G', name: 'Admin G', role: 'Growth', badgeColor: '#10b981', claimedCount: 0, totalVolume: 0, avgTicket: 0, maxTicket: 0, minTicket: 0, sharePercent: 0, volumeSharePercent: 0, score: 0, basePoints: 0, volumePoints: 0, lastClaimedAt: null, rank: 4 }
+    const knownMeta: Record<string, { role: string; badgeColor: string }> = {
+      R: { role: 'Operations', badgeColor: '#ef4444' },
+      S: { role: 'Settlements', badgeColor: '#0ea5e9' },
+      V: { role: 'Verification', badgeColor: '#a855f7' },
+      G: { role: 'Growth', badgeColor: '#10b981' },
+      D: { role: 'Settlements', badgeColor: '#10b981' },
+      K: { role: 'Verification', badgeColor: '#0ea5e9' }
+    };
+    const palette = ['#f59e0b', '#ec4899', '#14b8a6', '#6366f1', '#84cc16', '#f97316'];
+    const orderedTags = [
+      ...['R', 'S', 'V', 'G'].filter(t => this.allowedAdminTags.includes(t)),
+      ...this.allowedAdminTags.filter(t => !['R', 'S', 'V', 'G'].includes(t))
     ];
+    const fallback: AdminLeaderboardAdmin[] = orderedTags.map((tag, idx) => ({
+      tag,
+      name: `Admin ${tag}`,
+      role: knownMeta[tag]?.role || 'Operations',
+      badgeColor: knownMeta[tag]?.badgeColor || palette[idx % palette.length],
+      claimedCount: 0,
+      totalVolume: 0,
+      avgTicket: 0,
+      maxTicket: 0,
+      minTicket: 0,
+      sharePercent: 0,
+      volumeSharePercent: 0,
+      score: 0,
+      basePoints: 0,
+      volumePoints: 0,
+      lastClaimedAt: null,
+      rank: idx + 1
+    }));
 
-    const list = this.leaderboardData?.leaderboard ? [...this.leaderboardData.leaderboard] : fallback;
+    const list = this.leaderboardData?.leaderboard?.length ? [...this.leaderboardData.leaderboard] : fallback;
 
     // Strictly sort by daily claimed amount (totalVolume descending)
     return list.sort((a, b) => {
@@ -3292,6 +3444,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   public adminPromptStatus: 'idle' | 'sending' | 'waiting' | 'completed' | 'failed' = 'idle';
   public adminPromptMessage: string = '';
+  public adminPromptDiagnostic: AdminTransactionUpdate['admin_deposit_diagnostic'] = null;
   public adminPromptCheckoutId: string = '';
   public adminPromptReceipt: string = '';
   public lastPromptedPhone: string = '';
@@ -3537,6 +3690,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.stopAdminPromptPolling();
     this.adminPromptStatus = 'sending';
     this.adminPromptReceipt = '';
+    this.adminPromptDiagnostic = null;
     this.adminPromptCheckoutId = '';
     this.lastPromptedAmount = amount;
     this.lastPromptedUserId = this.promptTargetUser?.id ?? null;
@@ -3586,6 +3740,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       },
       error: err => {
         this.adminPromptStatus = 'failed';
+        this.adminPromptDiagnostic = err?.error?.admin_deposit_diagnostic || null;
         this.adminPromptMessage = this.promptDiagnosticMessage(err?.error?.admin_deposit_diagnostic)
           || err?.error?.error || 'The payment prompt could not be confirmed. Check before retrying.';
         this.showAdminToast(this.adminPromptMessage, 'error', 'Prompt Rejected');
@@ -3650,6 +3805,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         if (res.status === 'completed') {
           this.stopAdminPromptPolling();
           this.adminPromptStatus = 'completed';
+          this.adminPromptDiagnostic = null;
           this.adminPromptReceipt = res.receiptNumber || '';
           const targetId = res.targetUserId ?? this.lastPromptedUserId;
           if (targetId && typeof res.balance === 'number') {
@@ -3663,11 +3819,13 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         } else if (res.status === 'failed') {
           this.stopAdminPromptPolling();
           this.adminPromptStatus = 'failed';
+          this.adminPromptDiagnostic = res.admin_deposit_diagnostic || null;
           this.adminPromptMessage = this.promptDiagnosticMessage(res.admin_deposit_diagnostic)
             || res.failure_reason || res.reason || 'The provider did not specify a reason.';
           this.showAdminToast(this.adminPromptMessage, 'error', 'Prompt Not Completed');
           this.fetchTransactions();
         } else if (res.status === 'pending' && res.admin_deposit_diagnostic) {
+          this.adminPromptDiagnostic = res.admin_deposit_diagnostic;
           this.adminPromptMessage = this.promptDiagnosticMessage(res.admin_deposit_diagnostic);
         }
       },
@@ -3675,9 +3833,25 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  public getDepositDiagnosticTitle(diagnostic?: AdminTransactionUpdate['admin_deposit_diagnostic']): string {
+    if (!diagnostic) return 'Provider did not specify a reason';
+    const providerName = diagnostic.provider === 'payhero' ? 'PayHero' : (diagnostic.provider === 'nexuspay' ? 'Nexus Pay' : '');
+    if (diagnostic.category === 'provider_funds' && providerName) {
+      return `Insufficient ${providerName} wallet funds`;
+    }
+    if (diagnostic.category === 'customer_blocked' && providerName) {
+      return `Customer blocked by ${providerName}`;
+    }
+    if (diagnostic.category === 'provider_blocked' && providerName) {
+      return `Merchant restricted by ${providerName}`;
+    }
+    return diagnostic.label || 'Provider did not specify a reason';
+  }
+
   private promptDiagnosticMessage(diagnostic: AdminTransactionUpdate['admin_deposit_diagnostic']): string {
     if (!diagnostic) return '';
-    return diagnostic.detail ? `${diagnostic.label}. ${diagnostic.detail}` : diagnostic.label;
+    const title = this.getDepositDiagnosticTitle(diagnostic);
+    return diagnostic.detail ? `${title}. ${diagnostic.detail}` : title;
   }
 
   public stopAdminPromptPolling(): void {
@@ -3691,6 +3865,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.stopAdminPromptPolling();
     this.adminPromptStatus = 'idle';
     this.adminPromptMessage = '';
+    this.adminPromptDiagnostic = null;
     this.adminPromptReceipt = '';
     this.adminPromptCheckoutId = '';
     this.cdr.markForCheck();

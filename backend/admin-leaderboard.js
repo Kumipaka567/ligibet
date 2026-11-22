@@ -7,11 +7,52 @@ const RSVG_ADMINS_METADATA = [
   { tag: 'G', name: 'Admin G', role: 'Growth', badgeColor: '#10b981' }
 ];
 
+const EXTRA_ADMIN_PALETTE = [
+  { role: 'Treasury', badgeColor: '#f59e0b' },
+  { role: 'Compliance', badgeColor: '#ec4899' },
+  { role: 'Accounts', badgeColor: '#14b8a6' },
+  { role: 'Payments', badgeColor: '#6366f1' },
+  { role: 'Desk Lead', badgeColor: '#84cc16' },
+  { role: 'Support', badgeColor: '#f97316' }
+];
+
+const KNOWN_ADMIN_METADATA = new Map([
+  ...RSVG_ADMINS_METADATA.map(item => [item.tag, item]),
+  ['D', { tag: 'D', name: 'Admin D', role: 'Settlements', badgeColor: '#10b981' }],
+  ['K', { tag: 'K', name: 'Admin K', role: 'Verification', badgeColor: '#0ea5e9' }]
+]);
+
+function buildAdminsMetadata(tags) {
+  if (!Array.isArray(tags) || tags.length === 0) {
+    return [...RSVG_ADMINS_METADATA];
+  }
+  const normalized = [];
+  const seen = new Set();
+  for (const raw of tags) {
+    const t = String(raw || '').trim().toUpperCase();
+    if (/^[A-Z0-9]{1,3}$/.test(t) && !seen.has(t)) {
+      seen.add(t);
+      normalized.push(t);
+    }
+  }
+  if (normalized.length === 0) return [...RSVG_ADMINS_METADATA];
+  // Preserve default R, S, V, G ordering for the standard 4 tags while respecting additions/removals
+  const defaultOrder = ['R', 'S', 'V', 'G'].filter(t => seen.has(t));
+  const extraOrder = normalized.filter(t => !['R', 'S', 'V', 'G'].includes(t));
+  const finalTags = [...defaultOrder, ...extraOrder];
+  return finalTags.map((tag, idx) => {
+    if (KNOWN_ADMIN_METADATA.has(tag)) return { ...KNOWN_ADMIN_METADATA.get(tag) };
+    const palette = EXTRA_ADMIN_PALETTE[idx % EXTRA_ADMIN_PALETTE.length];
+    return { tag, name: `Admin ${tag}`, role: palette.role, badgeColor: palette.badgeColor };
+  });
+}
+
 const LEADERBOARD_START_DATE = '2026-11-07';
 
 function createAdminLeaderboard(models = {}, options = {}) {
   const { Transaction, User } = models;
   const nowFn = options.now || (() => new Date());
+  const getAdminTagsFn = typeof options.getAdminTags === 'function' ? options.getAdminTags : null;
 
   /**
    * Formats a Date object to YYYY-MM-DD in East Africa Time (UTC+3)
@@ -44,8 +85,13 @@ function createAdminLeaderboard(models = {}, options = {}) {
    * strictly for completed deposits (type === 'deposit', status === 'completed')
    * created within that 24-hour day, refreshing at 12:00 AM midnight EAT.
    */
-  async function getDailyLeaderboard(targetDateStr) {
+  async function getDailyLeaderboard(targetDateStr, customTags = null) {
     const dateStr = resolveTargetDate(targetDateStr);
+    const configuredTags = Array.isArray(customTags)
+      ? customTags
+      : (getAdminTagsFn ? await getAdminTagsFn() : null);
+    const activeAdmins = buildAdminsMetadata(configuredTags);
+    const activeTagList = activeAdmins.map(a => a.tag);
 
     // 24-hour day window in East Africa Time (UTC+3, no DST)
     // 12:00 AM (00:00:00.000) to 11:59:59 PM (23:59:59.999)
@@ -69,7 +115,7 @@ function createAdminLeaderboard(models = {}, options = {}) {
       queriedTxs = await Transaction.find({
         type: 'deposit',
         status: 'completed',
-        admin_tag: { $in: ['R', 'S', 'V', 'G'] },
+        admin_tag: { $in: activeTagList },
         created_at: { $gte: startOfDay, $lte: endOfDay }
       }).select('id user_id type status amount admin_tag admin_tagged_at created_at').lean();
     }
@@ -87,8 +133,8 @@ function createAdminLeaderboard(models = {}, options = {}) {
     const totalDayVolume = todayTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
     const overallAvgTicket = totalDayClaims > 0 ? Math.round(totalDayVolume / totalDayClaims) : 0;
 
-    // Process each of the RSVG admins for today's 24h claims
-    const entries = RSVG_ADMINS_METADATA.map(admin => {
+    // Process each of the active admins for today's 24h claims
+    const entries = activeAdmins.map(admin => {
       const adminTodayTxs = todayTxs.filter(t => t.admin_tag === admin.tag);
       const claimedCount = adminTodayTxs.length;
       const totalVolume = adminTodayTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
@@ -151,6 +197,7 @@ function createAdminLeaderboard(models = {}, options = {}) {
       date: dateStr,
       startDate: LEADERBOARD_START_DATE,
       serverTime: nowFn().toISOString(),
+      adminTags: Array.isArray(configuredTags) && configuredTags.length > 0 ? configuredTags : activeTagList,
       totalDayClaims,
       totalDayVolume,
       overallAvgTicket,

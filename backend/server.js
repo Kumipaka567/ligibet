@@ -2162,8 +2162,12 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
       extra.forEach(u => userMap.set(u.id, u));
     }
 
-    const diagnostics = await adminTransactionDiagnostics(Deposit, transactions);
+    const [diagnostics, adminTags] = await Promise.all([
+      adminTransactionDiagnostics(Deposit, transactions),
+      adminPrivacy.getAdminTags()
+    ]);
     return res.json({
+      adminTags,
       stats: {
         ...totals,
         connectedPlayers: onlinePlayers.summary().connectedPlayers,
@@ -2197,11 +2201,53 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
 
 app.get('/api/admin/leaderboard', authenticateAdminToken, async (req, res) => {
   try {
-    const data = await adminLeaderboard.getDailyLeaderboard(req.query.date);
+    const activeTags = await adminPrivacy.getAdminTags();
+    const data = await adminLeaderboard.getDailyLeaderboard(req.query.date, activeTags);
     return res.json(data);
   } catch (err) {
     console.error('Admin leaderboard error:', err);
     return res.status(500).json({ error: 'Failed to calculate admin leadership board' });
+  }
+});
+
+app.get('/api/admin/claim-tags', authenticateAdminToken, async (_req, res) => {
+  try {
+    const tags = await adminPrivacy.getAdminTags();
+    return res.json({ tags });
+  } catch (_err) {
+    return res.status(500).json({ error: 'Failed to load claiming admin initials.' });
+  }
+});
+
+app.post('/api/admin/claim-tags', authenticateSuperAdminToken, async (req, res) => {
+  try {
+    const result = await adminPrivacy.addAdminTag(req.body?.tag);
+    await AdminLog.create({
+      admin_id: req.user.id,
+      action: 'ADD_CLAIM_ADMIN_TAG',
+      details: `Added claiming admin initial [${result.tag}] (active: ${result.tags.join(', ')})`
+    }).catch(() => {});
+    adminNamespace.emit('admin_claim_tags_updated', { tags: result.tags });
+    adminNamespace.emit('admin_leaderboard_updated', { date: new Date().toISOString().slice(0, 10), tag: result.tag });
+    return res.json(result);
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to add admin initial.' });
+  }
+});
+
+app.delete('/api/admin/claim-tags/:tag', authenticateSuperAdminToken, async (req, res) => {
+  try {
+    const result = await adminPrivacy.removeAdminTag(req.params.tag);
+    await AdminLog.create({
+      admin_id: req.user.id,
+      action: 'REMOVE_CLAIM_ADMIN_TAG',
+      details: `Removed claiming admin initial [${result.tag}] (active: ${result.tags.join(', ')})`
+    }).catch(() => {});
+    adminNamespace.emit('admin_claim_tags_updated', { tags: result.tags });
+    adminNamespace.emit('admin_leaderboard_updated', { date: new Date().toISOString().slice(0, 10), tag: result.tag });
+    return res.json(result);
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to remove admin initial.' });
   }
 });
 
@@ -2556,8 +2602,9 @@ app.delete('/api/admin/transactions/:id', authenticateSuperAdminToken,
 app.post('/api/admin/transactions/:id/claim-tag', authenticateAdminToken, async (req, res) => {
   try {
     const txId = Number(req.params.id);
-    const tag = String(req.body.tag || '').toUpperCase();
-    if (!Number.isSafeInteger(txId) || txId <= 0 || !ADMIN_TAGS.includes(tag)) return res.status(400).json({ error: 'Invalid transaction or admin initial.' });
+    const tag = String(req.body.tag || '').trim().toUpperCase();
+    const activeTags = await adminPrivacy.getAdminTags();
+    if (!Number.isSafeInteger(txId) || txId <= 0 || !activeTags.includes(tag)) return res.status(400).json({ error: 'Invalid transaction or admin initial.' });
     const tx = await adminPrivacy.claim(txId, tag, req.user.id);
     await AdminLog.create({ admin_id: req.user.id, action: 'CLAIM_TRANSACTION', target_user_id: tx.user_id,
       details: 'Admin [' + tag + '] claimed completed deposit #' + txId }).catch(() => {});

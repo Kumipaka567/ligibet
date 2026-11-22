@@ -515,3 +515,27 @@ test('socket broadcasts verify each PIN independently and initial snapshots cann
   assert.equal(second.events[0].payload.topPlayers.length, 0);
   assert.equal(locked.events[0].payload.topPlayers[0].phone_number, '+25471*****78');
 });
+
+test('can add and remove claiming admin initials dynamically and claim transactions with a newly added initial', async () => {
+  const { service, transactions, phoneOwners } = fixture();
+  await assert.rejects(service.claim(101, 'M', 1), { status: 400 });
+
+  const added = await service.addAdminTag('m');
+  assert.equal(added.tag, 'M');
+  assert.ok(added.tags.includes('M'));
+  assert.deepEqual(await service.getAdminTags(), added.tags);
+  await assert.rejects(service.addAdminTag('M'), { status: 409 });
+
+  await service.claim(101, 'M', 1);
+  assert.equal(transactions.get(101).admin_tag, 'M');
+  assert.equal(phoneOwners.get('254712345678').owner_tag, 'M');
+
+  await service.configure('private-owner-key-only', { M: '9753' });
+  const unlocked = await service.unlock('M', '9753', 'shared');
+  assert.equal((await service.identity(unlocked.pinToken, 'shared')).tag, 'M');
+
+  const removed = await service.removeAdminTag('M');
+  assert.equal(removed.tag, 'M');
+  assert.ok(!removed.tags.includes('M'));
+  assert.equal(await service.identity(unlocked.pinToken, 'shared'), null);
+});

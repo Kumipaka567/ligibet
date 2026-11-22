@@ -135,7 +135,7 @@ const TransactionSchema = new mongoose.Schema({
   mpesa_receipt_number: { type: String, default: null },
   admin_tag: {
     type: String,
-    enum: ['S', 'G', 'R', 'V', null],
+    match: /^[A-Z0-9]{1,3}$/,
     default: null,
     index: true
   },
@@ -387,7 +387,7 @@ SupportTicketSchema.pre('save', async function(next) {
 // PIN identity is separate from the account used to open the dashboard.
 const AdminClientOwnerSchema = new mongoose.Schema({
   user_id: { type: Number, required: true, unique: true },
-  owner_tag: { type: String, required: true, enum: ['R', 'G', 'S', 'V'] },
+  owner_tag: { type: String, required: true, match: /^[A-Z0-9]{1,3}$/ },
   claimed_transaction_id: { type: Number, required: true },
   client_phone: String,
   client_username: String,
@@ -396,18 +396,18 @@ const AdminClientOwnerSchema = new mongoose.Schema({
 const AdminPinSessionSchema = new mongoose.Schema({
   token_hash: { type: String, required: true, unique: true },
   account_hash: { type: String, required: true },
-  tag: { type: String, required: true, enum: ['R', 'G', 'S', 'V'] },
+  tag: { type: String, required: true, match: /^[A-Z0-9]{1,3}$/ },
   profile_hash: { type: String, required: true },
   expires_at: { type: Date, required: true, expires: 0 }
 });
 const AdminPinProfileSchema = new mongoose.Schema({
-  _id: { type: String, enum: ['R', 'G', 'S', 'V'] },
+  _id: { type: String, match: /^[A-Z0-9]{1,3}$/ },
   pin_hash: { type: String, required: true },
   updated_at: { type: Date, default: Date.now }
 });
 const AdminPhoneOwnerSchema = new mongoose.Schema({
   _id: { type: String, required: true },
-  owner_tag: { type: String, required: true, enum: ['R', 'G', 'S', 'V'] },
+  owner_tag: { type: String, required: true, match: /^[A-Z0-9]{1,3}$/ },
   user_id: Number,
   admin_id: Number,
   client_phone: String,
@@ -417,7 +417,8 @@ const AdminPhoneOwnerSchema = new mongoose.Schema({
 });
 const AdminPinSettingsSchema = new mongoose.Schema({
   _id: { type: String, default: 'owner' },
-  owner_key_hash: { type: String, required: true },
+  owner_key_hash: { type: String, default: '' },
+  admin_tags: { type: [String], default: undefined },
   updated_at: { type: Date, default: Date.now }
 });
 const AdminPinAttemptSchema = new mongoose.Schema({

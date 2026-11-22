@@ -30,29 +30,38 @@ function depositDiagnostic(provider, raw, { reason, status, stage = 'confirmatio
   const cancelled = [status, ...records.flatMap(row => [row.Status, row.status])]
     .some(value => typeof value === 'string' && /^cancelled$|^canceled$/i.test(value.trim()));
   let category;
-  if (/insufficient|low balance|not enough|top.?up|required balance|balance too low/.test(text)
-    && /service (?:wallet|balance|token|credit)|merchant (?:wallet|account|balance)|(?:pay ?hero|nexus pay) (?:wallet|balance)|stk (?:fees?|credits?)|prompt (?:fees?|credits?)|account wallet/.test(text)) category = 'provider_funds';
-  else if (/block|blacklist|restrict|suspend|too many failed/.test(text) && /phone|number|customer|subscriber|recipient|msisdn/.test(text)) category = 'customer_blocked';
+  if (/insufficient|low balance|not enough|top.?up|required balance|balance too low|depleted|exhausted/.test(text)
+    && /service (?:wallet|balance|token|credit)|merchant (?:wallet|account|balance)|(?:pay ?hero|nexus(?: ?pay)?) (?:wallet|balance|account|funds|tokens?)|stk (?:fees?|credits?)|prompt (?:fees?|credits?)|account (?:wallet|balance)|wallet balance|token balance|service tokens?/.test(text)) category = 'provider_funds';
+  else if (/block|blacklist|restrict|suspend|too many (?:failed|unpaid|attempts|prompts)/.test(text) && /phone|number|customer|subscriber|recipient|msisdn|user|client|attempts|prompts|24 hours/.test(text)) category = 'customer_blocked';
   else if (/block|blacklist|restrict|suspend/.test(text) && /merchant|account|service|gateway/.test(text)) category = 'provider_blocked';
-  else if (/(?:wrong|incorrect|invalid) (?:m.?pesa )?pin|pin (?:is )?(?:wrong|incorrect|invalid|entered incorrectly)/.test(text)) category = 'wrong_pin';
+  else if (/(?:wrong|incorrect|invalid) (?:m.?pesa )?pin|pin (?:is )?(?:wrong|incorrect|invalid|entered incorrectly)|initiator information is invalid/.test(text)) category = 'wrong_pin';
   else if (/insufficient (?:funds|balance)|not enough (?:funds|balance)|balance (?:is )?(?:insufficient|too low)/.test(text)) category = stage === 'submission' ? 'reported' : 'customer_funds';
-  else if (/not (?:delivered|received|sent|reach)|did not (?:reach|receive)|delivery failed|unable to (?:deliver|reach)|subscriber (?:unreachable|unavailable)|phone (?:unreachable|switched off)/.test(text)) category = 'not_delivered';
-  else if (/cancel(?:led|ed)(?: by (?:user|customer|subscriber)| on the phone)|user cancel/.test(text)) category = 'cancelled';
+  else if (/not (?:delivered|received|sent|reach)|did not (?:reach|receive)|cannot be reached|could not be reached|delivery failed|unable to (?:deliver|reach)|subscriber (?:unreachable|unavailable)|phone (?:unreachable|switched off|off)|sim toolkit/.test(text)) category = 'not_delivered';
+  else if (/cancel(?:led|ed)(?: by (?:user|customer|subscriber)| on the phone)|user cancel|request cancelled/.test(text)) category = 'cancelled';
   else if (/timed?\s*out|expired|no response from|could not (?:get|obtain) a response/.test(text)) category = 'timed_out';
   else if (/invalid (?:m.?pesa |customer )?(?:phone|mobile|subscriber|msisdn)|not registered/.test(text)) category = 'invalid_phone';
   else if (/rate limit|too many requests|throttl/.test(text) || httpStatus === 429) category = 'rate_limit';
-  else if (/delay|still queued/.test(text)) category = 'delayed';
+  else if (/delay|still queued|already in process|unable to lock subscriber/.test(text) || code === '1001') category = 'delayed';
   else if (cancelled || code === '1032') category = 'cancelled';
-  else if (code === '1037') category = 'timed_out';
+  else if (code === '1037' || code === '1019') category = 'timed_out';
   else if (code === '2001') category = 'wrong_pin';
+  else if (code === '1' && stage !== 'submission') category = 'customer_funds';
   else if (details.length) category = 'reported';
   else if (stage === 'submission' && httpStatus >= 400 && httpStatus < 500 && httpStatus !== 408) category = 'provider_error';
   else if (status === 'pending') category = 'delayed';
   else category = 'unknown';
 
+  const fallbackDetails = {
+    timed_out: 'The provider has not confirmed delivery to the phone or a customer response.',
+    delayed: 'The provider has not confirmed delivery to the phone or a customer response.',
+    cancelled: 'Customer cancelled or dismissed the M-Pesa STK prompt on their phone.',
+    wrong_pin: 'Customer entered an incorrect M-Pesa PIN on the phone.',
+    customer_funds: 'Customer M-Pesa balance was insufficient to complete this deposit.',
+    not_delivered: 'The STK push prompt could not be delivered to the customer handset.'
+  };
+
   return { category, label: labels[category], provider: ['payhero', 'nexuspay'].includes(provider) ? provider : null,
-    code, detail: details[0] || (category === 'timed_out' || category === 'delayed'
-      ? 'The provider has not confirmed delivery to the phone or a customer response.' : null) };
+    code, detail: details[0] || fallbackDetails[category] || null };
 }
 
 function transactionDepositDiagnostic(tx, now = Date.now()) {
