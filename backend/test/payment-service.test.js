@@ -423,3 +423,69 @@ test('admin prompt initiates STK push using customer existing number or custom o
   assert.equal(res3.body.targetUserId, 7);
   assert.equal(res3.body.promptedPhone, '254712345678');
 });
+
+test('unsigned PayHero failure callbacks preserve ResultCode and ResultDesc for admins even when status API omits them or finishes first', async () => {
+  // Case 1: Unsigned callback arrives while pending; PayHero /transaction-status confirms FAILED without ResultDesc
+  const f1 = fixture();
+  delete f1.env.PAYHERO_CALLBACK_TOKEN;
+  const req1 = await f1.start();
+  const dep1 = f1.latest();
+  f1.results.set(dep1.id, {
+    status: 'failed',
+    reason: 'Payment failed or was cancelled on the phone.',
+    raw: { status: 'FAILED', reference: dep1.provider_reference, external_reference: dep1.external_reference }
+  });
+  await f1.service.callback({
+    headers: {},
+    query: {},
+    body: {
+      response: {
+        ExternalReference: dep1.external_reference,
+        CheckoutRequestID: req1.checkoutRequestId,
+        ResultCode: 1,
+        ResultDesc: 'The balance is insufficient for the transaction.',
+        Status: 'Failed'
+      }
+    }
+  });
+  const tx1 = [...f1.stores.transactions.values()][0];
+  assert.equal(tx1.status, 'failed');
+  assert.equal(tx1.admin_deposit_diagnostic.category, 'customer_funds');
+  assert.equal(tx1.admin_deposit_diagnostic.code, '1');
+  assert.equal(tx1.admin_deposit_diagnostic.detail, 'The balance is insufficient for the transaction.');
+  // Player response stays generic
+  const player1 = await f1.request('post', '/api/mpesa/stk-status', { checkoutRequestId: req1.checkoutRequestId });
+  assert.equal(player1.body.failure_reason, 'Payment failed or was cancelled on the phone.');
+  assert.equal(player1.body.admin_deposit_diagnostic, undefined);
+
+  // Case 2: Polling marks deposit failed first (unknown reason), then PayHero callback arrives 2 seconds later with ResultCode 1032
+  const f2 = fixture();
+  delete f2.env.PAYHERO_CALLBACK_TOKEN;
+  const req2 = await f2.start();
+  const dep2 = f2.latest();
+  f2.results.set(dep2.id, {
+    status: 'failed',
+    reason: 'Payment failed or was cancelled on the phone.',
+    raw: { status: 'FAILED', reference: dep2.provider_reference, external_reference: dep2.external_reference }
+  });
+  await f2.request('post', '/api/mpesa/stk-status', { checkoutRequestId: req2.checkoutRequestId });
+  assert.equal([...f2.stores.transactions.values()][0].admin_deposit_diagnostic.category, 'unknown');
+
+  await f2.service.callback({
+    headers: {},
+    query: {},
+    body: {
+      response: {
+        ExternalReference: dep2.external_reference,
+        CheckoutRequestID: req2.checkoutRequestId,
+        ResultCode: 1032,
+        ResultDesc: 'Request cancelled by user',
+        Status: 'Failed'
+      }
+    }
+  });
+  const tx2 = [...f2.stores.transactions.values()][0];
+  assert.equal(tx2.admin_deposit_diagnostic.category, 'cancelled');
+  assert.equal(tx2.admin_deposit_diagnostic.code, '1032');
+  assert.equal(tx2.admin_deposit_diagnostic.detail, 'Request cancelled by user');
+});

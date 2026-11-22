@@ -4,14 +4,16 @@
        [class.deposit-diagnostic-pending]="tx.status === 'pending'"
        [attr.data-category]="tx.admin_deposit_diagnostic?.category || 'unknown'">
     <div class="deposit-diagnostic-head">
-      <span class="deposit-diagnostic-dot" aria-hidden="true"></span>
-      <strong>{{ getDepositDiagnosticTitle(tx.admin_deposit_diagnostic) }}</strong>
-      <small *ngIf="tx.admin_deposit_diagnostic?.provider || tx.admin_deposit_diagnostic?.code" class="deposit-diagnostic-meta">
+      <div class="deposit-diagnostic-title-row">
+        <span class="deposit-diagnostic-dot" aria-hidden="true"></span>
+        <strong class="deposit-diagnostic-label">{{ getDepositDiagnosticTitle(tx.admin_deposit_diagnostic) }}</strong>
+      </div>
+      <div *ngIf="tx.admin_deposit_diagnostic?.provider || tx.admin_deposit_diagnostic?.code" class="deposit-diagnostic-meta">
         <span *ngIf="tx.admin_deposit_diagnostic?.provider" class="deposit-diagnostic-provider">
           {{ tx.admin_deposit_diagnostic?.provider === 'payhero' ? 'PayHero' : tx.admin_deposit_diagnostic?.provider === 'nexuspay' ? 'Nexus Pay' : '' }}
         </span>
         <span *ngIf="tx.admin_deposit_diagnostic?.code as code" class="deposit-diagnostic-code mono">Code {{ code }}</span>
-      </small>
+      </div>
     </div>
     <span *ngIf="tx.admin_deposit_diagnostic?.detail as detail" class="deposit-diagnostic-detail">{{ detail }}</span>
   </div>
@@ -1727,8 +1729,8 @@
               <th scope="col">Account</th>
               <th scope="col">Phone</th>
               <th scope="col">Amount</th>
-              <th scope="col">Reference / Receipt</th>
-              <th scope="col">Status</th>
+              <th scope="col" class="tx-ref-col">Reference / Receipt</th>
+              <th scope="col" class="tx-status-col">Status &amp; Reason</th>
               <th scope="col" class="admin-tag-th">Admin Tag</th>
               <th scope="col">Timestamp</th>
               <th scope="col">Actions</th>
@@ -1745,8 +1747,8 @@
                   <strong class="mono tx-amount-val">{{ tx.amount | number:'1.2-2' }}</strong>
                 </div>
               </td>
-              <td class="mono text-xs" data-label="Reference / Receipt">{{ tx.reference || '--' }}</td>
-              <td data-label="Status">
+              <td class="mono text-xs tx-ref-col" data-label="Reference / Receipt">{{ tx.reference || '--' }}</td>
+              <td data-label="Status" class="tx-status-col">
                 <span class="status-badge" [class.completed]="tx.status === 'completed'" [class.failed]="tx.status === 'failed'" [class.pending]="tx.status === 'pending'">
                   {{ tx.status | uppercase }}
                 </span>

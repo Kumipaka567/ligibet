@@ -107,9 +107,26 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
           await PaymentReceipt.create([{ _id: `mpesa:${verified.receipt}`, deposit_id: id,
             deposit_key: depositKey, provider: providerOf(deposit), created_at: new Date(now()) }], { session });
         }
+        let resolvedDiagnostic = null;
+        let resolvedPayload = result.raw || null;
+        if (!complete) {
+          const primaryDiag = result.adminDepositDiagnostic || depositDiagnostic(providerOf(deposit), result.raw,
+            { status: result.status, reason: result.reason, initiationStatus: deposit.initiation_status });
+          if (primaryDiag.category === 'unknown' && deposit.callback_payload && typeof deposit.callback_payload === 'object') {
+            const priorDiag = depositDiagnostic(providerOf(deposit), deposit.callback_payload, { status: 'failed' });
+            if (priorDiag.category !== 'unknown') {
+              resolvedDiagnostic = priorDiag;
+              resolvedPayload = {
+                ...(result.raw && typeof result.raw === 'object' ? result.raw : {}),
+                ...deposit.callback_payload
+              };
+            }
+          }
+          if (!resolvedDiagnostic) resolvedDiagnostic = primaryDiag;
+        }
         const update = { status: complete ? 'completed' : 'failed', provider_status: result.status,
           failure_reason: complete ? null : result.reason || 'Payment failed or was cancelled on the phone.',
-          callback_payload: result.raw || null, updated_at: new Date(now()),
+          callback_payload: resolvedPayload, updated_at: new Date(now()),
           ...(complete ? { mpesa_receipt_number: verified.receipt, credited_at: new Date(now()) } : {}) };
         const updated = await Deposit.findOneAndUpdate({ id, status: { $ne: 'completed' } }, { $set: update }, { session, new: true });
         if (!updated) throw error('Payment changed while confirming. Please check its status again.', 409);
@@ -122,8 +139,7 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
         if (deposit.transaction_id) alternatives.unshift({ id: deposit.transaction_id });
         const transactionFields = {
           status: update.status, failure_reason: update.failure_reason,
-          admin_deposit_diagnostic: complete ? null : (result.adminDepositDiagnostic || depositDiagnostic(providerOf(deposit), result.raw,
-            { status: result.status, reason: result.reason })),
+          admin_deposit_diagnostic: complete ? null : resolvedDiagnostic,
           ...(complete ? { reference: `MPESA-${verified.receipt}`, mpesa_receipt_number: verified.receipt } : {})
         };
         let transaction = alternatives.length ? await Transaction.findOneAndUpdate({
@@ -153,17 +169,79 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
     if (provider === 'nexuspay') filter.provider = 'nexuspay';
     return Deposit.findOne(filter).lean();
   }
-  async function refresh(deposit) {
+  function callbackMatchesDeposit(deposit, raw) {
+    if (!raw || typeof raw !== 'object') return false;
+    for (const [expected, supplied] of [
+      [deposit.external_reference, raw.ExternalReference || raw.external_reference],
+      [deposit.mpesa_checkout_request_id, raw.CheckoutRequestID || raw.checkout_request_id],
+      [deposit.provider_reference, raw.reference]
+    ]) {
+      if (expected && supplied && expected !== supplied) return false;
+    }
+    return true;
+  }
+  async function enrichFailedDiagnostic(deposit, raw) {
+    const provider = providerOf(deposit);
+    const diag = depositDiagnostic(provider, raw, { status: 'failed' });
+    if (!diag || diag.category === 'unknown') return null;
+    const mergedPayload = {
+      ...(deposit.callback_payload && typeof deposit.callback_payload === 'object' ? deposit.callback_payload : {}),
+      ...raw
+    };
+    await Deposit.updateOne({ id: deposit.id, status: 'failed' }, {
+      $set: { callback_payload: mergedPayload, updated_at: new Date(now()) }
+    });
+    const alternatives = references(deposit);
+    if (deposit.transaction_id) alternatives.unshift({ id: deposit.transaction_id });
+    if (!alternatives.length) return diag;
+    const updatedTx = await Transaction.findOneAndUpdate(
+      {
+        user_id: deposit.user_id,
+        type: 'deposit',
+        status: 'failed',
+        $or: alternatives
+      },
+      { $set: { admin_deposit_diagnostic: diag } },
+      { new: true }
+    );
+    if (updatedTx) {
+      emitRealtimeMutation({
+        action: 'mpesa_deposit_failed',
+        userId: deposit.user_id,
+        transaction: updatedTx,
+        deposits: true
+      });
+    }
+    return diag;
+  }
+  async function refresh(deposit, callbackHint = null) {
     if (!deposit || deposit.status !== 'pending') return deposit;
     const provider = providerOf(deposit);
     if (!provider || (provider === 'nexuspay' && !deposit.mpesa_checkout_request_id)) return deposit;
-    const leased = await Deposit.findOneAndUpdate({ id: deposit.id, status: 'pending',
-      $or: [{ next_poll_at: null }, { next_poll_at: { $lte: new Date(now()) } }]
-    }, { $set: { next_poll_at: new Date(now() + 4000) } }, { new: true });
+    const hintDiag = callbackHint ? depositDiagnostic(provider, callbackHint, { status: 'failed' }) : null;
+    const hasDiagnosticHint = Boolean(hintDiag && hintDiag.category !== 'unknown');
+    if (hasDiagnosticHint) {
+      await Deposit.updateOne(
+        { id: deposit.id, status: 'pending' },
+        { $set: { callback_payload: callbackHint, updated_at: new Date(now()) } }
+      );
+    }
+    const leaseFilter = hasDiagnosticHint
+      ? { id: deposit.id, status: 'pending' }
+      : { id: deposit.id, status: 'pending', $or: [{ next_poll_at: null }, { next_poll_at: { $lte: new Date(now()) } }] };
+    const leased = await Deposit.findOneAndUpdate(leaseFilter, { $set: { next_poll_at: new Date(now() + 4000) } }, { new: true });
     if (!leased) return Deposit.findOne({ id: deposit.id }).lean();
     try {
       const result = await gateways.check(provider, leased);
-      return result.status === 'pending' ? leased : await settle(deposit.id, result);
+      if (result.status === 'pending') return leased;
+      if (result.status !== 'completed' && hasDiagnosticHint) {
+        const checkDiag = depositDiagnostic(provider, result.raw, { status: result.status, reason: result.reason });
+        if (checkDiag.category === 'unknown') {
+          result.adminDepositDiagnostic = hintDiag;
+          result.raw = { ...(result.raw && typeof result.raw === 'object' ? result.raw : {}), ...callbackHint };
+        }
+      }
+      return await settle(deposit.id, result);
     } catch (cause) {
       // A network error or unverifiable result is not evidence that the customer failed to pay.
       logger.warn('Payment confirmation unavailable; payment retained for reconciliation.');
@@ -206,7 +284,7 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
       return { success: true, message: 'STK push sent. Enter your M-Pesa PIN on your phone.', checkoutRequestId: accepted.checkoutRequestId };
     } catch (cause) {
       await Deposit.updateOne({ id: deposit.id }, { $set: { initiation_status: cause.definitive ? 'rejected' : 'unknown' } });
-      if (cause.definitive) await settle(deposit.id, { status: 'failed', reason: cause.message, adminDepositDiagnostic: cause.adminDepositDiagnostic });
+      if (cause.definitive) await settle(deposit.id, { status: 'failed', reason: cause.message, raw: cause.providerRaw || null, adminDepositDiagnostic: cause.adminDepositDiagnostic });
       else if (cause.adminDepositDiagnostic) {
         await Transaction.updateOne({ id: transaction.id, status: 'pending' },
           { $set: { admin_deposit_diagnostic: cause.adminDepositDiagnostic } });
@@ -281,8 +359,13 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
     if (typeof reference !== 'string' || !reference.trim() || reference.length > 256) return;
     const deposit = await findDeposit(reference, undefined, 'payhero');
     if (!deposit || deposit.status === 'completed') return;
+    if (!callbackMatchesDeposit(deposit, raw)) return;
+    if (deposit.status === 'failed') {
+      await enrichFailedDiagnostic(deposit, raw);
+      return;
+    }
     // Without a callback secret, use the notification only as a hint to verify through PayHero's API.
-    if (!authenticated) { await refresh(deposit); return; }
+    if (!authenticated) { await refresh(deposit, raw); return; }
     const result = gateways.parsePayHero(deposit, raw);
     if (result.status !== 'pending') await settle(deposit.id, result);
   }

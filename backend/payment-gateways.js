@@ -96,7 +96,9 @@ function createPaymentGateways({ http = axios, env = process.env } = {}) {
       const httpStatus = cause.response?.status ?? response?.status;
       const rejected = httpStatus >= 400 && httpStatus < 500 && httpStatus !== 408;
       const failure = cause.definitive !== undefined ? cause : error(rejected ? 'The payment prompt was rejected. Please try again later.' : 'The payment request could not be confirmed. Check with support before retrying.', 502, rejected);
-      failure.adminDepositDiagnostic = depositDiagnostic(provider, cause.response?.data ?? response?.data,
+      const rawError = cause.response?.data ?? response?.data ?? null;
+      failure.providerRaw = rawError;
+      failure.adminDepositDiagnostic = depositDiagnostic(provider, rawError,
         { stage: 'submission', httpStatus, status: failure.definitive ? 'failed' : 'pending' });
       throw failure;
     }

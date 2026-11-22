@@ -3834,7 +3834,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
   public getDepositDiagnosticTitle(diagnostic?: AdminTransactionUpdate['admin_deposit_diagnostic']): string {
-    if (!diagnostic) return 'Provider did not specify a reason';
+    if (!diagnostic) return 'Not completed on phone';
     const providerName = diagnostic.provider === 'payhero' ? 'PayHero' : (diagnostic.provider === 'nexuspay' ? 'Nexus Pay' : '');
     if (diagnostic.category === 'provider_funds' && providerName) {
       return `Insufficient ${providerName} wallet funds`;
@@ -3845,7 +3845,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (diagnostic.category === 'provider_blocked' && providerName) {
       return `Merchant restricted by ${providerName}`;
     }
-    return diagnostic.label || 'Provider did not specify a reason';
+    return diagnostic.label || 'Not completed on phone';
   }
 
   private promptDiagnosticMessage(diagnostic: AdminTransactionUpdate['admin_deposit_diagnostic']): string {
