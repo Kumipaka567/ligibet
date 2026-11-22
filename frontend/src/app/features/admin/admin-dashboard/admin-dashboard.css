@@ -4734,153 +4734,89 @@
 
 .admin-table th.tx-ref-col,
 .admin-table td.tx-ref-col {
-  max-width: 165px;
+  max-width: 170px;
   word-break: break-all;
 }
 
 .admin-table th.tx-status-col,
 .admin-table td.tx-status-col {
-  min-width: 248px;
-  max-width: 330px;
-  white-space: normal;
+  white-space: nowrap;
 }
 
-.deposit-diagnostic {
-  --diag-accent: #fb7185;
-  --diag-bg: rgba(244, 63, 94, 0.10);
-  --diag-border: rgba(251, 113, 133, 0.28);
-  --diag-text: #fecdd3;
-  --diag-sub: #fda4af;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  width: 100%;
-  min-width: 224px;
-  max-width: 315px;
-  margin-top: 6px;
-  padding: 7px 10px;
-  border: 1px solid var(--diag-border);
-  border-left: 3px solid var(--diag-accent);
-  border-radius: 7px;
-  background: var(--diag-bg);
-  color: var(--diag-text);
-  font-size: 11.5px;
-  line-height: 1.38;
-  text-align: left;
-  white-space: normal;
-  word-break: normal;
-  overflow-wrap: break-word;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
-}
-
-.deposit-diagnostic-pending,
-.deposit-diagnostic[data-category="delayed"],
-.deposit-diagnostic[data-category="timed_out"],
-.deposit-diagnostic[data-category="not_delivered"] {
-  --diag-accent: #fbbf24;
-  --diag-bg: rgba(245, 158, 11, 0.11);
-  --diag-border: rgba(251, 191, 36, 0.30);
-  --diag-text: #fef3c7;
-  --diag-sub: #fde68a;
-}
-
-.deposit-diagnostic[data-category="cancelled"] {
-  --diag-accent: #fb923c;
-  --diag-bg: rgba(249, 115, 22, 0.11);
-  --diag-border: rgba(251, 146, 60, 0.30);
-  --diag-text: #ffedd5;
-  --diag-sub: #fdba74;
-}
-
-.deposit-diagnostic[data-category="customer_blocked"],
-.deposit-diagnostic[data-category="provider_blocked"],
-.deposit-diagnostic[data-category="provider_funds"],
-.deposit-diagnostic[data-category="provider_error"],
-.deposit-diagnostic[data-category="rate_limit"] {
-  --diag-accent: #c084fc;
-  --diag-bg: rgba(168, 85, 247, 0.13);
-  --diag-border: rgba(192, 132, 252, 0.34);
-  --diag-text: #f3e8ff;
-  --diag-sub: #d8b4fe;
-}
-
-.deposit-diagnostic-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 5px 8px;
-}
-
-.deposit-diagnostic-title-row {
+.status-inline-group {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-width: 0;
-}
-
-.deposit-diagnostic-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--diag-accent);
-  box-shadow: 0 0 8px var(--diag-accent);
-  flex-shrink: 0;
-}
-
-.deposit-diagnostic-label,
-.deposit-diagnostic strong {
-  font-weight: 700;
-  font-size: 11.5px;
-  color: #ffffff;
-  letter-spacing: 0.01em;
-  white-space: normal;
-  word-break: normal;
-}
-
-.deposit-diagnostic-detail {
-  color: var(--diag-text);
-  font-size: 11px;
-  line-height: 1.35;
-  opacity: 0.92;
-  white-space: normal;
-  word-break: normal;
-}
-
-.deposit-diagnostic-meta {
-  display: inline-flex;
-  align-items: center;
   flex-wrap: nowrap;
-  gap: 4px;
-  font-size: 10px;
-  color: var(--diag-sub);
-  flex-shrink: 0;
+  white-space: nowrap;
 }
 
-.deposit-diagnostic-provider,
-.deposit-diagnostic-code {
+.deposit-reason-pill {
+  --reason-accent: #fb7185;
+  --reason-bg: rgba(244, 63, 94, 0.12);
+  --reason-border: rgba(251, 113, 133, 0.30);
+  --reason-text: #fecdd3;
   display: inline-flex;
   align-items: center;
-  padding: 2px 7px;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid var(--reason-border);
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.52);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--reason-bg);
+  color: var(--reason-text);
+  font-size: 10.5px;
   font-weight: 600;
+  line-height: 1.2;
   white-space: nowrap;
   word-break: keep-all;
+  flex-shrink: 0;
+}
+
+.deposit-reason-pill.is-pending,
+.deposit-reason-pill[data-category="delayed"],
+.deposit-reason-pill[data-category="timed_out"],
+.deposit-reason-pill[data-category="not_delivered"] {
+  --reason-accent: #fbbf24;
+  --reason-bg: rgba(245, 158, 11, 0.13);
+  --reason-border: rgba(251, 191, 36, 0.32);
+  --reason-text: #fef3c7;
+}
+
+.deposit-reason-pill[data-category="cancelled"] {
+  --reason-accent: #fb923c;
+  --reason-bg: rgba(249, 115, 22, 0.13);
+  --reason-border: rgba(251, 146, 60, 0.32);
+  --reason-text: #ffedd5;
+}
+
+.deposit-reason-pill[data-category="customer_blocked"],
+.deposit-reason-pill[data-category="provider_blocked"],
+.deposit-reason-pill[data-category="provider_funds"],
+.deposit-reason-pill[data-category="provider_error"],
+.deposit-reason-pill[data-category="rate_limit"] {
+  --reason-accent: #c084fc;
+  --reason-bg: rgba(168, 85, 247, 0.14);
+  --reason-border: rgba(192, 132, 252, 0.34);
+  --reason-text: #f3e8ff;
+}
+
+.deposit-reason-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--reason-accent);
+  box-shadow: 0 0 6px var(--reason-accent);
   flex-shrink: 0;
 }
 
 @media (max-width: 960px) {
   .admin-table th.tx-status-col,
   .admin-table td.tx-status-col {
-    min-width: 0;
-    max-width: none;
-    grid-column: 1 / -1;
+    white-space: normal;
   }
-  .deposit-diagnostic {
-    min-width: 0;
-    max-width: 100%;
+  .status-inline-group {
+    flex-wrap: wrap;
+    white-space: normal;
   }
 }
 

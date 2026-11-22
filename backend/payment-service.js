@@ -233,7 +233,12 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
     if (!leased) return Deposit.findOne({ id: deposit.id }).lean();
     try {
       const result = await gateways.check(provider, leased);
-      if (result.status === 'pending') return leased;
+      if (result.status === 'pending') {
+        if (hasDiagnosticHint) {
+          await Deposit.updateOne({ id: deposit.id, status: 'pending' }, { $set: { next_poll_at: new Date(now() + 1000) } });
+        }
+        return leased;
+      }
       if (result.status !== 'completed' && hasDiagnosticHint) {
         const checkDiag = depositDiagnostic(provider, result.raw, { status: result.status, reason: result.reason });
         if (checkDiag.category === 'unknown') {

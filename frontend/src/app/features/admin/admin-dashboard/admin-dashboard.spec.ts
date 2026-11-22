@@ -909,14 +909,17 @@ describe('Admin dashboard live account management', () => {
     });
 
     expect(component.getDepositDiagnosticTitle({
-      category: 'provider_funds', label: 'Insufficient provider wallet funds', provider: 'payhero', code: null, detail: 'Low service wallet balance'
-    })).toBe('Insufficient PayHero wallet funds');
+      category: 'provider_funds', label: 'Gateway insufficient funds', provider: 'payhero', code: null, detail: 'Low service wallet balance'
+    })).toBe('PayHero insufficient funds');
     expect(component.getDepositDiagnosticTitle({
-      category: 'customer_blocked', label: 'Customer blocked by provider', provider: 'nexuspay', code: null, detail: 'Blacklisted'
-    })).toBe('Customer blocked by Nexus Pay');
+      category: 'customer_blocked', label: 'Customer blocked', provider: 'nexuspay', code: null, detail: 'Blacklisted'
+    })).toBe('Blocked by Nexus');
     expect(component.getDepositDiagnosticTitle({
-      category: 'wrong_pin', label: 'Incorrect M-Pesa PIN', provider: 'payhero', code: '2001', detail: 'Wrong PIN'
-    })).toBe('Incorrect M-Pesa PIN');
+      category: 'wrong_pin', label: 'Wrong PIN', provider: 'payhero', code: '2001', detail: 'Wrong PIN'
+    })).toBe('Wrong PIN');
+    expect(component.getDepositDiagnosticTitle({
+      category: 'customer_funds', label: 'Insufficient funds', provider: 'payhero', code: '1', detail: 'Balance is insufficient'
+    })).toBe('Insufficient funds');
 
     // Ordinary admins cannot add or remove claiming admin initials
     auth.currentUser$.next({ id: 2, username: 'ordinary-admin', balance: 0, role: 'admin' });

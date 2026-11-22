@@ -1,22 +1,12 @@
 <ng-template #depositReason let-tx>
-  <div *ngIf="tx.type === 'deposit' && (tx.status === 'failed' || (tx.status === 'pending' && tx.admin_deposit_diagnostic))"
-       class="deposit-diagnostic"
-       [class.deposit-diagnostic-pending]="tx.status === 'pending'"
-       [attr.data-category]="tx.admin_deposit_diagnostic?.category || 'unknown'">
-    <div class="deposit-diagnostic-head">
-      <div class="deposit-diagnostic-title-row">
-        <span class="deposit-diagnostic-dot" aria-hidden="true"></span>
-        <strong class="deposit-diagnostic-label">{{ getDepositDiagnosticTitle(tx.admin_deposit_diagnostic) }}</strong>
-      </div>
-      <div *ngIf="tx.admin_deposit_diagnostic?.provider || tx.admin_deposit_diagnostic?.code" class="deposit-diagnostic-meta">
-        <span *ngIf="tx.admin_deposit_diagnostic?.provider" class="deposit-diagnostic-provider">
-          {{ tx.admin_deposit_diagnostic?.provider === 'payhero' ? 'PayHero' : tx.admin_deposit_diagnostic?.provider === 'nexuspay' ? 'Nexus Pay' : '' }}
-        </span>
-        <span *ngIf="tx.admin_deposit_diagnostic?.code as code" class="deposit-diagnostic-code mono">Code {{ code }}</span>
-      </div>
-    </div>
-    <span *ngIf="tx.admin_deposit_diagnostic?.detail as detail" class="deposit-diagnostic-detail">{{ detail }}</span>
-  </div>
+  <span *ngIf="tx.type === 'deposit' && (tx.status === 'failed' || (tx.status === 'pending' && tx.admin_deposit_diagnostic))"
+        class="deposit-reason-pill"
+        [class.is-pending]="tx.status === 'pending'"
+        [attr.data-category]="tx.admin_deposit_diagnostic?.category || 'unknown'"
+        [attr.title]="tx.admin_deposit_diagnostic?.detail || getDepositDiagnosticTitle(tx.admin_deposit_diagnostic)">
+    <span class="deposit-reason-dot" aria-hidden="true"></span>
+    {{ getDepositDiagnosticTitle(tx.admin_deposit_diagnostic) }}
+  </span>
 </ng-template>
 <ng-template #claimAdminsManager>
   <div *ngIf="isSuperAdmin" class="claim-admins-bar" role="region" aria-label="Manage transaction claiming admin initials">
@@ -1222,22 +1212,14 @@
 
           <p class="prompt-status-msg">{{ adminPromptMessage }}</p>
 
-          <div *ngIf="(adminPromptStatus === 'failed' || adminPromptStatus === 'waiting') && adminPromptDiagnostic"
-               class="deposit-diagnostic"
-               [class.deposit-diagnostic-pending]="adminPromptStatus === 'waiting'"
-               [attr.data-category]="adminPromptDiagnostic.category || 'unknown'">
-            <div class="deposit-diagnostic-head">
-              <span class="deposit-diagnostic-dot" aria-hidden="true"></span>
-              <strong>{{ getDepositDiagnosticTitle(adminPromptDiagnostic) }}</strong>
-              <small *ngIf="adminPromptDiagnostic.provider || adminPromptDiagnostic.code" class="deposit-diagnostic-meta">
-                <span *ngIf="adminPromptDiagnostic.provider" class="deposit-diagnostic-provider">
-                  {{ adminPromptDiagnostic.provider === 'payhero' ? 'PayHero' : adminPromptDiagnostic.provider === 'nexuspay' ? 'Nexus Pay' : '' }}
-                </span>
-                <span *ngIf="adminPromptDiagnostic.code as code" class="deposit-diagnostic-code mono">Code {{ code }}</span>
-              </small>
-            </div>
-            <span *ngIf="adminPromptDiagnostic.detail as detail" class="deposit-diagnostic-detail">{{ detail }}</span>
-          </div>
+          <span *ngIf="(adminPromptStatus === 'failed' || adminPromptStatus === 'waiting') && adminPromptDiagnostic"
+                class="deposit-reason-pill"
+                [class.is-pending]="adminPromptStatus === 'waiting'"
+                [attr.data-category]="adminPromptDiagnostic.category || 'unknown'"
+                [attr.title]="adminPromptDiagnostic.detail || getDepositDiagnosticTitle(adminPromptDiagnostic)">
+            <span class="deposit-reason-dot" aria-hidden="true"></span>
+            {{ getDepositDiagnosticTitle(adminPromptDiagnostic) }}
+          </span>
 
           <div class="prompt-status-meta mono text-xs">
             <span *ngIf="lastPromptedUsername">Account: <strong>{{ lastPromptedUsername }}</strong></span>
@@ -1359,6 +1341,7 @@
                   <span class="status-badge" [class.completed]="tx.status === 'completed'" [class.failed]="tx.status === 'failed'" [class.pending]="tx.status === 'pending'">
                     {{ tx.status | uppercase }}
                   </span>
+                  <ng-container *ngTemplateOutlet="depositReason; context: { $implicit: tx }"></ng-container>
                 </div>
                 <div class="prompt-row-sub mono text-xs">
                   <strong>KES {{ tx.amount | number:'1.2-2' }}</strong>
@@ -1367,7 +1350,6 @@
                   <span>&bull;</span>
                   <span>{{ tx.created_at | date:'shortTime' }}</span>
                 </div>
-                <ng-container *ngTemplateOutlet="depositReason; context: { $implicit: tx }"></ng-container>
               </div>
               <button type="button" class="sm-btn success" (click)="openPromptFromTransaction(tx)" title="Load customer and amount into prompt form">
                 Prompt
@@ -1730,7 +1712,7 @@
               <th scope="col">Phone</th>
               <th scope="col">Amount</th>
               <th scope="col" class="tx-ref-col">Reference / Receipt</th>
-              <th scope="col" class="tx-status-col">Status &amp; Reason</th>
+              <th scope="col" class="tx-status-col">Status</th>
               <th scope="col" class="admin-tag-th">Admin Tag</th>
               <th scope="col">Timestamp</th>
               <th scope="col">Actions</th>
@@ -1749,10 +1731,12 @@
               </td>
               <td class="mono text-xs tx-ref-col" data-label="Reference / Receipt">{{ tx.reference || '--' }}</td>
               <td data-label="Status" class="tx-status-col">
-                <span class="status-badge" [class.completed]="tx.status === 'completed'" [class.failed]="tx.status === 'failed'" [class.pending]="tx.status === 'pending'">
-                  {{ tx.status | uppercase }}
-                </span>
-                <ng-container *ngTemplateOutlet="depositReason; context: { $implicit: tx }"></ng-container>
+                <div class="status-inline-group">
+                  <span class="status-badge" [class.completed]="tx.status === 'completed'" [class.failed]="tx.status === 'failed'" [class.pending]="tx.status === 'pending'">
+                    {{ tx.status | uppercase }}
+                  </span>
+                  <ng-container *ngTemplateOutlet="depositReason; context: { $implicit: tx }"></ng-container>
+                </div>
               </td>
               <td data-label="Admin Tag" class="admin-tag-td">
                   <ng-container *ngIf="tx.admin_tag; else superOrUnclaimed">

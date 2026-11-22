@@ -3834,18 +3834,34 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
   public getDepositDiagnosticTitle(diagnostic?: AdminTransactionUpdate['admin_deposit_diagnostic']): string {
-    if (!diagnostic) return 'Not completed on phone';
-    const providerName = diagnostic.provider === 'payhero' ? 'PayHero' : (diagnostic.provider === 'nexuspay' ? 'Nexus Pay' : '');
+    if (!diagnostic) return 'Failed on phone';
+    const providerName = diagnostic.provider === 'payhero' ? 'PayHero' : (diagnostic.provider === 'nexuspay' ? 'Nexus' : '');
     if (diagnostic.category === 'provider_funds' && providerName) {
-      return `Insufficient ${providerName} wallet funds`;
+      return `${providerName} insufficient funds`;
     }
     if (diagnostic.category === 'customer_blocked' && providerName) {
-      return `Customer blocked by ${providerName}`;
+      return `Blocked by ${providerName}`;
     }
     if (diagnostic.category === 'provider_blocked' && providerName) {
-      return `Merchant restricted by ${providerName}`;
+      return `${providerName} restricted`;
     }
-    return diagnostic.label || 'Not completed on phone';
+    const shortLabels: Record<string, string> = {
+      customer_funds: 'Insufficient funds',
+      wrong_pin: 'Wrong PIN',
+      cancelled: 'Cancelled by user',
+      timed_out: 'Prompt timed out',
+      not_delivered: 'Prompt not reached',
+      delayed: 'Delayed prompt',
+      customer_blocked: 'Customer blocked',
+      provider_blocked: 'Gateway restricted',
+      provider_funds: 'Gateway insufficient funds',
+      invalid_phone: 'Invalid phone',
+      rate_limit: 'Rate limited',
+      provider_error: 'Prompt rejected',
+      reported: 'Provider error',
+      unknown: 'Failed on phone'
+    };
+    return shortLabels[diagnostic.category] || diagnostic.label || 'Failed on phone';
   }
 
   private promptDiagnosticMessage(diagnostic: AdminTransactionUpdate['admin_deposit_diagnostic']): string {

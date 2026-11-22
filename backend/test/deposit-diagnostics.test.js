@@ -5,7 +5,11 @@ const { depositDiagnostic, transactionDepositDiagnostic, adminTransactionDiagnos
 test('admin reasons separate customer, prompt delivery and provider failures', () => {
   for (const [raw, expected, stage] of [
     [{ ResultDesc: 'Your M-Pesa balance is insufficient' }, 'customer_funds'],
+    [{ ResultCode: 1, ResultDesc: 'The balance is insufficient for the transaction.' }, 'customer_funds'],
+    [{ ResultCode: 1, ResultDesc: 'Timed out after insufficient balance' }, 'customer_funds'],
+    [{ ResultDesc: 'Insufficient M-Pesa account balance' }, 'customer_funds'],
     [{ errorMessage: 'Invalid M-Pesa PIN' }, 'wrong_pin'],
+    [{ ResultCode: 2001, ResultDesc: 'The initiator information is invalid.' }, 'wrong_pin'],
     [{ ResultCode: 1032 }, 'cancelled'],
     [{ resultCode: 1037 }, 'timed_out'],
     [{ status_reason: 'STK prompt was not delivered' }, 'not_delivered'],

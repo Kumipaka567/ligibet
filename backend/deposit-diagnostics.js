@@ -1,10 +1,10 @@
 const labels = {
-  customer_funds: 'Insufficient M-Pesa funds', wrong_pin: 'Incorrect M-Pesa PIN', cancelled: 'Cancelled by customer',
-  timed_out: 'Prompt timed out', not_delivered: 'Prompt did not reach the phone', delayed: 'Prompt delayed',
-  customer_blocked: 'Customer blocked by provider', provider_blocked: 'Merchant restricted by provider',
-  provider_funds: 'Insufficient provider wallet funds', invalid_phone: 'Invalid customer phone number',
-  rate_limit: 'Provider rate limit', provider_error: 'Prompt rejected before reaching phone',
-  reported: 'Provider reported a failure', unknown: 'Not completed on phone'
+  customer_funds: 'Insufficient funds', wrong_pin: 'Wrong PIN', cancelled: 'Cancelled by user',
+  timed_out: 'Prompt timed out', not_delivered: 'Prompt not reached', delayed: 'Delayed prompt',
+  customer_blocked: 'Customer blocked', provider_blocked: 'Gateway restricted',
+  provider_funds: 'Gateway insufficient funds', invalid_phone: 'Invalid phone',
+  rate_limit: 'Rate limited', provider_error: 'Prompt rejected',
+  reported: 'Provider error', unknown: 'Failed on phone'
 };
 
 function safeDetail(value) {
@@ -33,11 +33,12 @@ function depositDiagnostic(provider, raw, { reason, status, stage = 'confirmatio
     .some(value => typeof value === 'string' && /^cancelled$|^canceled$/i.test(value.trim()));
   let category;
   if (/insufficient|low balance|not enough|top.?up|required balance|balance too low|depleted|exhausted/.test(text)
-    && /service (?:wallet|balance|token|credit)|merchant (?:wallet|account|balance)|(?:pay ?hero|nexus(?: ?pay)?) (?:wallet|balance|account|funds|tokens?)|stk (?:fees?|credits?)|prompt (?:fees?|credits?)|account (?:wallet|balance)|wallet balance|token balance|service tokens?/.test(text)) category = 'provider_funds';
+    && /service (?:wallet|balance|token|credit)|merchant (?:wallet|account|balance)|(?:pay ?hero|nexus(?: ?pay)?) (?:wallet|balance|account|funds|tokens?)|stk (?:fees?|credits?)|prompt (?:fees?|credits?)|service tokens?|token balance|wallet balance/.test(text)) category = 'provider_funds';
   else if (/block|blacklist|restrict|suspend|too many (?:failed|unpaid|attempts|prompts)/.test(text) && /phone|number|customer|subscriber|recipient|msisdn|user|client|attempts|prompts|24 hours/.test(text)) category = 'customer_blocked';
   else if (/block|blacklist|restrict|suspend/.test(text) && /merchant|account|service|gateway/.test(text)) category = 'provider_blocked';
-  else if (/(?:wrong|incorrect|invalid) (?:m.?pesa )?pin|pin (?:is )?(?:wrong|incorrect|invalid|entered incorrectly)|initiator information is invalid/.test(text)) category = 'wrong_pin';
-  else if (/insufficient (?:funds|balance)|not enough (?:funds|balance)|balance (?:is )?(?:insufficient|too low)/.test(text)) category = effectiveStage === 'submission' ? 'reported' : 'customer_funds';
+  else if ((code === '1' || code === '2006') && effectiveStage !== 'submission') category = 'customer_funds';
+  else if (/insufficient(?:\s+[\w.-]+){0,3}\s+(?:funds|balance|money|credit|amount)|not enough(?:\s+[\w.-]+){0,2}\s+(?:funds|balance|money)|balance(?:\s+[\w.-]+){0,2}\s+(?:is\s+)?(?:insufficient|too low|less)|low\s+m.?pesa\s+(?:funds|balance)|insufficient\s+funds/.test(text)) category = effectiveStage === 'submission' ? 'reported' : 'customer_funds';
+  else if (code === '2001' || /(?:wrong|incorrect|invalid) (?:m.?pesa )?pin|pin (?:is )?(?:wrong|incorrect|invalid|entered incorrectly)|initiator information is invalid/.test(text)) category = 'wrong_pin';
   else if (/not (?:delivered|received|sent|reach)|did not (?:reach|receive)|cannot be reached|could not be reached|delivery failed|unable to (?:deliver|reach)|subscriber (?:unreachable|unavailable)|phone (?:unreachable|switched off|off)|sim toolkit/.test(text)) category = 'not_delivered';
   else if (/cancel(?:led|ed)(?: by (?:user|customer|subscriber)| on the phone)|user cancel|request cancelled/.test(text)) category = 'cancelled';
   else if (/timed?\s*out|expired|no response from|could not (?:get|obtain) a response/.test(text)) category = 'timed_out';
@@ -46,8 +47,6 @@ function depositDiagnostic(provider, raw, { reason, status, stage = 'confirmatio
   else if (/delay|still queued|already in process|unable to lock subscriber/.test(text) || code === '1001') category = 'delayed';
   else if (cancelled || code === '1032') category = 'cancelled';
   else if (code === '1037' || code === '1019') category = 'timed_out';
-  else if (code === '2001') category = 'wrong_pin';
-  else if (code === '1' && effectiveStage !== 'submission') category = 'customer_funds';
   else if (details.length) category = 'reported';
   else if (effectiveStage === 'submission' && ((httpStatus >= 400 && httpStatus < 500 && httpStatus !== 408) || initiationStatus === 'rejected')) category = 'provider_error';
   else if (status === 'pending') category = 'delayed';
