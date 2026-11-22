@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { createPaymentGateways, phoneNumber, money, error, PROVIDERS } = require('./payment-gateways');
+const { depositDiagnostic, transactionDepositDiagnostic } = require('./deposit-diagnostics');
 
 function createPaymentService({ models, env = process.env, gateways = createPaymentGateways({ env }),
   emitRealtimeMutation = () => {}, adminNamespace = { emit() {} }, getMinimumDeposit = () => 1,
@@ -121,6 +122,8 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
         if (deposit.transaction_id) alternatives.unshift({ id: deposit.transaction_id });
         const transactionFields = {
           status: update.status, failure_reason: update.failure_reason,
+          admin_deposit_diagnostic: complete ? null : (result.adminDepositDiagnostic || depositDiagnostic(providerOf(deposit), result.raw,
+            { status: result.status, reason: result.reason })),
           ...(complete ? { reference: `MPESA-${verified.receipt}`, mpesa_receipt_number: verified.receipt } : {})
         };
         let transaction = alternatives.length ? await Transaction.findOneAndUpdate({
@@ -203,7 +206,11 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
       return { success: true, message: 'STK push sent. Enter your M-Pesa PIN on your phone.', checkoutRequestId: accepted.checkoutRequestId };
     } catch (cause) {
       await Deposit.updateOne({ id: deposit.id }, { $set: { initiation_status: cause.definitive ? 'rejected' : 'unknown' } });
-      if (cause.definitive) await settle(deposit.id, { status: 'failed', reason: cause.message });
+      if (cause.definitive) await settle(deposit.id, { status: 'failed', reason: cause.message, adminDepositDiagnostic: cause.adminDepositDiagnostic });
+      else if (cause.adminDepositDiagnostic) {
+        await Transaction.updateOne({ id: transaction.id, status: 'pending' },
+          { $set: { admin_deposit_diagnostic: cause.adminDepositDiagnostic } });
+      }
       throw cause;
     } finally {
       if (activeGateway === 'payhero') adminNamespace.emit('dashboard_stats_updated', { action: 'payhero_service_wallet_changed', userId: null, occurredAt: new Date(now()).toISOString() });
@@ -233,6 +240,8 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
     }
     deposit = await refresh(deposit);
     const user = await User.findOne({ id: deposit.user_id }).select('id username balance').lean();
+    const transaction = deposit.transaction_id ? await Transaction.findOne({ id: deposit.transaction_id, user_id: deposit.user_id }).lean() : null;
+    const diagnostic = transaction ? transactionDepositDiagnostic(transaction, now()) : null;
     return {
       status: deposit.status,
       receiptNumber: deposit.mpesa_receipt_number || null,
@@ -242,7 +251,9 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
       targetUsername: user?.username || null,
       ...(user && deposit.status === 'completed' ? { balance: user.balance } : {}),
       failure_reason: deposit.failure_reason || null,
-      reason: deposit.failure_reason || null
+      reason: deposit.failure_reason || null,
+      admin_deposit_diagnostic: deposit.status === 'failed' && (!diagnostic || diagnostic.category === 'unknown')
+        ? depositDiagnostic(providerOf(deposit), deposit.callback_payload, { status: deposit.provider_status, reason: deposit.failure_reason }) : diagnostic
     };
   }
   async function reconcilePending() {
@@ -276,17 +287,18 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
     if (result.status !== 'pending') await settle(deposit.id, result);
   }
   function mount(app, { authenticateToken, authenticateAdminToken }) {
-    const handle = action => async (req, res) => {
+    const handle = (action, adminDiagnostics = false) => async (req, res) => {
       try { return await action(req, res); }
       catch (cause) {
-        return res.status(cause.status || 503).json({ error: cause.status ? cause.message : 'Payment service is temporarily unavailable. Please check again.' });
+        return res.status(cause.status || 503).json({ error: cause.status ? cause.message : 'Payment service is temporarily unavailable. Please check again.',
+          ...(adminDiagnostics && cause.adminDepositDiagnostic ? { admin_deposit_diagnostic: cause.adminDepositDiagnostic } : {}) });
       }
     };
     app.get('/api/admin/payment-gateway', authenticateAdminToken, handle(async (req, res) => res.json(await settings())));
     app.put('/api/admin/payment-gateway', authenticateAdminToken, handle(async (req, res) => res.json(await switchGateway(req.body.gateway, req.user.id))));
     app.post(['/api/admin/payment-prompt', '/api/admin/mpesa/prompt', '/api/admin/payhero/prompt'], authenticateAdminToken, handle(async (req, res) => {
       return res.json(await promptCustomer(req.user, req.body, req.blockedClientIds));
-    }));
+    }, true));
     app.post(['/api/admin/payment-prompt/status', '/api/admin/mpesa/prompt-status'], authenticateAdminToken, handle(async (req, res) => {
       return res.json(await adminPromptStatus(req.body.checkoutRequestId, req.blockedClientIds));
     }));

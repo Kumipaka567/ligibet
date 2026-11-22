@@ -4731,3 +4731,27 @@
     align-items: stretch;
   }
 }
+
+.deposit-diagnostic {
+  display: grid;
+  gap: 3px;
+  min-width: min(10rem, 100%);
+  max-width: 23rem;
+  margin-top: 6px;
+  padding: 7px 9px;
+  border-left: 2px solid #fb7185;
+  border-radius: 4px;
+  background: rgba(244, 63, 94, .10);
+  color: #fecdd3;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.deposit-diagnostic-pending {
+  border-left-color: #fbbf24;
+  background: rgba(245, 158, 11, .10);
+  color: #fef3c7;
+}
+.deposit-diagnostic small { font-size: 11px; }

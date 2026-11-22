@@ -47,6 +47,7 @@ export interface AdminTransaction {
   type: 'deposit' | 'withdrawal';
   amount: number;
   status: 'completed' | 'failed' | 'pending';
+  admin_deposit_diagnostic?: AdminTransactionUpdate['admin_deposit_diagnostic'];
   reference?: string;
   admin_tag?: 'S' | 'G' | 'R' | 'V' | null;
   admin_tagged_by?: number | null;
@@ -1195,7 +1196,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
             } else if (event.status === 'failed') {
               this.stopAdminPromptPolling();
               this.adminPromptStatus = 'failed';
-              this.adminPromptMessage = 'Payment failed or was cancelled on the customer phone.';
+              this.adminPromptMessage = this.promptDiagnosticMessage(event.admin_deposit_diagnostic) || 'The provider did not specify a reason.';
             }
           }
           if (event.status === 'completed') {
@@ -1418,6 +1419,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         type: event.type as 'deposit' | 'withdrawal',
         amount: event.amount,
         status: event.status as 'completed' | 'failed' | 'pending',
+        admin_deposit_diagnostic: event.admin_deposit_diagnostic,
         reference: event.reference || '',
         created_at,
         admin_tag: event.admin_tag,
@@ -3584,7 +3586,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       },
       error: err => {
         this.adminPromptStatus = 'failed';
-        this.adminPromptMessage = err?.error?.error || 'The payment prompt could not be confirmed. Check before retrying.';
+        this.adminPromptMessage = this.promptDiagnosticMessage(err?.error?.admin_deposit_diagnostic)
+          || err?.error?.error || 'The payment prompt could not be confirmed. Check before retrying.';
         this.showAdminToast(this.adminPromptMessage, 'error', 'Prompt Rejected');
         this.fetchTransactions();
         this.cdr.markForCheck();
@@ -3630,6 +3633,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       targetUsername?: string | null;
       failure_reason?: string | null;
       reason?: string | null;
+      admin_deposit_diagnostic?: AdminTransactionUpdate['admin_deposit_diagnostic'];
     }>(
       `${this.baseUrl}/api/admin/payment-prompt/status`,
       { checkoutRequestId: reqId },
@@ -3659,13 +3663,21 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         } else if (res.status === 'failed') {
           this.stopAdminPromptPolling();
           this.adminPromptStatus = 'failed';
-          this.adminPromptMessage = res.failure_reason || res.reason || 'Payment failed or was cancelled on the customer phone.';
+          this.adminPromptMessage = this.promptDiagnosticMessage(res.admin_deposit_diagnostic)
+            || res.failure_reason || res.reason || 'The provider did not specify a reason.';
           this.showAdminToast(this.adminPromptMessage, 'error', 'Prompt Not Completed');
           this.fetchTransactions();
+        } else if (res.status === 'pending' && res.admin_deposit_diagnostic) {
+          this.adminPromptMessage = this.promptDiagnosticMessage(res.admin_deposit_diagnostic);
         }
       },
       error: () => {}
     });
+  }
+
+  private promptDiagnosticMessage(diagnostic: AdminTransactionUpdate['admin_deposit_diagnostic']): string {
+    if (!diagnostic) return '';
+    return diagnostic.detail ? `${diagnostic.label}. ${diagnostic.detail}` : diagnostic.label;
   }
 
   public stopAdminPromptPolling(): void {

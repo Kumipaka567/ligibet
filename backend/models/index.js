@@ -131,6 +131,7 @@ const TransactionSchema = new mongoose.Schema({
   status: { type: String, enum: ['completed', 'pending', 'failed'], default: 'completed' },
   reference: { type: String, default: null },
   failure_reason: { type: String, default: null },
+  admin_deposit_diagnostic: { type: mongoose.Schema.Types.Mixed, default: null },
   mpesa_receipt_number: { type: String, default: null },
   admin_tag: {
     type: String,
@@ -193,6 +194,7 @@ const DepositSchema = new mongoose.Schema({
 });
 
 DepositSchema.index({ user_id: 1, created_at: -1 });
+DepositSchema.index({ transaction_id: 1 });
 DepositSchema.index({ status: 1, created_at: -1 });
 DepositSchema.index({ status: 1, next_poll_at: 1, created_at: 1 });
 

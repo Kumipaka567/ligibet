@@ -364,6 +364,21 @@ test('PayHero failure callbacks finish pending deposits even when the envelope s
   assert.equal(f.stores.users.get(7).balance, 50);
 });
 
+test('provider diagnostics are available to admins and omitted from the player status response', async () => {
+  const f = fixture();
+  const request = await f.start();
+  const deposit = f.latest();
+  f.results.set(deposit.id, { status: 'failed', reason: 'Payment failed on the phone.', raw: { ResultDesc: 'Incorrect PIN' } });
+  const body = { checkoutRequestId: request.checkoutRequestId };
+  const player = await f.request('post', '/api/mpesa/stk-status', body);
+  assert.equal(player.body.status, 'failed');
+  assert.equal(player.body.failure_reason, 'Payment failed on the phone.');
+  assert.equal(player.body.admin_deposit_diagnostic, undefined);
+  const admin = await f.request('post', '/api/admin/payment-prompt/status', body, { id: 1, role: 'admin' });
+  assert.equal(admin.body.admin_deposit_diagnostic.category, 'wrong_pin');
+  assert.equal(f.stores.users.get(7).balance, 50);
+});
+
 test('admin prompt initiates STK push using customer existing number or custom override number through active gateway', async () => {
   const f = fixture();
   f.stores.users.set(7, { id: 7, username: 'player7', phone_number: '+254712345678', balance: 50 });

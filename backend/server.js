@@ -18,6 +18,7 @@ const { createRealtimeEmitter, adminSocketAccessError, revokeAdminSockets } = re
 const { userSearchConditions } = require('./user-search');
 const { createPayHeroBalanceFetcher } = require('./payhero-balance');
 const { createPaymentService } = require('./payment-service');
+const { depositDiagnostic, adminTransactionDiagnostics } = require('./deposit-diagnostics');
 const { createOnlinePlayers } = require('./online-players');
 const { createDashboardStats } = require('./dashboard-stats');
 const { createDeleteAdminTransaction } = require('./delete-admin-transaction');
@@ -2147,7 +2148,7 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
   try {
     const [users, transactions, totals, logs] = await Promise.all([
       User.find(adminClientScope(req, 'id')).select('-password_hash -__v -_id').sort({ created_at: -1, id: -1 }).limit(100).lean(),
-      Transaction.find({ ...adminClientScope(req, 'user_id'), admin_deleted_at: null }).select('id user_id client_phone type amount status reference created_at admin_tag').sort({ created_at: -1 }).limit(100).lean(),
+      Transaction.find({ ...adminClientScope(req, 'user_id'), admin_deleted_at: null }).select('id user_id client_phone type amount status reference created_at admin_tag failure_reason admin_deposit_diagnostic').sort({ created_at: -1 }).limit(100).lean(),
       getDashboardTotals(),
       AdminLog.find({ action: { $ne: 'DELETE_COMPLETED_TRANSACTION' } }).sort({ created_at: -1 }).limit(50).lean()
     ]);
@@ -2161,6 +2162,7 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
       extra.forEach(u => userMap.set(u.id, u));
     }
 
+    const diagnostics = await adminTransactionDiagnostics(Deposit, transactions);
     return res.json({
       stats: {
         ...totals,
@@ -2180,6 +2182,7 @@ app.get('/api/admin/overview', authenticateAdminToken, async (req, res) => {
           type: t.type,
           amount: t.amount,
           status: t.status,
+          admin_deposit_diagnostic: diagnostics.get(t.id),
           reference: t.reference || '',
           created_at: t.created_at
         };
@@ -2510,7 +2513,7 @@ app.get('/api/admin/transactions', authenticateAdminToken, async (req, res) => {
     if (statusFilter !== 'all') filter.status = statusFilter;
 
     const transactions = await Transaction.find(filter)
-      .select('id user_id client_phone type amount status reference created_at admin_tag admin_tagged_by admin_tagged_at')
+      .select('id user_id client_phone type amount status reference created_at admin_tag admin_tagged_by admin_tagged_at failure_reason admin_deposit_diagnostic')
       .sort({ created_at: -1 })
       .limit(100)
       .lean();
@@ -2519,6 +2522,7 @@ app.get('/api/admin/transactions', authenticateAdminToken, async (req, res) => {
     const users = await User.find({ id: { $in: allUserIds } }, 'id username phone_number').lean();
     const userMap = new Map(users.map(u => [u.id, u]));
 
+    const diagnostics = await adminTransactionDiagnostics(Deposit, transactions);
     const result = transactions.map(t => {
       const u = userMap.get(t.user_id) || {};
       return {
@@ -2530,6 +2534,7 @@ app.get('/api/admin/transactions', authenticateAdminToken, async (req, res) => {
         type: t.type,
         amount: t.amount,
         status: t.status,
+        admin_deposit_diagnostic: diagnostics.get(t.id),
         reference: t.reference || '',
         created_at: t.created_at,
         admin_tag: t.admin_tag || null,
@@ -3159,6 +3164,8 @@ app.get('/api/admin/deposits', authenticateAdminToken, async (req, res) => {
         const u = userMap.get(d.user_id) || {};
         return {
           ...d,
+          admin_deposit_diagnostic: d.status === 'failed' ? depositDiagnostic(d.provider, d.callback_payload,
+            { reason: d.failure_reason, status: d.provider_status || d.status }) : null,
           username: u.username || 'Unknown',
           phone_number: u.phone_number || ''
         };

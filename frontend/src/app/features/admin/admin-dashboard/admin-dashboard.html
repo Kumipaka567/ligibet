@@ -1,3 +1,14 @@
+<ng-template #depositReason let-tx>
+  <div *ngIf="tx.type === 'deposit' && (tx.status === 'failed' || (tx.status === 'pending' && tx.admin_deposit_diagnostic))"
+       class="deposit-diagnostic" [class.deposit-diagnostic-pending]="tx.status === 'pending'">
+    <strong>{{ tx.admin_deposit_diagnostic?.label || 'Provider did not specify a reason' }}</strong>
+    <span *ngIf="tx.admin_deposit_diagnostic?.detail as detail">{{ detail }}</span>
+    <small *ngIf="tx.admin_deposit_diagnostic?.provider || tx.admin_deposit_diagnostic?.code">
+      {{ tx.admin_deposit_diagnostic?.provider === 'payhero' ? 'PayHero' : tx.admin_deposit_diagnostic?.provider === 'nexuspay' ? 'Nexus Pay' : '' }}
+      <span *ngIf="tx.admin_deposit_diagnostic?.code as code"> · Code {{ code }}</span>
+    </small>
+  </div>
+</ng-template>
 <main class="admin-shell" [class.menu-open]="mobileMenuOpen">
 <a class="admin-skip-link" href="#admin-content">Skip to dashboard content</a>
 <button *ngIf="mobileMenuOpen" class="sidebar-backdrop" type="button" (click)="toggleMobileMenu()" aria-label="Close navigation"></button>
@@ -1270,6 +1281,7 @@
                   <span class="status-badge" [class.completed]="tx.status === 'completed'" [class.failed]="tx.status === 'failed'" [class.pending]="tx.status === 'pending'">
                     {{ tx.status | uppercase }}
                   </span>
+                  <ng-container *ngTemplateOutlet="depositReason; context: { $implicit: tx }"></ng-container>
                 </div>
                 <div class="prompt-row-sub mono text-xs">
                   <strong>KES {{ tx.amount | number:'1.2-2' }}</strong>
@@ -1658,6 +1670,7 @@
                 <span class="status-badge" [class.completed]="tx.status === 'completed'" [class.failed]="tx.status === 'failed'" [class.pending]="tx.status === 'pending'">
                   {{ tx.status | uppercase }}
                 </span>
+                <ng-container *ngTemplateOutlet="depositReason; context: { $implicit: tx }"></ng-container>
               </td>
               <td data-label="Admin Tag" class="admin-tag-td">
                   <ng-container *ngIf="tx.admin_tag; else superOrUnclaimed">

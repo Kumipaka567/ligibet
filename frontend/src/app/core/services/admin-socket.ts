@@ -138,6 +138,14 @@ export interface AdminOnlinePlayersSummary {
   updatedAt: string;
 }
 
+export interface AdminDepositDiagnostic {
+  category: string;
+  label: string;
+  provider: 'payhero' | 'nexuspay' | null;
+  code: string | null;
+  detail: string | null;
+}
+
 export interface AdminTransactionUpdate {
   id?: number;
   user_id: number;
@@ -146,6 +154,7 @@ export interface AdminTransactionUpdate {
   type: string;
   amount: number;
   status: string;
+  admin_deposit_diagnostic?: AdminDepositDiagnostic | null;
   reference?: string;
   admin_tag?: 'S' | 'G' | 'R' | 'V' | null;
   admin_tagged_by?: number | null;

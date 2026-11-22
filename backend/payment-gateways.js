@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { depositDiagnostic } = require('./deposit-diagnostics');
 
 const PROVIDERS = ['payhero', 'nexuspay'];
 const error = (message, status = 502, definitive = false) => Object.assign(new Error(message), { status, definitive });
@@ -92,9 +93,12 @@ function createPaymentGateways({ http = axios, env = process.env } = {}) {
       return { checkoutRequestId: data.CheckoutRequestID || data.checkout_request_id || deposit.external_reference,
         providerReference: String(data.reference ?? data.MerchantRequestID ?? '') };
     } catch (cause) {
-      if (cause.definitive !== undefined) throw cause;
-      const rejected = cause.response?.status >= 400 && cause.response.status < 500 && cause.response.status !== 408;
-      throw error(rejected ? 'The payment prompt was rejected. Please try again later.' : 'The payment request could not be confirmed. Check with support before retrying.', 502, rejected);
+      const httpStatus = cause.response?.status ?? response?.status;
+      const rejected = httpStatus >= 400 && httpStatus < 500 && httpStatus !== 408;
+      const failure = cause.definitive !== undefined ? cause : error(rejected ? 'The payment prompt was rejected. Please try again later.' : 'The payment request could not be confirmed. Check with support before retrying.', 502, rejected);
+      failure.adminDepositDiagnostic = depositDiagnostic(provider, cause.response?.data ?? response?.data,
+        { stage: 'submission', httpStatus, status: failure.definitive ? 'failed' : 'pending' });
+      throw failure;
     }
   }
   async function check(provider, deposit) {
