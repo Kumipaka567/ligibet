@@ -1196,18 +1196,24 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         if (!event) return;
         if (event.type === 'deposit') {
           this.fetchPayHeroBalance(true);
-          if (this.adminPromptStatus === 'waiting' && (this.lastPromptedUserId === event.user_id || this.promptTargetUser?.id === event.user_id)) {
-            if (event.status === 'completed') {
+          if ((this.adminPromptStatus === 'waiting' || this.adminPromptStatus === 'failed')
+            && (this.lastPromptedUserId === event.user_id || this.promptTargetUser?.id === event.user_id)) {
+            if (event.status === 'completed' && this.adminPromptStatus === 'waiting') {
               this.stopAdminPromptPolling();
               this.adminPromptStatus = 'completed';
               this.adminPromptDiagnostic = null;
               this.adminPromptReceipt = (event.reference || '').replace(/^MPESA-/, '');
               this.adminPromptMessage = `M-Pesa deposit of KES ${Number(event.amount || this.lastPromptedAmount).toLocaleString()} confirmed and credited!`;
             } else if (event.status === 'failed') {
-              this.stopAdminPromptPolling();
-              this.adminPromptStatus = 'failed';
-              this.adminPromptDiagnostic = event.admin_deposit_diagnostic || null;
-              this.adminPromptMessage = this.promptDiagnosticMessage(event.admin_deposit_diagnostic) || 'The provider did not specify a reason.';
+              const incomingDiag = event.admin_deposit_diagnostic || null;
+              const shouldUpdatePrompt = this.adminPromptStatus === 'waiting'
+                || (incomingDiag && incomingDiag.category !== 'unknown' && (!this.adminPromptDiagnostic || this.adminPromptDiagnostic.category === 'unknown'));
+              if (shouldUpdatePrompt) {
+                this.stopAdminPromptPolling();
+                this.adminPromptStatus = 'failed';
+                this.adminPromptDiagnostic = incomingDiag;
+                this.adminPromptMessage = this.promptDiagnosticMessage(incomingDiag) || 'Failed on phone.';
+              }
             }
           }
           if (event.status === 'completed') {
@@ -3821,7 +3827,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           this.adminPromptStatus = 'failed';
           this.adminPromptDiagnostic = res.admin_deposit_diagnostic || null;
           this.adminPromptMessage = this.promptDiagnosticMessage(res.admin_deposit_diagnostic)
-            || res.failure_reason || res.reason || 'The provider did not specify a reason.';
+            || res.failure_reason || res.reason || 'Failed on phone.';
           this.showAdminToast(this.adminPromptMessage, 'error', 'Prompt Not Completed');
           this.fetchTransactions();
         } else if (res.status === 'pending' && res.admin_deposit_diagnostic) {

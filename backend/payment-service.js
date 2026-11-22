@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { createPaymentGateways, phoneNumber, money, error, PROVIDERS } = require('./payment-gateways');
-const { depositDiagnostic, transactionDepositDiagnostic } = require('./deposit-diagnostics');
+const { depositDiagnostic, transactionDepositDiagnostic, isStrongerDiagnostic } = require('./deposit-diagnostics');
 
 function createPaymentService({ models, env = process.env, gateways = createPaymentGateways({ env }),
   emitRealtimeMutation = () => {}, adminNamespace = { emit() {} }, getMinimumDeposit = () => 1,
@@ -112,9 +112,9 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
         if (!complete) {
           const primaryDiag = result.adminDepositDiagnostic || depositDiagnostic(providerOf(deposit), result.raw,
             { status: result.status, reason: result.reason, initiationStatus: deposit.initiation_status });
-          if (primaryDiag.category === 'unknown' && deposit.callback_payload && typeof deposit.callback_payload === 'object') {
+          if (deposit.callback_payload && typeof deposit.callback_payload === 'object') {
             const priorDiag = depositDiagnostic(providerOf(deposit), deposit.callback_payload, { status: 'failed' });
-            if (priorDiag.category !== 'unknown') {
+            if (isStrongerDiagnostic(priorDiag, primaryDiag)) {
               resolvedDiagnostic = priorDiag;
               resolvedPayload = {
                 ...(result.raw && typeof result.raw === 'object' ? result.raw : {}),
@@ -184,6 +184,12 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
     const provider = providerOf(deposit);
     const diag = depositDiagnostic(provider, raw, { status: 'failed' });
     if (!diag || diag.category === 'unknown') return null;
+    const existingDiag = deposit.callback_payload && typeof deposit.callback_payload === 'object'
+      ? depositDiagnostic(provider, deposit.callback_payload, { status: deposit.provider_status || 'failed' })
+      : null;
+    if (existingDiag && existingDiag.category !== 'unknown' && !isStrongerDiagnostic(diag, existingDiag)) {
+      return existingDiag;
+    }
     const mergedPayload = {
       ...(deposit.callback_payload && typeof deposit.callback_payload === 'object' ? deposit.callback_payload : {}),
       ...raw
@@ -241,7 +247,7 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
       }
       if (result.status !== 'completed' && hasDiagnosticHint) {
         const checkDiag = depositDiagnostic(provider, result.raw, { status: result.status, reason: result.reason });
-        if (checkDiag.category === 'unknown') {
+        if (isStrongerDiagnostic(hintDiag, checkDiag)) {
           result.adminDepositDiagnostic = hintDiag;
           result.raw = { ...(result.raw && typeof result.raw === 'object' ? result.raw : {}), ...callbackHint };
         }
@@ -374,6 +380,70 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
     const result = gateways.parsePayHero(deposit, raw);
     if (result.status !== 'pending') await settle(deposit.id, result);
   }
+  function verifyNexusSignature(req, secret) {
+    const supplied = String(req.headers?.['x-webhook-signature'] || req.headers?.['X-Webhook-Signature'] || '').trim();
+    if (!supplied) return false;
+    const candidates = [];
+    if (Buffer.isBuffer(req.rawBody)) candidates.push(req.rawBody);
+    else if (typeof req.rawBody === 'string') candidates.push(req.rawBody);
+    candidates.push(JSON.stringify(req.body || {}));
+    return candidates.some(body => {
+      const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex');
+      const a = Buffer.from(supplied), b = Buffer.from(expected);
+      return a.length === b.length && crypto.timingSafeEqual(a, b);
+    });
+  }
+  async function nexusWebhook(req) {
+    const secret = env.NEXUSPAY_WEBHOOK_SECRET?.trim();
+    let authenticated = false;
+    if (secret) {
+      authenticated = verifyNexusSignature(req, secret);
+      if (!authenticated) throw error('Unauthorized webhook.', 401);
+    }
+    const payload = req.body && typeof req.body === 'object' ? req.body : {};
+    const event = String(payload.event || req.headers?.['x-webhook-event'] || '').trim().toLowerCase();
+    const data = payload.data && typeof payload.data === 'object' ? payload.data : payload;
+    const reference = data.checkoutRequestId || data.checkout_request_id || payload.checkoutRequestId;
+    if (typeof reference !== 'string' || !reference.trim() || reference.length > 256) return;
+    const deposit = await findDeposit(reference.trim(), undefined, 'nexuspay');
+    if (!deposit || deposit.status === 'completed') return;
+    if (data.checkoutRequestId && deposit.mpesa_checkout_request_id && data.checkoutRequestId !== deposit.mpesa_checkout_request_id) return;
+    const inferredStatus = event === 'payment.cancelled' || event === 'payment.canceled'
+      ? 'cancelled'
+      : (event === 'payment.completed' ? 'completed' : (event === 'payment.failed' ? 'failed' : String(data.status || '').trim().toLowerCase()));
+    const hint = {
+      ...data,
+      ...(event ? { event } : {}),
+      ...(inferredStatus && !data.status ? { status: inferredStatus } : {})
+    };
+    if (deposit.status === 'failed') {
+      await enrichFailedDiagnostic(deposit, hint);
+      return;
+    }
+    // Without a configured webhook secret, treat the webhook only as a hint and verify via Nexus Pay's status API.
+    if (!authenticated) {
+      await refresh(deposit, hint);
+      return;
+    }
+    if (inferredStatus === 'completed') {
+      await settle(deposit.id, {
+        status: 'completed',
+        amount: data.amount,
+        phone: data.phoneNumber,
+        receipt: data.mpesaReceiptNumber,
+        raw: hint
+      });
+    } else if (inferredStatus === 'failed' || inferredStatus === 'cancelled') {
+      await settle(deposit.id, {
+        status: inferredStatus,
+        amount: data.amount,
+        phone: data.phoneNumber,
+        receipt: data.mpesaReceiptNumber,
+        reason: inferredStatus === 'cancelled' ? 'Payment cancelled on the phone.' : 'Payment failed on the phone.',
+        raw: hint
+      });
+    }
+  }
   function mount(app, { authenticateToken, authenticateAdminToken }) {
     const handle = (action, adminDiagnostics = false) => async (req, res) => {
       try { return await action(req, res); }
@@ -424,7 +494,11 @@ function createPaymentService({ models, env = process.env, gateways = createPaym
       await callback(req);
       return res.json({ status: true, message: 'Callback processed.' });
     }));
+    app.post(['/api/nexuspay/webhook', '/api/nexuspay/callback'], handle(async (req, res) => {
+      await nexusWebhook(req);
+      return res.json({ received: true });
+    }));
   }
-  return { settings, switchGateway, initiate, promptCustomer, adminPromptStatus, settle, refresh, reconcilePending, callback, mount };
+  return { settings, switchGateway, initiate, promptCustomer, adminPromptStatus, settle, refresh, reconcilePending, callback, nexusWebhook, mount };
 }
 module.exports = { createPaymentService };

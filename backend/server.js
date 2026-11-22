@@ -203,7 +203,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '50kb' }));
+app.use(express.json({
+  limit: '50kb',
+  verify: (req, _res, buf) => { req.rawBody = buf; }
+}));
 
 const distPath = fs.existsSync(path.join(__dirname, '../frontend/dist/frontend/browser'))
   ? path.join(__dirname, '../frontend/dist/frontend/browser')

@@ -489,3 +489,58 @@ test('unsigned PayHero failure callbacks preserve ResultCode and ResultDesc for 
   assert.equal(tx2.admin_deposit_diagnostic.code, '1032');
   assert.equal(tx2.admin_deposit_diagnostic.detail, 'Request cancelled by user');
 });
+
+test('Nexus Pay webhooks verify signatures when configured and preserve cancellation or failure diagnostics safely', async () => {
+  const crypto = require('crypto');
+  // Case 1: Unsigned webhook hint when NEXUSPAY_WEBHOOK_SECRET is unset cannot credit without API check,
+  // but preserves payment.cancelled diagnostic even when status API returns bare { status: "failed" }.
+  const f1 = fixture();
+  await f1.service.switchGateway('nexuspay', 1);
+  const started1 = await f1.start();
+  const dep1 = f1.latest();
+  f1.results.set(dep1.id, {
+    status: 'failed',
+    reason: 'Payment failed on the phone.',
+    raw: { status: 'failed', amount: '199', phoneNumber: '254712345678', mpesaReceiptNumber: null }
+  });
+  await f1.service.nexusWebhook({
+    headers: { 'x-webhook-event': 'payment.cancelled' },
+    body: {
+      event: 'payment.cancelled',
+      data: { checkoutRequestId: started1.checkoutRequestId, status: 'cancelled', amount: '199', phoneNumber: '254712345678' }
+    }
+  });
+  const tx1 = [...f1.stores.transactions.values()][0];
+  assert.equal(tx1.status, 'failed');
+  assert.equal(tx1.admin_deposit_diagnostic.category, 'cancelled');
+  assert.equal(tx1.admin_deposit_diagnostic.label, 'Cancelled by user');
+  assert.equal(f1.stores.users.get(7).balance, 50);
+
+  // Case 2: Signed Nexus webhook with NEXUSPAY_WEBHOOK_SECRET rejects bad signatures and preserves insufficient funds details
+  const f2 = fixture();
+  f2.env.NEXUSPAY_WEBHOOK_SECRET = 'whsec_test_secret';
+  await f2.service.switchGateway('nexuspay', 1);
+  const started2 = await f2.start();
+  const body2 = {
+    event: 'payment.failed',
+    data: {
+      checkoutRequestId: started2.checkoutRequestId,
+      status: 'failed',
+      resultCode: 1,
+      resultDescription: 'The balance is insufficient for the transaction.',
+      amount: '199',
+      phoneNumber: '254712345678'
+    }
+  };
+  await assert.rejects(f2.service.nexusWebhook({ headers: { 'x-webhook-signature': 'sha256=bad' }, body: body2 }), { status: 401 });
+  const rawBody2 = Buffer.from(JSON.stringify(body2));
+  const sig2 = 'sha256=' + crypto.createHmac('sha256', 'whsec_test_secret').update(rawBody2).digest('hex');
+  await f2.service.nexusWebhook({ headers: { 'x-webhook-signature': sig2 }, body: body2, rawBody: rawBody2 });
+  const tx2 = [...f2.stores.transactions.values()][0];
+  assert.equal(tx2.status, 'failed');
+  assert.equal(tx2.admin_deposit_diagnostic.category, 'customer_funds');
+  assert.equal(tx2.admin_deposit_diagnostic.label, 'Insufficient funds');
+  // Player status endpoint never leaks admin diagnostics
+  const player2 = await f2.request('post', '/api/mpesa/stk-status', { checkoutRequestId: started2.checkoutRequestId });
+  assert.equal(player2.body.admin_deposit_diagnostic, undefined);
+});
