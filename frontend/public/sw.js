@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ligibet-app-v3';
+const CACHE_NAME = 'ligibet-app-v4';
 const STATIC_ASSETS = [
   '/favicon.ico',
   '/favicon.png',

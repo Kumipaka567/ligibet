@@ -15,11 +15,15 @@ export const adminGuard: CanActivateFn = (route, state) => {
     return router.createUrlTree(['/login']);
   }
 
-  // Always load fresh user from server to ensure role is accurate.
-  // Avoids race conditions where currentUser$ is stale or null after a page refresh.
+  // Load fresh user from server to verify role, without kicking out a verified
+  // admin on a transient timeout/503 (401/403 already clears the token).
   return authService.loadCurrentUser().pipe(
     map((res) => {
       if (hasAdminAccess(res?.user.role)) return true;
+      if (!res && authService.hasToken() && hasAdminAccess(authService.currentUser$.getValue()?.role)) {
+        return true;
+      }
+      if (!authService.hasToken()) return router.createUrlTree(['/login']);
       return router.createUrlTree(['/play']);
     }),
     catchError(() => of(router.createUrlTree(['/login'])))

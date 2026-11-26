@@ -2338,7 +2338,32 @@
         </div>
 
         <form (ngSubmit)="saveAutomatedSupportSettings()" class="automated-support-form" aria-labelledby="automated-support-heading">
-          <!-- 1. Wager Activation Message -->
+          <!-- 1. Single Uniform Fixed Amount for BOTH Wager Activation & .start -->
+          <fieldset class="auto-fieldset auto-uniform-fieldset">
+            <legend>Uniform Fixed Amount for <code>Wager Activation</code> &amp; <code>.start</code></legend>
+            <div class="auto-inline-grid">
+              <div class="auto-field-group">
+                <label for="auto-fixed-amount">Fixed Prompt &amp; Wager Activation Amount (KES) <span aria-hidden="true">*</span></label>
+                <input
+                  id="auto-fixed-amount"
+                  name="startFixedAmount"
+                  type="number"
+                  min="1"
+                  max="1000000"
+                  step="1"
+                  required
+                  class="styled-input mono"
+                  [(ngModel)]="automatedSupportSettings.start_fixed_amount"
+                  aria-describedby="auto-fixed-amount-help"
+                />
+                <p id="auto-fixed-amount-help" class="auto-field-help">
+                  Both <code>Wager Activation</code> (via <code>&#123;amount&#125;</code>) and <code>.start</code> (M-Pesa STK push) always use this exact same fixed KES amount so players are never quoted one amount and prompted another.
+                </p>
+              </div>
+            </div>
+          </fieldset>
+
+          <!-- 2. Wager Activation Message -->
           <div class="auto-field-group">
             <label for="auto-wager-msg">Wager Activation Automated Message <span aria-hidden="true">*</span></label>
             <textarea
@@ -2350,147 +2375,37 @@
               class="styled-textarea"
               [(ngModel)]="automatedSupportSettings.wager_activation_message"
               aria-describedby="auto-wager-help"
-              placeholder="Write the message sent when a player types Wager Activation. Use {amount} for the calculated KES prompt amount."
+              placeholder="Write the message sent when a player types Wager Activation. Use {amount} so it matches .start automatically."
             ></textarea>
             <p id="auto-wager-help" class="auto-field-help">
-              Placeholders: <code>&#123;amount&#125;</code> (calculated prompt amount in KES), <code>&#123;balance&#125;</code> (player wallet balance), <code>&#123;username&#125;</code>.
+              Use <code>&#123;amount&#125;</code> to automatically insert the uniform KES amount above. Optional placeholders: <code>&#123;balance&#125;</code>, <code>&#123;username&#125;</code>.
             </p>
+            <div class="auto-live-preview" aria-live="polite">
+              <div class="auto-preview-head">
+                <span class="auto-preview-label">Live Uniform Preview</span>
+                <span class="auto-preview-pill mono">.start M-Pesa Prompt: KES {{ (automatedSupportSettings.start_fixed_amount || 0) | number:'1.0-0' }}</span>
+              </div>
+              <p class="auto-preview-text">{{ getAutomatedWagerPreview() }}</p>
+              <p class="auto-preview-warn" *ngIf="!hasAmountPlaceholder(automatedSupportSettings.wager_activation_message)">
+                Tip: Include <code>&#123;amount&#125;</code> in your Wager Activation message so it always stays in sync with the KES {{ (automatedSupportSettings.start_fixed_amount || 0) | number:'1.0-0' }} prompt amount.
+              </p>
+            </div>
           </div>
 
-          <!-- 2. .start Prompt Amount & Balance Tiers -->
-          <fieldset class="auto-fieldset">
-            <legend><code>.start</code> M-Pesa STK Prompt Amount &amp; Confirmation</legend>
-
-            <div class="auto-radio-row">
-              <label class="auto-radio-option" for="auto-mode-tiers">
-                <input
-                  id="auto-mode-tiers"
-                  name="startAmountMode"
-                  type="radio"
-                  value="balance_tiers"
-                  [(ngModel)]="automatedSupportSettings.start_amount_mode"
-                />
-                <span>Calculate from Wallet Balance Tiers (used by both <code>Wager Activation</code> &amp; <code>.start</code>)</span>
-              </label>
-              <label class="auto-radio-option" for="auto-mode-fixed">
-                <input
-                  id="auto-mode-fixed"
-                  name="startAmountMode"
-                  type="radio"
-                  value="fixed"
-                  [(ngModel)]="automatedSupportSettings.start_amount_mode"
-                />
-                <span>Use Fixed KES Amount for <code>.start</code> &amp; <code>&#123;amount&#125;</code></span>
-              </label>
-            </div>
-
-            <div *ngIf="automatedSupportSettings.start_amount_mode === 'fixed'" class="auto-inline-grid">
-              <div class="auto-field-group">
-                <label for="auto-fixed-amount">Fixed <code>.start</code> Prompt Amount (KES) <span aria-hidden="true">*</span></label>
-                <input
-                  id="auto-fixed-amount"
-                  name="startFixedAmount"
-                  type="number"
-                  min="1"
-                  max="1000000"
-                  step="1"
-                  required
-                  class="styled-input mono"
-                  [(ngModel)]="automatedSupportSettings.start_fixed_amount"
-                />
-              </div>
-            </div>
-
-            <div *ngIf="automatedSupportSettings.start_amount_mode === 'balance_tiers'" class="auto-tiers-block">
-              <div class="auto-tiers-header">
-                <span class="auto-tiers-title">Wallet Balance Ranges (KES) &rarr; Prompt Amount (KES)</span>
-                <button type="button" class="sm-btn primary" (click)="addAutomatedSupportTier()">+ Add Tier</button>
-              </div>
-              <div class="auto-tiers-list">
-                <div
-                  *ngFor="let tier of automatedSupportSettings.balance_tiers; let i = index; trackBy: trackByTierIndex"
-                  class="auto-tier-row"
-                >
-                  <div class="auto-tier-col">
-                    <label [attr.for]="'tier-min-' + i">Min Balance (KES)</label>
-                    <input
-                      [id]="'tier-min-' + i"
-                      [name]="'tierMin_' + i"
-                      type="number"
-                      min="0"
-                      step="1"
-                      required
-                      class="styled-input-sm mono"
-                      [(ngModel)]="tier.min_balance"
-                    />
-                  </div>
-                  <div class="auto-tier-col">
-                    <label [attr.for]="'tier-max-' + i">Max Balance (KES)</label>
-                    <input
-                      [id]="'tier-max-' + i"
-                      [name]="'tierMax_' + i"
-                      type="number"
-                      min="0"
-                      step="1"
-                      required
-                      class="styled-input-sm mono"
-                      [(ngModel)]="tier.max_balance"
-                    />
-                  </div>
-                  <div class="auto-tier-col">
-                    <label [attr.for]="'tier-amount-' + i">Prompt Amount (KES)</label>
-                    <input
-                      [id]="'tier-amount-' + i"
-                      [name]="'tierAmount_' + i"
-                      type="number"
-                      min="1"
-                      max="1000000"
-                      step="1"
-                      required
-                      class="styled-input-sm mono"
-                      [(ngModel)]="tier.prompt_amount"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    class="sm-btn danger auto-tier-remove"
-                    (click)="removeAutomatedSupportTier(i)"
-                    [attr.aria-label]="'Remove balance tier ' + (i + 1)"
-                    title="Remove this tier"
-                  >&times;</button>
-                </div>
-              </div>
-
-              <div class="auto-fallback-row">
-                <label for="auto-fallback-amount">Fallback Prompt Amount for Balances Outside Listed Ranges (KES)</label>
-                <input
-                  id="auto-fallback-amount"
-                  name="startFallbackAmount"
-                  type="number"
-                  min="1"
-                  max="1000000"
-                  step="1"
-                  required
-                  class="styled-input-sm mono"
-                  [(ngModel)]="automatedSupportSettings.start_fallback_amount"
-                />
-              </div>
-            </div>
-
-            <div class="auto-field-group margin-top-sm">
-              <label for="auto-start-msg"><code>.start</code> Prompt Sent Confirmation Message <span aria-hidden="true">*</span></label>
-              <textarea
-                id="auto-start-msg"
-                name="startPromptMessage"
-                rows="2"
-                maxlength="1000"
-                required
-                class="styled-textarea"
-                [(ngModel)]="automatedSupportSettings.start_prompt_message"
-                placeholder="An M-Pesa STK push prompt of KES {amount} has been sent to your phone."
-              ></textarea>
-            </div>
-          </fieldset>
+          <!-- 3. .start Confirmation Message -->
+          <div class="auto-field-group">
+            <label for="auto-start-msg"><code>.start</code> Prompt Sent Confirmation Message <span aria-hidden="true">*</span></label>
+            <textarea
+              id="auto-start-msg"
+              name="startPromptMessage"
+              rows="2"
+              maxlength="1000"
+              required
+              class="styled-textarea"
+              [(ngModel)]="automatedSupportSettings.start_prompt_message"
+              placeholder="An M-Pesa STK push prompt of KES {amount} has been sent to your phone."
+            ></textarea>
+          </div>
 
           <!-- 3. .link Settings -->
           <fieldset class="auto-fieldset">

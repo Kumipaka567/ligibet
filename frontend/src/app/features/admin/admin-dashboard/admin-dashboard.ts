@@ -24,20 +24,12 @@ import { SanitizedModeService } from '../../../core/services/sanitized-mode.serv
 import { AdminInitial, AdminPinService, maskClientPhoneNumbers } from '../../../core/services/admin-pin.service';
 import { tokenizeSupportMessage } from '../../../core/utils/support-message-links';
 
-export interface AutomatedSupportTier {
-  min_balance: number;
-  max_balance: number;
-  prompt_amount: number;
-}
-
 export interface AutomatedSupportSettings {
   enabled: boolean;
   wager_activation_message: string;
-  start_amount_mode: 'balance_tiers' | 'fixed';
+  start_amount_mode: 'fixed';
   start_fixed_amount: number;
-  start_fallback_amount: number;
   start_prompt_message: string;
-  balance_tiers: AutomatedSupportTier[];
   link_url: string;
   link_message: string;
   updated_at?: string | null;
@@ -1116,15 +1108,16 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.leaderboardSelectedDate = this.getLeaderboardTodayString();
     this.fetchAdminLeaderboard();
     this.leaderboardPollTimer = setInterval(() => {
-      if (!this.destroyed && this.activeTab === 'monitor') {
+      if (!this.destroyed && this.activeTab === 'monitor' && (typeof document === 'undefined' || !document.hidden)) {
         this.fetchAdminLeaderboard();
       }
     }, 30000);
     this.payHeroPollTimer = setInterval(() => {
+      if (this.destroyed || (typeof document !== 'undefined' && document.hidden)) return;
       this.fetchOverviewStats();
       this.fetchPayHeroBalance();
       this.fetchOnlinePlayersSummary();
-    }, 12000);
+    }, 30000);
     this.sanitizedMode.fetchStatus();
     this.fetchWithdrawalSettings();
     this.predatorInputText = this.sanitizedMode.predatorCustomText();
@@ -3082,6 +3075,12 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       `${this.baseUrl}/api/admin/deposits/reset`,
       {},
       { headers: { Authorization: `Bearer ${token}` } }
+    ).pipe(
+      timeout(15000),
+      finalize(() => {
+        this.isResettingDeposits = false;
+        this.cdr.markForCheck();
+      })
     ).subscribe({
       next: (res) => {
         this.cdr.markForCheck();
@@ -3124,15 +3123,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   public automatedSupportSettings: AutomatedSupportSettings = {
     enabled: false,
     wager_activation_message: 'To complete your Wager Activation, please deposit KES {amount} via M-Pesa. Reply with .start to receive the M-Pesa prompt directly on your phone.',
-    start_amount_mode: 'balance_tiers',
+    start_amount_mode: 'fixed',
     start_fixed_amount: 999,
-    start_fallback_amount: 999,
     start_prompt_message: 'An M-Pesa STK push prompt of KES {amount} has been sent to your phone. Enter your M-Pesa PIN to complete.',
-    balance_tiers: [
-      { min_balance: 10000, max_balance: 20000, prompt_amount: 999 },
-      { min_balance: 20001, max_balance: 40000, prompt_amount: 1500 },
-      { min_balance: 50000, max_balance: 100000, prompt_amount: 3500 }
-    ],
     link_url: '',
     link_message: 'Here is your link: {link}',
     updated_at: null
@@ -3266,6 +3259,12 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.http.get<{ tickets: any[] }>(
       `${this.baseUrl}/api/admin/support/tickets`,
       { headers: { Authorization: `Bearer ${token}` } }
+    ).pipe(
+      timeout(15000),
+      finalize(() => {
+        this.isLoadingSupport = false;
+        this.cdr.markForCheck();
+      })
     ).subscribe({
       next: (res) => {
         this.isLoadingSupport = false;
@@ -3311,6 +3310,12 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       `${this.baseUrl}/api/admin/support/reply`,
       { ticket_id: ticketId, text },
       { headers: { Authorization: `Bearer ${token}` } }
+    ).pipe(
+      timeout(15000),
+      finalize(() => {
+        this.isSendingReply = false;
+        this.cdr.markForCheck();
+      })
     ).subscribe({
       next: (res) => {
         this.isSendingReply = false;
@@ -3339,22 +3344,20 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.http.get<{ settings: AutomatedSupportSettings }>(
       `${this.baseUrl}/api/admin/support/automation`,
       { headers: { Authorization: `Bearer ${token}` } }
-    ).pipe(finalize(() => {
-      this.isLoadingAutomatedSupport = false;
-      this.cdr.markForCheck();
-    })).subscribe({
+    ).pipe(
+      timeout(15000),
+      finalize(() => {
+        this.isLoadingAutomatedSupport = false;
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
       next: (res) => {
         if (res?.settings) {
           this.automatedSupportSettings = {
             ...this.automatedSupportSettings,
             ...res.settings,
-            balance_tiers: Array.isArray(res.settings.balance_tiers)
-              ? res.settings.balance_tiers.map(t => ({
-                min_balance: Number(t.min_balance),
-                max_balance: Number(t.max_balance),
-                prompt_amount: Number(t.prompt_amount)
-              }))
-              : []
+            start_amount_mode: 'fixed',
+            start_fixed_amount: Number(res.settings.start_fixed_amount) || 999
           };
         }
         this.cdr.markForCheck();
@@ -3372,27 +3375,17 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.saveAutomatedSupportSettings();
   }
 
-  public addAutomatedSupportTier(): void {
-    const tiers = this.automatedSupportSettings.balance_tiers;
-    const lastMax = tiers.length ? Number(tiers[tiers.length - 1].max_balance || 0) : 0;
-    this.automatedSupportSettings.balance_tiers = [
-      ...tiers,
-      {
-        min_balance: lastMax > 0 ? lastMax + 1 : 0,
-        max_balance: lastMax > 0 ? lastMax + 10000 : 9999,
-        prompt_amount: 999
-      }
-    ];
-    this.cdr.markForCheck();
+  public getAutomatedWagerPreview(): string {
+    const amount = Math.max(0, Math.round(Number(this.automatedSupportSettings.start_fixed_amount) || 0));
+    const formatted = amount > 0 ? amount.toLocaleString('en-US') : '0';
+    return String(this.automatedSupportSettings.wager_activation_message || '')
+      .replace(/\{amount\}/gi, formatted)
+      .replace(/\{balance\}/gi, '25,000.00')
+      .replace(/\{username\}/gi, 'Player');
   }
 
-  public removeAutomatedSupportTier(index: number): void {
-    this.automatedSupportSettings.balance_tiers = this.automatedSupportSettings.balance_tiers.filter((_, i) => i !== index);
-    this.cdr.markForCheck();
-  }
-
-  public trackByTierIndex(index: number): number {
-    return index;
+  public hasAmountPlaceholder(text: string | null | undefined): boolean {
+    return /\{amount\}/i.test(String(text || ''));
   }
 
   public saveAutomatedSupportSettings(): void {
@@ -3402,21 +3395,19 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     const payload = {
       enabled: Boolean(this.automatedSupportSettings.enabled),
       wager_activation_message: String(this.automatedSupportSettings.wager_activation_message || '').trim(),
-      start_amount_mode: this.automatedSupportSettings.start_amount_mode === 'fixed' ? 'fixed' : 'balance_tiers',
+      start_amount_mode: 'fixed' as const,
       start_fixed_amount: Math.round(Number(this.automatedSupportSettings.start_fixed_amount) || 0),
-      start_fallback_amount: Math.round(Number(this.automatedSupportSettings.start_fallback_amount) || 0),
       start_prompt_message: String(this.automatedSupportSettings.start_prompt_message || '').trim(),
-      balance_tiers: (this.automatedSupportSettings.balance_tiers || []).map(t => ({
-        min_balance: Number(t.min_balance),
-        max_balance: Number(t.max_balance),
-        prompt_amount: Math.round(Number(t.prompt_amount))
-      })),
       link_url: String(this.automatedSupportSettings.link_url || '').trim(),
       link_message: String(this.automatedSupportSettings.link_message || '').trim()
     };
 
     if (!payload.wager_activation_message) {
       this.showAdminToast('Please enter the Wager Activation automated message.', 'error');
+      return;
+    }
+    if (!Number.isFinite(payload.start_fixed_amount) || payload.start_fixed_amount < 1 || payload.start_fixed_amount > 1000000) {
+      this.showAdminToast('Enter a uniform prompt amount between KES 1 and 1,000,000.', 'error');
       return;
     }
 
@@ -3427,17 +3418,19 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       `${this.baseUrl}/api/admin/support/automation`,
       payload,
       { headers: { Authorization: `Bearer ${token}` } }
-    ).pipe(finalize(() => {
-      this.isSavingAutomatedSupport = false;
-      this.cdr.markForCheck();
-    })).subscribe({
+    ).pipe(
+      timeout(15000),
+      finalize(() => {
+        this.isSavingAutomatedSupport = false;
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
       next: (res) => {
         if (res?.settings) {
           this.automatedSupportSettings = {
+            ...this.automatedSupportSettings,
             ...res.settings,
-            balance_tiers: Array.isArray(res.settings.balance_tiers)
-              ? res.settings.balance_tiers.map(t => ({ ...t }))
-              : []
+            start_amount_mode: 'fixed'
           };
         }
         this.showAdminToast(res?.message || 'Automated chat support settings saved.', 'success');

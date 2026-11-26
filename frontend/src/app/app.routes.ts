@@ -1,5 +1,4 @@
 import { Routes } from '@angular/router';
-import { AviatorComponent } from './features/game/aviator/aviator.component';
 import { adminGuard } from './core/guards/admin-guard';
 import { authGuard } from './core/guards/auth-guard';
 
@@ -21,7 +20,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/dashboard/player-dashboard.component')
       .then((m) => m.PlayerDashboardComponent)
   },
-  { path: 'play', component: AviatorComponent, canActivate: [authGuard] },
+  {
+    path: 'play',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/game/aviator/aviator.component')
+      .then((m) => m.AviatorComponent)
+  },
   {
     path: 'admin',
     canActivate: [adminGuard],

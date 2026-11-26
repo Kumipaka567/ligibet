@@ -16,7 +16,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Subscription, timeout } from 'rxjs';
 import { ChatMessage, GameRoom, GameSocketService, LiveBetBroadcast, RoomState } from '../../../core/services/game-socket.service';
 import { AuthService, User, TransactionRecord } from '../../../core/services/auth.service';
 import { withdrawalErrorPopup } from '../../../core/services/withdrawal-feedback';
@@ -239,12 +239,14 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   public isClaimingBonus = signal<boolean>(false);
   private bonusNotifTimeout: any = null;
 
-  // Game loading splash screen (shown for 3s after login)
+  // Game loading splash screen (brief 800ms intro; skips connection overlay if socket is already live)
   public gameLoading = signal<boolean>(true);
   public connectionLoading = signal<boolean>(false);
   public connectionLoadingSlow = signal<boolean>(false);
   private connectionScreenReady = false;
   private loadingPresentationTimers: ReturnType<typeof setTimeout>[] = [];
+  private walletSupportPollTimer: ReturnType<typeof setInterval> | null = null;
+  private pendingPanelTimers: Partial<Record<1 | 2, ReturnType<typeof setTimeout>>> = {};
 
   // Transaction History State
   public transactionHistory: TransactionRecord[] = [];
@@ -421,18 +423,21 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
       this.startStandaloneGameLoop();
     }
     // Opening presentation only: the room stream continues behind these screens.
+    // Skip the extra connection screen when the shared session socket is already live.
     this.loadingPresentationTimers.push(setTimeout(() => {
       this.gameLoading.set(false);
       if (this.isMiniView || this.isSanitized()) return;
-      this.connectionLoading.set(true);
-      this.loadingPresentationTimers.push(setTimeout(() => {
+      if (this.isConnected() || !this.authService.getToken()) {
         this.connectionScreenReady = true;
-        if (this.isConnected() || !this.authService.getToken()) this.connectionLoading.set(false);
-      }, 650));
+        this.connectionLoading.set(false);
+        return;
+      }
+      this.connectionLoading.set(true);
+      this.connectionScreenReady = true;
       this.loadingPresentationTimers.push(setTimeout(() => {
         if (this.connectionLoading()) this.connectionLoadingSlow.set(true);
-      }, 15000));
-    }, 3000));
+      }, 10000));
+    }, 800));
   }
 
   private initPlaneImage() {
@@ -462,29 +467,39 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
       this.soundEnabled.set(true);
     }
 
-    this.flightSound = new Audio('/assets/audio/aviator%20sound.mpeg');
-    this.flightSound.loop = true;
-    this.flightSound.preload = 'auto';
-    this.flightSound.volume = 0.5;
+    // Prefer Web Audio API (single fetch + decode for zero-gap seamless looping).
+    // Fall back to HTML5 Audio only when Web Audio is unavailable or decoding fails.
+    const setupHtmlAudioFallback = () => {
+      if (!this.flightSound) {
+        this.flightSound = new Audio('/assets/audio/aviator%20sound.mpeg');
+        this.flightSound.loop = true;
+        this.flightSound.preload = 'metadata';
+        this.flightSound.volume = 0.5;
+      }
+      if (!this.flyAwaySound) {
+        this.flyAwaySound = new Audio('/assets/audio/flew%20away%20sound.mpeg');
+        this.flyAwaySound.preload = 'metadata';
+        this.flyAwaySound.volume = 0.65;
+      }
+    };
 
-    this.flyAwaySound = new Audio('/assets/audio/flew%20away%20sound.mpeg');
-    this.flyAwaySound.preload = 'auto';
-    this.flyAwaySound.volume = 0.65;
-
-    // Web Audio API decodes audio for zero-gap seamless looping
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContextClass) {
         this.audioCtx = new AudioContextClass();
         this.loadAudioBuffer('/assets/audio/aviator%20sound.mpeg').then(buf => {
-          this.flightAudioBuffer = buf;
-        }).catch(() => undefined);
+          if (buf) this.flightAudioBuffer = buf;
+          else setupHtmlAudioFallback();
+        }).catch(() => setupHtmlAudioFallback());
         this.loadAudioBuffer('/assets/audio/flew%20away%20sound.mpeg').then(buf => {
-          this.flyAwayAudioBuffer = buf;
-        }).catch(() => undefined);
+          if (buf) this.flyAwayAudioBuffer = buf;
+          else setupHtmlAudioFallback();
+        }).catch(() => setupHtmlAudioFallback());
+      } else {
+        setupHtmlAudioFallback();
       }
     } catch {
-      // AudioContext fallback to standard HTML5 Audio
+      setupHtmlAudioFallback();
     }
   }
 
@@ -702,6 +717,10 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.bettingIntervalId) clearInterval(this.bettingIntervalId);
     if (this.mockLoopIntervalId) clearInterval(this.mockLoopIntervalId);
     if (this.fakeJoinIntervalId) clearInterval(this.fakeJoinIntervalId);
+    if (this.mpesaPollingInterval) clearInterval(this.mpesaPollingInterval);
+    if (this.walletSupportPollTimer) clearInterval(this.walletSupportPollTimer);
+    if (this.pendingPanelTimers[1]) clearTimeout(this.pendingPanelTimers[1]);
+    if (this.pendingPanelTimers[2]) clearTimeout(this.pendingPanelTimers[2]);
     if (this.resizeObserver) this.resizeObserver.disconnect();
     this.stopAllGameAudio();
     // The socket is deliberately left open. It is shared, and the root
@@ -789,7 +808,9 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
       this.gameSocket.isConnected$.subscribe(connected => {
         this.isConnected.set(connected);
         if (connected && this.connectionScreenReady) this.connectionLoading.set(false);
-        if (connected) {
+        if (!connected) {
+          this.clearPendingPanels();
+        } else {
           if (this.mockLoopIntervalId) {
             clearInterval(this.mockLoopIntervalId);
             this.mockLoopIntervalId = null;
@@ -1592,6 +1613,19 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private setPanelPending(panelIndex: 1 | 2, isPending: boolean, clearQueued = false) {
+    if (this.pendingPanelTimers[panelIndex]) {
+      clearTimeout(this.pendingPanelTimers[panelIndex]);
+      delete this.pendingPanelTimers[panelIndex];
+    }
+    if (isPending) {
+      this.pendingPanelTimers[panelIndex] = setTimeout(() => {
+        delete this.pendingPanelTimers[panelIndex];
+        const current = panelIndex === 1 ? this.panel1() : this.panel2();
+        if (current.isPending) {
+          this.setPanelPending(panelIndex, false);
+        }
+      }, 8000);
+    }
     const apply = (panel: PanelBetState): PanelBetState => ({
       ...panel,
       isPending,
@@ -2595,6 +2629,27 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     if (tab === 'support') {
       this.loadWalletSupportMessages();
+      this.ensureWalletSupportPolling();
+    } else {
+      this.stopWalletSupportPolling();
+    }
+  }
+
+  private ensureWalletSupportPolling(): void {
+    if (this.walletSupportPollTimer) return;
+    this.walletSupportPollTimer = setInterval(() => {
+      if (this.showWalletModal() && this.walletTab() === 'support' && !document.hidden) {
+        this.loadWalletSupportMessages(true);
+      } else if (!this.showWalletModal()) {
+        this.stopWalletSupportPolling();
+      }
+    }, 6000);
+  }
+
+  private stopWalletSupportPolling(): void {
+    if (this.walletSupportPollTimer) {
+      clearInterval(this.walletSupportPollTimer);
+      this.walletSupportPollTimer = null;
     }
   }
 
@@ -2647,7 +2702,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
       text,
       category: this.walletSupportCategory(),
       username: user?.username || phone
-    }, options).subscribe({
+    }, options).pipe(timeout({ first: 20000 })).subscribe({
       next: (res) => {
         this.isSendingWalletSupport.set(false);
         this.walletSupportInputText.set('');
@@ -2668,7 +2723,11 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       error: (err) => {
         this.isSendingWalletSupport.set(false);
-        this.walletSupportStatusMsg.set(err?.error?.error || 'Failed to send message.');
+        this.walletSupportStatusMsg.set(
+          err?.name === 'TimeoutError'
+            ? 'Request timed out. Please check your connection and try again.'
+            : (err?.error?.error || 'Failed to send message.')
+        );
       }
     });
   }
@@ -3121,7 +3180,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
         `${getBackendOrigin()}/api/chat/send`,
         { message: text },
         { headers: token ? { Authorization: `Bearer ${token}` } : {} }
-      ).subscribe({
+      ).pipe(timeout({ first: 15000 })).subscribe({
         next: (res) => {
           this.chatInputText = '';
           this.isSendingChat.set(false);
@@ -3179,7 +3238,7 @@ export class AviatorGameComponent implements OnInit, AfterViewInit, OnDestroy {
       `${getBackendOrigin()}/api/chat/rain/claim`,
       { rainId: rainId },
       { headers: token ? { Authorization: `Bearer ${token}` } : {} }
-    ).subscribe({
+    ).pipe(timeout({ first: 15000 })).subscribe({
       next: (res) => {
         this.isClaimingRain.set(false);
         this.claimedRainIds.add(rainId);

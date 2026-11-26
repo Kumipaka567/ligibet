@@ -314,7 +314,7 @@ function createAdminPrivacy(models) {
     await ensureOwnershipMigration();
     // Only the legacy import is memoized. Live ownership and exemptions are always fresh.
     const [users, existing] = await Promise.all([
-      User.find({}).select('id username phone_number role').lean(),
+      User.find({}).select('-_id id username phone_number role').lean(),
       AdminPhoneOwner.find({}).lean()
     ]);
     const exemptPhones = staffPhones(users);
@@ -494,6 +494,9 @@ function createAdminPrivacy(models) {
       const clients = pinIdentity && !controlRequest ? await directory() : [];
       req.blockedClients = pinIdentity ? clients.filter(client => !client.exempt && client.owner_tag !== pinIdentity.tag) : [];
       req.blockedClientIds = req.blockedClients.map(client => client.id);
+      // For read-only GET requests, reuse the fresh ownership directory just loaded
+      // at request entry instead of repeating a full-collection scan milliseconds later.
+      const requestDirectory = pinIdentity && !controlRequest && req.method === 'GET' ? clients : null;
       res.json = payload => {
         // Serialize immediately so concurrent mutations cannot alter an outbound snapshot.
         const snapshot = JSON.parse(JSON.stringify(payload));
@@ -502,7 +505,10 @@ function createAdminPrivacy(models) {
           sendJson(snapshot);
           return res;
         }
-        Promise.all([directory(), identity(req.headers['x-admin-pin'], accountToken)])
+        Promise.all([
+          requestDirectory ? Promise.resolve(requestDirectory) : directory(),
+          requestDirectory ? Promise.resolve(pinIdentity) : identity(req.headers['x-admin-pin'], accountToken)
+        ])
           .then(([users, currentIdentity]) => sendJson(protectPayload(snapshot, users, currentIdentity?.tag, req.query?.search, supportResponse)))
           .catch(() => { if (!res.headersSent) { res.status(503); sendJson({ error: 'Phone privacy verification unavailable. Please retry.' }); } });
         return res;

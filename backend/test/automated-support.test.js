@@ -82,20 +82,13 @@ test('detects Wager Activation, .start, and .link case-insensitively without mat
   assert.equal(detectAutomatedSupportCommand('link please'), null);
 });
 
-test('calculates prompt amounts accurately for default balance tiers, fallback, and fixed mode', () => {
-  const base = { ...DEFAULT_AUTOMATED_SUPPORT };
-  assert.equal(calculatePromptAmount(10000, base), 999);
-  assert.equal(calculatePromptAmount(15500, base), 999);
-  assert.equal(calculatePromptAmount(20000, base), 999);
-  assert.equal(calculatePromptAmount(20001, base), 1500);
-  assert.equal(calculatePromptAmount(35000, base), 1500);
-  assert.equal(calculatePromptAmount(40000, base), 1500);
-  assert.equal(calculatePromptAmount(50000, base), 3500);
-  assert.equal(calculatePromptAmount(75000, base), 3500);
-  assert.equal(calculatePromptAmount(100000, base), 3500);
-  assert.equal(calculatePromptAmount(5000, base), 999); // fallback
-  assert.equal(calculatePromptAmount(45000, { ...base, start_fallback_amount: 2500 }), 2500);
-  assert.equal(calculatePromptAmount(75000, { ...base, start_amount_mode: 'fixed', start_fixed_amount: 2200 }), 2200);
+test('uses a single uniform admin-editable fixed amount across every wallet balance', () => {
+  const fixed3500 = { ...DEFAULT_AUTOMATED_SUPPORT, start_fixed_amount: 3500 };
+  for (const balance of [0, 5000, 15000, 30000, 75000, 150000]) {
+    assert.equal(calculatePromptAmount(balance, fixed3500), 3500);
+  }
+  // Legacy documents saved with balance_tiers still resolve uniformly to start_fixed_amount
+  assert.equal(calculatePromptAmount(75000, { start_amount_mode: 'balance_tiers', start_fixed_amount: 1500 }), 1500);
 });
 
 test('when automated chat support is OFF, player commands do not trigger replies or STK pushes', async () => {
@@ -108,67 +101,59 @@ test('when automated chat support is OFF, player commands do not trigger replies
   assert.equal(f.initiated.length, 0);
 });
 
-test('Wager Activation replies with admin message and balance-calculated amount for authenticated players only', async () => {
-  const f = makeFixture({ userBalance: 75000 });
+test('Wager Activation and .start always use the exact same uniform fixed amount edited by admin', async () => {
+  const f = makeFixture({ userBalance: 75000, userPhone: '+254712345678' });
   await f.service.saveSettings({
     ...DEFAULT_AUTOMATED_SUPPORT,
     enabled: true,
-    wager_activation_message: 'Hi {username}, your balance is KES {balance}. Deposit KES {amount} by typing .start.'
-  }, { id: 1, username: 'admin' });
-
-  // Unauthenticated visitor cannot read another account's balance
-  const anon = await f.service.handlePlayerMessage({ text: 'Wager Activation', authenticatedUser: null, fallbackPhone: '0712345678' });
-  assert.equal(anon.command, 'wager_activation');
-  assert.match(anon.replyText, /log in/i);
-  assert.ok(!anon.replyText.includes('3,500'));
-
-  // Authenticated player receives exact balance tier amount (75,000 -> 3,500)
-  const authed = await f.service.handlePlayerMessage({ text: 'wager activation', authenticatedUser: { id: 7 }, fallbackPhone: '0712345678' });
-  assert.equal(authed.command, 'wager_activation');
-  assert.equal(authed.amount, 3500);
-  assert.equal(authed.replyText, 'Hi player7, your balance is KES 75,000.00. Deposit KES 3,500 by typing .start.');
-});
-
-test('.start initiates a live M-Pesa STK prompt for authenticated player with cooldown and safe error handling', async () => {
-  const f = makeFixture({ userBalance: 25000, userPhone: '+254712345678' });
-  await f.service.saveSettings({
-    ...DEFAULT_AUTOMATED_SUPPORT,
-    enabled: true,
+    start_fixed_amount: 3500,
+    wager_activation_message: 'Hi {username}, please deposit KES {amount} to activate your wager. Type .start to receive the prompt.',
     start_prompt_message: 'Prompt of KES {amount} sent! Enter your M-Pesa PIN.'
   }, { id: 1, username: 'admin' });
 
-  // Unauthenticated visitor cannot trigger STK pushes
-  const anon = await f.service.handlePlayerMessage({ text: '.start', authenticatedUser: null, fallbackPhone: '0712345678' });
-  assert.match(anon.replyText, /log in/i);
+  // Unauthenticated visitor cannot read account info or trigger STK pushes
+  const anonWager = await f.service.handlePlayerMessage({ text: 'Wager Activation', authenticatedUser: null, fallbackPhone: '0712345678' });
+  assert.match(anonWager.replyText, /log in/i);
+  const anonStart = await f.service.handlePlayerMessage({ text: '.start', authenticatedUser: null, fallbackPhone: '0712345678' });
+  assert.match(anonStart.replyText, /log in/i);
   assert.equal(f.initiated.length, 0);
 
-  // Authenticated player with KES 25,000 balance gets KES 1,500 prompt
+  // Authenticated player gets uniform KES 3,500 on BOTH Wager Activation AND .start
+  const wager = await f.service.handlePlayerMessage({ text: 'wager activation', authenticatedUser: { id: 7 }, fallbackPhone: '0712345678' });
+  assert.equal(wager.amount, 3500);
+  assert.equal(wager.replyText, 'Hi player7, please deposit KES 3,500 to activate your wager. Type .start to receive the prompt.');
+
   const first = await f.service.handlePlayerMessage({ text: '.start', authenticatedUser: { id: 7 }, fallbackPhone: '0712345678' });
   assert.equal(first.stkPrompt.initiated, true);
-  assert.equal(first.stkPrompt.amount, 1500);
-  assert.equal(first.replyText, 'Prompt of KES 1,500 sent! Enter your M-Pesa PIN.');
-  assert.deepEqual(f.initiated, [{ userId: 7, amount: 1500, phone: '254712345678' }]);
+  assert.equal(first.stkPrompt.amount, 3500);
+  assert.equal(first.replyText, 'Prompt of KES 3,500 sent! Enter your M-Pesa PIN.');
+  assert.deepEqual(f.initiated, [{ userId: 7, amount: 3500, phone: '254712345678' }]);
 
   // Immediate repeat hits cooldown without firing a duplicate STK prompt
   const rapid = await f.service.handlePlayerMessage({ text: '.start', authenticatedUser: { id: 7 }, fallbackPhone: '0712345678' });
   assert.equal(rapid.stkPrompt.initiated, false);
   assert.equal(f.initiated.length, 1);
 
-  // After cooldown, fixed .start amount override takes effect
+  // Admin edits the uniform fixed amount to KES 1,500 -> both Wager Activation and .start update together
   f.tick(16000);
   await f.service.saveSettings({
     ...DEFAULT_AUTOMATED_SUPPORT,
     enabled: true,
-    start_amount_mode: 'fixed',
-    start_fixed_amount: 1200
+    start_fixed_amount: 1500,
+    wager_activation_message: 'Deposit KES {amount}. Reply .start.'
   }, { id: 1, username: 'admin' });
+
+  const wagerUpdated = await f.service.handlePlayerMessage({ text: 'Wager Activation', authenticatedUser: { id: 7 } });
+  assert.equal(wagerUpdated.amount, 1500);
+  assert.equal(wagerUpdated.replyText, 'Deposit KES 1,500. Reply .start.');
+
   const second = await f.service.handlePlayerMessage({ text: '.start', authenticatedUser: { id: 7 }, fallbackPhone: '0712345678' });
   assert.equal(second.stkPrompt.initiated, true);
-  assert.equal(second.stkPrompt.amount, 1200);
-  assert.equal(f.initiated.at(-1).amount, 1200);
+  assert.equal(second.stkPrompt.amount, 1500);
+  assert.equal(f.initiated.at(-1).amount, 1500);
 });
 
-test('.link returns admin-configured HTTPS URL and rejects unsafe URL schemes on save', async () => {
+test('.link returns admin-configured HTTPS URL and rejects unsafe URL schemes or invalid amounts on save', async () => {
   assert.throws(() => validateAndSanitizeSettings({
     ...DEFAULT_AUTOMATED_SUPPORT,
     link_url: 'javascript:alert(1)'
@@ -176,7 +161,7 @@ test('.link returns admin-configured HTTPS URL and rejects unsafe URL schemes on
 
   assert.throws(() => validateAndSanitizeSettings({
     ...DEFAULT_AUTOMATED_SUPPORT,
-    balance_tiers: [{ min_balance: 50000, max_balance: 10000, prompt_amount: 999 }]
+    start_fixed_amount: 0
   }), { status: 400 });
 
   const f = makeFixture();

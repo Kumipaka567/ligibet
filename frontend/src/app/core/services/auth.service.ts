@@ -107,6 +107,8 @@ export class AuthService {
   // finish signing up even when the browser refuses to persist anything.
   private memoryToken: string | null = null;
   private backendReadiness: Observable<void> | null = null;
+  private lastBackendReadyAt = 0;
+  private static readonly BACKEND_READY_TTL_MS = 30000;
   private profileRequest: Observable<{ user: User } | null> | null = null;
   private profileToken: string | null = null;
 
@@ -233,6 +235,9 @@ export class AuthService {
   }
 
   private extractErrorMessage(err: any): string {
+    if (err?.name === 'TimeoutError') {
+      return 'The server is taking too long to respond. Please try again.';
+    }
     if (err && err.error && typeof err.error === 'object' && err.error.error) {
       return err.error.error;
     }
@@ -261,12 +266,16 @@ export class AuthService {
   }
 
   /** Wake an idle API with read-only requests; never retry credential submissions. */
-  public prepareBackend(): Observable<void> {
+  public prepareBackend(force = false): Observable<void> {
+    if (!force && this.lastBackendReadyAt > 0 && (Date.now() - this.lastBackendReadyAt) < AuthService.BACKEND_READY_TTL_MS) {
+      return of(undefined);
+    }
     if (!this.backendReadiness) {
       const readiness: Observable<void> = defer(() => this.http.get<{ status?: string }>(`${getBackendOrigin()}/healthz`)).pipe(
         timeout({ first: 10000 }),
         map(health => {
           if (health?.status !== 'ok') throw { status: 503, message: 'The server is starting. Please wait a moment.' };
+          this.lastBackendReadyAt = Date.now();
         }),
         retry({ delay: error => {
           const transient = error?.name === 'TimeoutError' || [0, 200, 500, 502, 503, 504, 520, 521, 522, 523, 524].includes(error?.status);
@@ -274,8 +283,11 @@ export class AuthService {
           return timer(2000);
         } }),
         timeout({ first: 90000 }),
-        catchError(error => throwError(() => error?.name === 'TimeoutError'
-          ? { status: 503, message: 'The server is still starting or unavailable. Please try again shortly.' } : error)),
+        catchError(error => {
+          this.lastBackendReadyAt = 0;
+          return throwError(() => error?.name === 'TimeoutError'
+            ? { status: 503, message: 'The server is still starting or unavailable. Please try again shortly.' } : error);
+        }),
         finalize(() => { if (this.backendReadiness === readiness) this.backendReadiness = null; }),
         shareReplay({ bufferSize: 1, refCount: true })
       );
@@ -287,7 +299,10 @@ export class AuthService {
   public register(credentials: { username: string; phone_number?: string; password: string }): Observable<AuthResponse> {
     return this.prepareBackend().pipe(
       switchMap(() => this.http.post<AuthResponse>(`${this.apiUrl}/register`, credentials).pipe(timeout({ first: 30000 }))),
-      catchError(err => throwError(() => this.toAuthError(err)))
+      catchError(err => {
+        if (err?.name === 'TimeoutError' || !err?.status || err.status >= 500) this.lastBackendReadyAt = 0;
+        return throwError(() => this.toAuthError(err));
+      })
     );
   }
 
@@ -295,12 +310,16 @@ export class AuthService {
     return this.prepareBackend().pipe(
       switchMap(() => this.http.post<AuthResponse>(`${this.apiUrl}/login`, credentials).pipe(timeout({ first: 30000 }))),
       tap(res => this.setSession(res)),
-      catchError(err => throwError(() => this.toAuthError(err)))
+      catchError(err => {
+        if (err?.name === 'TimeoutError' || !err?.status || err.status >= 500) this.lastBackendReadyAt = 0;
+        return throwError(() => this.toAuthError(err));
+      })
     );
   }
 
   public resetPassword(data: { phone_number: string; new_password: string }): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.apiUrl}/reset-password`, data).pipe(
+      timeout({ first: 15000 }),
       catchError(err => throwError(() => this.extractErrorMessage(err)))
     );
   }
@@ -341,19 +360,29 @@ export class AuthService {
   // opens instantly; the server enforces the real rule either way.
   public readonly minimumDeposit$ = new BehaviorSubject<number>(199);
   private minimumDepositLoaded = false;
+  private minimumDepositInFlight = false;
 
   public get minimumDeposit(): number {
     return this.minimumDeposit$.value;
   }
 
   public loadMinimumDeposit(force = false): void {
-    if (this.minimumDepositLoaded && !force) return;
-    this.minimumDepositLoaded = true;
+    if ((this.minimumDepositLoaded && !force) || this.minimumDepositInFlight) return;
+    this.minimumDepositInFlight = true;
     this.http.get<{ minimum_deposit: number }>(`${this.baseUrl}/settings/deposit`).pipe(
-      catchError(() => of({ minimum_deposit: this.minimumDeposit$.value }))
-    ).subscribe(res => {
-      const value = Number(res?.minimum_deposit);
-      if (Number.isFinite(value) && value >= 199 && value <= 10000) this.minimumDeposit$.next(value);
+      timeout({ first: 12000 }),
+      finalize(() => { this.minimumDepositInFlight = false; })
+    ).subscribe({
+      next: res => {
+        const value = Number(res?.minimum_deposit);
+        if (Number.isFinite(value) && value >= 199 && value <= 10000) {
+          this.minimumDeposit$.next(value);
+          this.minimumDepositLoaded = true;
+        }
+      },
+      error: () => {
+        // Keep minimumDepositLoaded false so the next call retries cleanly.
+      }
     });
   }
 
@@ -365,6 +394,7 @@ export class AuthService {
       { amount, phone },
       { headers }
     ).pipe(
+      timeout({ first: 25000 }),
       catchError(err => throwError(() => this.extractErrorMessage(err)))
     );
   }
@@ -397,6 +427,7 @@ export class AuthService {
       { checkoutRequestId },
       { headers }
     ).pipe(
+      timeout({ first: 12000 }),
       catchError(err => throwError(() => this.extractErrorMessage(err)))
     );
   }
@@ -409,6 +440,7 @@ export class AuthService {
       { checkoutRequestId },
       { headers }
     ).pipe(
+      timeout({ first: 10000 }),
       catchError(err => throwError(() => this.extractErrorMessage(err)))
     );
   }
@@ -421,6 +453,7 @@ export class AuthService {
     });
 
     return this.http.post<{ message: string; balance: number }>(`${this.apiUrl}/deposit`, { amount }, { headers }).pipe(
+      timeout({ first: 15000 }),
       tap(res => {
         this.updateBalance(res.balance);
       }),
@@ -439,6 +472,7 @@ export class AuthService {
       { amount, phone, mpesaCodePrefix },
       { headers }
     ).pipe(
+      timeout({ first: 20000 }),
       tap(res => {
         if (res.balance !== undefined) this.updateBalance(res.balance);
         const currentUser = this.currentUser$.getValue();
@@ -476,6 +510,7 @@ export class AuthService {
       { currentPassword, newPassword },
       { headers: this.getAuthHeaders() }
     ).pipe(
+      timeout({ first: 15000 }),
       catchError(err => throwError(() => this.extractErrorMessage(err)))
     );
   }
@@ -486,6 +521,7 @@ export class AuthService {
       { newUsername },
       { headers: this.getAuthHeaders() }
     ).pipe(
+      timeout({ first: 15000 }),
       tap(res => {
         const current = this.currentUser$.getValue();
         if (current && res?.username) this.currentUser$.next({ ...current, username: res.username });
@@ -497,6 +533,7 @@ export class AuthService {
   public claimWelcomeBonus(): Observable<BonusClaimResponse> {
     const headers = this.getAuthHeaders();
     return this.http.post<BonusClaimResponse>(`${this.baseUrl}/bonus/claim`, {}, { headers }).pipe(
+      timeout({ first: 15000 }),
       tap(res => {
         this.updateBalance(res.balance);
         const currentUser = this.currentUser$.getValue();

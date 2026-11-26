@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
+import { finalize, timeout } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { SanitizedModeService } from '../../../core/services/sanitized-mode.service';
 import { getBackendOrigin } from '../../../core/config/backend-url';
@@ -20,7 +21,7 @@ import { tokenizeSupportMessage } from '../../../core/utils/support-message-link
         <div class="lb-auth-topbar-inner">
           <a class="lb-auth-logo">
             <span class="lb-auth-mark">
-              <img src="assets/images/ligibet-logo.png" alt="" onerror="this.style.display='none'" />
+              <img src="assets/images/ligibet-logo.png" alt="" width="42" height="42" fetchpriority="high" onerror="this.style.display='none'" />
             </span>
             <span class="lb-auth-word"><b>Ligi</b>{{ isSanitized() ? '' : 'Bets' }}</span>
           </a>
@@ -31,9 +32,15 @@ import { tokenizeSupportMessage } from '../../../core/utils/support-message-link
       <main class="lb-auth-main">
         <section class="lb-auth-card">
 
+          <!-- RETURNING SESSION CHECK -->
+          <div class="lb-alert success" *ngIf="isCheckingSession" style="display:flex;align-items:center;gap:10px;">
+            <span class="lb-spinner" style="border-color:rgba(13,127,54,0.25);border-top-color:#0d7f36;"></span>
+            <span>Restoring your session...</span>
+          </div>
+
           <!-- APP DOWNLOAD BANNER -->
           <div class="lb-auth-app" (click)="triggerAppDownload()">
-            <img src="assets/images/ligibet-logo.png" alt="Ligi App" class="lb-auth-app-logo" onerror="this.src='favicon.svg'" />
+            <img src="assets/images/ligibet-logo.png" alt="Ligi App" width="38" height="38" class="lb-auth-app-logo" onerror="this.src='favicon.svg'" />
             <div class="lb-auth-app-text">
               <span class="lb-auth-app-title">{{ isSanitized() ? 'Ligi Mobile App' : 'LigiBet Mobile App' }}</span>
               <span class="lb-auth-app-sub">{{ isSanitized() ? 'Fast & Smooth &bull; Free Data Mode' : 'Instant Aviator &bull; Free Data Mode' }}</span>
@@ -761,6 +768,7 @@ export class AuthLandingComponent implements OnInit, OnDestroy {
   public showPassword: boolean = false;
   public showNewPassword: boolean = false;
   public isSubmitting: boolean = false;
+  public isCheckingSession: boolean = false;
   public errorMessage: string | null = null;
   public successMessage: string | null = null;
 
@@ -795,17 +803,23 @@ export class AuthLandingComponent implements OnInit, OnDestroy {
     }
 
     if (this.authService.hasToken()) {
-      this.authService.loadCurrentUser().subscribe(res => {
+      this.isCheckingSession = true;
+      this.authService.loadCurrentUser().pipe(
+        finalize(() => { this.isCheckingSession = false; })
+      ).subscribe(res => {
         if (res?.user) {
           // Everyone lands on the dashboard; admins reach the console from the profile menu.
           this.router.navigate(['/dashboard']);
         }
       });
+    } else {
+      // Pre-warm the backend while the player enters credentials so tapping Log in is instant.
+      this.authService.prepareBackend().subscribe({ error: () => {} });
     }
 
-    // Auto-refresh support conversation every 6 seconds if phone is set
+    // Auto-refresh support conversation every 6 seconds ONLY when the suspension appeal chat is active.
     this.supportPollTimer = setInterval(() => {
-      if (this.supportPhone || this.phone) {
+      if (this.isSuspendedNotice && this.isSupportExpanded && (this.supportPhone || this.phone)) {
         this.loadSupportMessages(true);
       }
     }, 6000);
@@ -873,7 +887,7 @@ export class AuthLandingComponent implements OnInit, OnDestroy {
       text,
       category: this.supportCategory,
       username: phoneToSend
-    }, options).subscribe({
+    }, options).pipe(timeout({ first: 20000 })).subscribe({
       next: (res) => {
         this.isSendingSupport = false;
         this.supportInputText = '';
@@ -893,7 +907,9 @@ export class AuthLandingComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.isSendingSupport = false;
-        this.supportStatusMsg = err?.error?.error || 'Failed to send message. Please retry.';
+        this.supportStatusMsg = err?.name === 'TimeoutError'
+          ? 'Request timed out. Please check your connection and retry.'
+          : (err?.error?.error || 'Failed to send message. Please retry.');
       }
     });
   }
@@ -977,7 +993,7 @@ export class AuthLandingComponent implements OnInit, OnDestroy {
       this.errorMessage = 'Please enter your phone number and password.';
       return;
     }
-    const { fullPhone, rawPhone } = this.formatPhone(trimmed);
+    const { fullPhone } = this.formatPhone(trimmed);
     if (!this.isAllowedRegion(fullPhone)) {
       this.errorMessage = 'Unavailable in your region.';
       return;
@@ -1006,36 +1022,10 @@ export class AuthLandingComponent implements OnInit, OnDestroy {
           return;
         }
 
-        // Worth retrying under the raw input only when the server rejected the
-        // credentials or the formatted value itself. Retrying a 429 or a 500
-        // just doubles the load and buries the real reason behind a
-        // wrong-password message.
-        const isWorthRetrying = err?.status === 401 || err?.status === 400;
-        if (isWorthRetrying && rawPhone !== fullPhone) {
-          this.authService.login({ username: rawPhone, password: this.password }).subscribe({
-            next: (res) => {
-              this.isSubmitting = false;
-              this.router.navigate(['/dashboard']);
-            },
-            error: (retryErr) => {
-              this.isSubmitting = false;
-              const retryMsg = String(retryErr?.message || '');
-              if (retryErr?.status === 403 && (retryMsg.toLowerCase().includes('suspended') || (retryErr as any)?.code === 'ACCOUNT_SUSPENDED')) {
-                this.isSuspendedNotice = true;
-                this.errorMessage = 'Your account has been suspended contact our support using the chat below to appeal';
-                this.supportCategory = 'appeal';
-                this.supportPhone = this.phone;
-                this.isSupportExpanded = true;
-                this.loadSupportMessages();
-                return;
-              }
-              this.errorMessage = retryErr?.message || 'Invalid phone number or password.';
-            }
-          });
-        } else {
-          this.isSubmitting = false;
-          this.errorMessage = err?.message || 'Invalid phone number or password.';
-        }
+        // The backend already matches every phone variation (+254, 254, 07, 7)
+        // in one query, so a second login attempt only doubles wait time.
+        this.isSubmitting = false;
+        this.errorMessage = err?.message || 'Invalid phone number or password.';
       }
     });
   }

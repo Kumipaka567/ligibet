@@ -605,6 +605,7 @@ function authenticateToken(req, res, next) {
 }
 
 async function authenticateAdminToken(req, res, next) {
+  if (req.user?._adminVerified) return next();
   authenticateToken(req, res, async () => {
     try {
       let user = null;
@@ -614,7 +615,7 @@ async function authenticateAdminToken(req, res, next) {
             { id: req.user?.id },
             { username: req.user?.username }
           ]
-        }).lean();
+        }).select('id username role is_suspended').lean();
       } else if (process.env.NODE_ENV !== 'production') {
         user = findLocalDevUser(req.user?.username) || (isAdminRole(req.user?.role) ? req.user : null);
       }
@@ -628,6 +629,7 @@ async function authenticateAdminToken(req, res, next) {
       req.user.id = user.id || req.user?.id || 1;
       req.user.username = user.username || req.user?.username || 'admin';
       req.user.role = user.role;
+      req.user._adminVerified = true;
       next();
     } catch (err) {
       console.error('authenticateAdminToken verification error:', err);
@@ -637,6 +639,12 @@ async function authenticateAdminToken(req, res, next) {
 }
 
 async function authenticateSuperAdminToken(req, res, next) {
+  if (req.user?._adminVerified) {
+    if (!isSuperAdmin(req.user.role)) {
+      return res.status(403).json({ error: 'Superadmin privileges required' });
+    }
+    return next();
+  }
   authenticateToken(req, res, async () => {
     try {
       let user = null;
@@ -646,7 +654,7 @@ async function authenticateSuperAdminToken(req, res, next) {
             { id: req.user?.id },
             { username: req.user?.username }
           ]
-        }).lean();
+        }).select('id username role is_suspended').lean();
       } else if (process.env.NODE_ENV !== 'production') {
         user = findLocalDevUser(req.user?.username) || (isSuperAdmin(req.user?.role) ? req.user : null);
       }
@@ -660,6 +668,7 @@ async function authenticateSuperAdminToken(req, res, next) {
       req.user.id = user.id || req.user?.id || 1;
       req.user.username = user.username || req.user?.username || 'superadmin';
       req.user.role = user.role;
+      req.user._adminVerified = true;
       next();
     } catch (err) {
       console.error('authenticateSuperAdminToken verification error:', err);
@@ -1259,13 +1268,15 @@ app.post(['/api/wallet/withdraw', '/api/payments/withdraw'], authenticateToken, 
       const targetPhone = req.body.phone || user.phone_number || '0792011285';
       const cleanPhone = String(targetPhone).replace(/[^0-9]/g, '');
 
-      // Try live MPESA app endpoints
+      // Try live MPESA app endpoints (avoid pointless localhost hops in production)
       const mpesaKey = process.env.MPESA_CONNECT_KEY || 'mpesa_connect_live_key';
       const mpesaEndpoints = [
         process.env.MPESA_API_URL,
         'https://api.twoapp.site/api/v1/integrations/withdraw',
-        'http://localhost:3000/api/v1/integrations/withdraw',
-        'http://127.0.0.1:3000/api/v1/integrations/withdraw'
+        ...(process.env.NODE_ENV !== 'production' ? [
+          'http://localhost:3000/api/v1/integrations/withdraw',
+          'http://127.0.0.1:3000/api/v1/integrations/withdraw'
+        ] : [])
       ].filter(Boolean);
 
       for (const mpesaUrl of mpesaEndpoints) {
@@ -1278,7 +1289,7 @@ app.post(['/api/wallet/withdraw', '/api/payments/withdraw'], authenticateToken, 
             apiKey: mpesaKey,
             reference: adminMpesaCode,
             notes: 'Withdrawal payout from LIGIBET B2C'
-          }, { timeout: 3500 });
+          }, { timeout: 1800 });
 
           if (mpesaRes.data && mpesaRes.data.success) {
             if (mpesaRes.data.newBalance !== undefined) mpesaNewBalance = mpesaRes.data.newBalance;
@@ -1758,6 +1769,10 @@ function createChatRainDrop(options = {}) {
   };
 
   activeRainDrops.set(rainId, rainObj);
+  if (activeRainDrops.size > 10) {
+    const oldestKey = activeRainDrops.keys().next().value;
+    if (oldestKey) activeRainDrops.delete(oldestKey);
+  }
   return rainObj;
 }
 
@@ -1826,7 +1841,6 @@ setInterval(async () => {
       if (recentChatMessages.length > 120) recentChatMessages.shift();
 
       io.emit('chat_message', newRain);
-      io.emit('chatMessage', newRain);
       return;
     }
 
@@ -1837,7 +1851,6 @@ setInterval(async () => {
 
     // Broadcast to all active players
     io.emit('chat_message', newMsg);
-    io.emit('chatMessage', newMsg);
 
     // Occasionally like a recent message (to simulate live community likes)
     if (Math.random() > 0.55 && recentChatMessages.length > 2) {
@@ -2101,7 +2114,7 @@ app.post('/api/admin/pin/configure', authenticateSuperAdminToken, async (req, re
   catch (err) { return res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to save admin PINs.' }); }
 });
 
-const getDashboardTotals = createDashboardStats(privacyModels);
+const getDashboardTotals = createDashboardStats(privacyModels, { ttlMs: 10000 });
 app.get('/api/admin/stats', authenticateAdminToken, async (req, res) => {
   try {
     const totals = await getDashboardTotals();
@@ -4274,11 +4287,9 @@ async function launchFlight() {
       await handleCrash();
     } else {
       io.to(playerRoomName(1)).emit('multiplier_tick', { multiplier: currentMultiplier, roundId: currentRound.id, room: 1 });
-      io.to(playerRoomName(1)).emit('multiplier', { multiplier: currentMultiplier, room: 1 });
-      io.to(playerRoomName(1)).emit('game_multiplier', { multiplier: currentMultiplier, room: 1 });
       
       const now = Date.now();
-      if (now - lastAdminTick >= 500) {
+      if (now - lastAdminTick >= 1000) {
         lastAdminTick = now;
         emitAdminCurrentRound();
       }
@@ -4419,11 +4430,10 @@ function launchSecondaryFlight(room) {
       await handleSecondaryCrash(room);
     } else {
       io.to(playerRoomName(room)).emit('multiplier_tick', { multiplier: engine.multiplier, roundId: engine.currentRound.id, room });
-      io.to(playerRoomName(room)).emit('multiplier', { multiplier: engine.multiplier, room });
 
-      // Throttle live admin room multiplier update to twice a second
+      // Throttle live admin room multiplier update to once a second
       const now = Date.now();
-      if (now - lastAdminTick >= 500) {
+      if (now - lastAdminTick >= 1000) {
         lastAdminTick = now;
         adminNamespace.emit('admin_next_round', getAdminNextRoundPayload());
       }
@@ -5171,6 +5181,37 @@ async function startServer() {
       loadAdminRoundHistory(), loadPreviousRoundSummary()
     ]);
   } catch (e) {}
+
+  // Keep MongoDB storage bounded: prune crashed GameRound documents older than 7 days
+  // in gentle batches so Atlas free/shared storage cannot fill up and halt writes.
+  let pruningRounds = false;
+  async function pruneOldGameRounds() {
+    if (pruningRounds || mongoose.connection.readyState !== 1) return;
+    pruningRounds = true;
+    try {
+      const cutoff = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+      let totalDeleted = 0;
+      for (let pass = 0; pass < 5; pass++) {
+        const stale = await GameRound.find({ status: 'crashed', created_at: { $lt: cutoff } })
+          .select('_id')
+          .limit(5000)
+          .lean();
+        if (!stale.length) break;
+        const result = await GameRound.deleteMany({ _id: { $in: stale.map(doc => doc._id) } });
+        totalDeleted += result.deletedCount || 0;
+        if (stale.length < 5000) break;
+      }
+      if (totalDeleted > 0) {
+        console.log(`🧹 Pruned ${totalDeleted} crashed GameRound document(s) older than 7 days.`);
+      }
+    } catch (err) {
+      console.warn('GameRound retention cleanup warning:', err.message);
+    } finally {
+      pruningRounds = false;
+    }
+  }
+  setTimeout(() => { pruneOldGameRounds().catch(() => {}); }, 60000).unref();
+  setInterval(() => { pruneOldGameRounds().catch(() => {}); }, 60 * 60 * 1000).unref();
 
   // Payment-provider polling must not delay game startup after a restart.
   paymentService.reconcilePending().catch(() => {});

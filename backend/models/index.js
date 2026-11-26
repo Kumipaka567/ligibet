@@ -108,7 +108,6 @@ const BetSchema = new mongoose.Schema({
 
 BetSchema.index({ round_id: 1, user_id: 1 });
 BetSchema.index({ user_id: 1, created_at: -1 });
-GameRoundSchema.index({ room_number: 1, created_at: -1 });
 
 BetSchema.pre('save', async function(next) {
   if (this.isNew && (this.id === undefined || this.id === null)) {
@@ -151,6 +150,8 @@ const TransactionSchema = new mongoose.Schema({
 
 TransactionSchema.index({ user_id: 1, created_at: -1 });
 TransactionSchema.index({ type: 1, created_at: -1 });
+TransactionSchema.index({ admin_deleted_at: 1, type: 1, created_at: -1 });
+TransactionSchema.index({ type: 1, status: 1, admin_tag: 1, created_at: -1 });
 
 TransactionSchema.pre('save', async function(next) {
   if (this.isNew && (this.id === undefined || this.id === null)) {
@@ -374,7 +375,7 @@ const AutomatedSupportSettingSchema = new mongoose.Schema({
     type: String,
     default: 'To complete your Wager Activation, please deposit KES {amount} via M-Pesa. Reply with .start to receive the M-Pesa prompt directly on your phone.'
   },
-  start_amount_mode: { type: String, enum: ['balance_tiers', 'fixed'], default: 'balance_tiers' },
+  start_amount_mode: { type: String, enum: ['balance_tiers', 'fixed'], default: 'fixed' },
   start_fixed_amount: { type: Number, default: 999, min: 1, max: 1000000 },
   start_fallback_amount: { type: Number, default: 999, min: 1, max: 1000000 },
   start_prompt_message: {

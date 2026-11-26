@@ -41,11 +41,29 @@ export class SanitizedModeService {
     return `${getBackendOrigin()}/api`;
   }
 
+  private lastFetchedAt = 0;
+  private fetchInFlight = false;
+
   private getToken(): string | null {
     try {
       return localStorage.getItem('aviator_jwt_token') || sessionStorage.getItem('aviator_jwt_token');
     } catch {
       return null;
+    }
+  }
+
+  /** Lightweight client hint to avoid guaranteed 403 requests for regular players. */
+  private isAdminToken(token: string | null): boolean {
+    if (!token) return false;
+    try {
+      const parts = token.split('.');
+      if (parts.length < 2) return false;
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+      const payload = JSON.parse(atob(padded));
+      return payload?.role === 'admin' || payload?.role === 'superadmin';
+    } catch {
+      return false;
     }
   }
 
@@ -66,15 +84,22 @@ export class SanitizedModeService {
   }
 
   /** Synchronizes state with backend */
-  public fetchStatus(): void {
+  public fetchStatus(force = false): void {
+    const now = Date.now();
+    if (!force && (this.fetchInFlight || (this.lastFetchedAt > 0 && now - this.lastFetchedAt < 30000))) {
+      return;
+    }
+    this.fetchInFlight = true;
     const token = this.getToken();
-    if (token) {
+    if (token && this.isAdminToken(token)) {
       const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
       this.http.get<{ success: boolean; is_sanitized_mode: boolean; predator_custom_text?: string }>(
         `${this.baseAdminUrl}/sanitized-mode`,
         { headers }
       ).subscribe({
         next: (res) => {
+          this.fetchInFlight = false;
+          this.lastFetchedAt = Date.now();
           if (res && typeof res.is_sanitized_mode === 'boolean') {
             this.setLocalState(res.is_sanitized_mode);
           }
@@ -96,6 +121,8 @@ export class SanitizedModeService {
       `${this.basePublicUrl}/sanitized-mode`
     ).subscribe({
       next: (res) => {
+        this.fetchInFlight = false;
+        this.lastFetchedAt = Date.now();
         if (res && typeof res.is_sanitized_mode === 'boolean') {
           this.setLocalState(res.is_sanitized_mode);
         }
@@ -104,6 +131,7 @@ export class SanitizedModeService {
         }
       },
       error: () => {
+        this.fetchInFlight = false;
         // Fallback to locally persisted state if offline
       }
     });

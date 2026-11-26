@@ -471,7 +471,7 @@ describe('Admin dashboard live account management', () => {
   });
 
   it('periodically checks service tokens and cancels pending checks on destruction', () => {
-    vi.advanceTimersByTime(12000);
+    vi.advanceTimersByTime(30000);
     const request = http.expectOne(request => request.url.includes('/api/admin/payhero/balance'));
     fixture.destroy();
     expect(request.cancelled).toBe(true);
@@ -929,7 +929,7 @@ describe('Admin dashboard live account management', () => {
     http.expectNone(r => r.url.includes('/api/admin/claim-tags'));
   });
 
-  it('loads, toggles, and saves automated chat support settings and tokenizes links safely', () => {
+  it('loads, toggles, and saves uniform automated chat support settings and tokenizes links safely', () => {
     // Ordinary admins can also manage automated chat support
     auth.currentUser$.next({ id: 2, username: 'ordinary-admin', balance: 0, role: 'admin' });
     component.setTab('support');
@@ -940,30 +940,26 @@ describe('Admin dashboard live account management', () => {
       settings: {
         enabled: false,
         wager_activation_message: 'Deposit KES {amount}. Type .start.',
-        start_amount_mode: 'balance_tiers',
-        start_fixed_amount: 999,
-        start_fallback_amount: 999,
+        start_amount_mode: 'fixed',
+        start_fixed_amount: 1500,
         start_prompt_message: 'Prompt of KES {amount} sent.',
-        balance_tiers: [
-          { min_balance: 10000, max_balance: 20000, prompt_amount: 999 },
-          { min_balance: 20001, max_balance: 40000, prompt_amount: 1500 },
-          { min_balance: 50000, max_balance: 100000, prompt_amount: 3500 }
-        ],
         link_url: 'https://t.me/help',
         link_message: 'Open: {link}'
       }
     });
     expect(component.automatedSupportSettings.enabled).toBe(false);
-    expect(component.automatedSupportSettings.balance_tiers.length).toBe(3);
+    expect(component.automatedSupportSettings.start_fixed_amount).toBe(1500);
+    expect(component.getAutomatedWagerPreview()).toBe('Deposit KES 1,500. Type .start.');
+    expect(component.hasAmountPlaceholder(component.automatedSupportSettings.wager_activation_message)).toBe(true);
 
-    component.addAutomatedSupportTier();
-    expect(component.automatedSupportSettings.balance_tiers.length).toBe(4);
-    component.removeAutomatedSupportTier(3);
-    expect(component.automatedSupportSettings.balance_tiers.length).toBe(3);
+    component.automatedSupportSettings.start_fixed_amount = 3500;
+    expect(component.getAutomatedWagerPreview()).toBe('Deposit KES 3,500. Type .start.');
 
     component.toggleAutomatedSupportEnabled();
     const putReq = http.expectOne(r => r.method === 'PUT' && r.url.endsWith('/api/admin/support/automation'));
     expect(putReq.request.body.enabled).toBe(true);
+    expect(putReq.request.body.start_amount_mode).toBe('fixed');
+    expect(putReq.request.body.start_fixed_amount).toBe(3500);
     expect(putReq.request.body.link_url).toBe('https://t.me/help');
     putReq.flush({
       message: 'Automated chat support enabled and settings saved.',

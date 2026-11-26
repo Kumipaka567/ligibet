@@ -9,7 +9,7 @@
 
       <a class="lb-logo" (click)="setNavTab('home')">
         <span class="lb-logo-mark">
-          <img src="assets/images/ligibet-logo.png" alt="" onerror="this.style.display='none'" />
+          <img src="assets/images/ligibet-logo.png" alt="" width="42" height="42" decoding="async" onerror="this.style.display='none'" />
         </span>
         <span class="lb-logo-word"><b>Ligi</b>{{ isSanitized() ? '' : 'Bets' }}</span>
       </a>
@@ -86,7 +86,7 @@
           (click)="setNavTab(item.id)"
         >
           <span class="lb-rail-icon">
-            <img [src]="item.icon" [alt]="item.label" />
+            <img [src]="item.icon" [alt]="item.label" loading="lazy" decoding="async" />
             <em class="lb-rail-badge" *ngIf="item.badge" [class.is-new]="item.badge === 'NEW'">{{ item.badge }}</em>
           </span>
           <span class="lb-rail-label">{{ item.label }}</span>
@@ -183,7 +183,11 @@
             class="lb-hero-slide"
             [class.active]="currentBannerIndex() === i"
           >
-            <img class="lb-hero-photo" [src]="banner.image" [alt]="banner.headline" (click)="openGame(banner.gameId)" />
+            <img class="lb-hero-photo" [src]="banner.image" [alt]="banner.headline"
+                 [attr.fetchpriority]="i === 0 ? 'high' : 'low'"
+                 [attr.loading]="i === 0 ? null : 'lazy'"
+                 decoding="async"
+                 (click)="openGame(banner.gameId)" />
             <div class="lb-hero-inner">
               <div class="lb-hero-brand">
                 <span class="lb-hero-mark"><b>Ligi</b>{{ isSanitized() ? '' : 'Bets' }}</span>
@@ -193,7 +197,11 @@
                 <p class="lb-hero-prize">{{ banner.prize }} <span>{{ banner.prizeSuffix }}</span></p>
                 <button class="lb-hero-cta" type="button" (click)="openGame(banner.gameId)">{{ banner.cta }}</button>
               </div>
-              <img class="lb-hero-art" [src]="banner.art" [alt]="banner.headline" (click)="openGame(banner.gameId)" />
+              <img class="lb-hero-art" [src]="banner.art" [alt]="banner.headline"
+                   [attr.fetchpriority]="i === 0 ? null : 'low'"
+                   [attr.loading]="i === 0 ? null : 'lazy'"
+                   decoding="async"
+                   (click)="openGame(banner.gameId)" />
               <span class="lb-hero-tag">{{ banner.tag }} <i>18+</i></span>
             </div>
           </div>

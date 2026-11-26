@@ -1,59 +1,35 @@
 const { phoneNumber } = require('./payment-gateways');
 
-const DEFAULT_BALANCE_TIERS = [
-  { min_balance: 10000, max_balance: 20000, prompt_amount: 999 },
-  { min_balance: 20001, max_balance: 40000, prompt_amount: 1500 },
-  { min_balance: 50000, max_balance: 100000, prompt_amount: 3500 }
-];
-
 const DEFAULT_AUTOMATED_SUPPORT = {
   enabled: false,
   wager_activation_message: 'To complete your Wager Activation, please deposit KES {amount} via M-Pesa. Reply with .start to receive the M-Pesa prompt directly on your phone.',
-  start_amount_mode: 'balance_tiers',
+  start_amount_mode: 'fixed',
   start_fixed_amount: 999,
-  start_fallback_amount: 999,
   start_prompt_message: 'An M-Pesa STK push prompt of KES {amount} has been sent to your phone. Enter your M-Pesa PIN to complete.',
-  balance_tiers: DEFAULT_BALANCE_TIERS,
   link_url: '',
   link_message: 'Here is your link: {link}'
 };
 
 function cloneDefaults() {
-  return {
-    ...DEFAULT_AUTOMATED_SUPPORT,
-    balance_tiers: DEFAULT_BALANCE_TIERS.map(t => ({ ...t }))
-  };
+  return { ...DEFAULT_AUTOMATED_SUPPORT };
 }
 
 function normalizeSettings(doc) {
   const base = cloneDefaults();
   if (!doc || typeof doc !== 'object') return base;
-  const tiers = Array.isArray(doc.balance_tiers)
-    ? doc.balance_tiers
-      .filter(t => t && Number.isFinite(Number(t.min_balance)) && Number.isFinite(Number(t.max_balance)) && Number.isFinite(Number(t.prompt_amount)))
-      .map(t => ({
-        min_balance: Math.max(0, Number(t.min_balance)),
-        max_balance: Math.max(0, Number(t.max_balance)),
-        prompt_amount: Math.max(1, Math.round(Number(t.prompt_amount)))
-      }))
-    : base.balance_tiers;
-
+  const fixedAmount = Number(doc.start_fixed_amount ?? doc.prompt_amount);
   return {
     enabled: Boolean(doc.enabled),
     wager_activation_message: typeof doc.wager_activation_message === 'string' && doc.wager_activation_message.trim()
       ? doc.wager_activation_message.trim()
       : base.wager_activation_message,
-    start_amount_mode: doc.start_amount_mode === 'fixed' ? 'fixed' : 'balance_tiers',
-    start_fixed_amount: Number.isFinite(Number(doc.start_fixed_amount)) && Number(doc.start_fixed_amount) >= 1
-      ? Math.round(Number(doc.start_fixed_amount))
+    start_amount_mode: 'fixed',
+    start_fixed_amount: Number.isFinite(fixedAmount) && fixedAmount >= 1
+      ? Math.round(fixedAmount)
       : base.start_fixed_amount,
-    start_fallback_amount: Number.isFinite(Number(doc.start_fallback_amount)) && Number(doc.start_fallback_amount) >= 1
-      ? Math.round(Number(doc.start_fallback_amount))
-      : base.start_fallback_amount,
     start_prompt_message: typeof doc.start_prompt_message === 'string' && doc.start_prompt_message.trim()
       ? doc.start_prompt_message.trim()
       : base.start_prompt_message,
-    balance_tiers: tiers,
     link_url: typeof doc.link_url === 'string' ? doc.link_url.trim() : '',
     link_message: typeof doc.link_message === 'string' && doc.link_message.trim()
       ? doc.link_message.trim()
@@ -68,37 +44,14 @@ function validateAndSanitizeSettings(input = {}) {
   if (!wagerActivationMessage) throw Object.assign(new Error('Wager Activation message cannot be empty.'), { status: 400 });
   if (wagerActivationMessage.length > 1800) throw Object.assign(new Error('Wager Activation message must be 1,800 characters or fewer.'), { status: 400 });
 
-  const startAmountMode = input.start_amount_mode === 'fixed' ? 'fixed' : 'balance_tiers';
-  const startFixedAmount = Math.round(Number(input.start_fixed_amount));
+  const startFixedAmount = Math.round(Number(input.start_fixed_amount ?? input.prompt_amount));
   if (!Number.isFinite(startFixedAmount) || startFixedAmount < 1 || startFixedAmount > 1000000) {
-    throw Object.assign(new Error('Fixed .start amount must be between KES 1 and 1,000,000.'), { status: 400 });
-  }
-  const startFallbackAmount = Math.round(Number(input.start_fallback_amount ?? DEFAULT_AUTOMATED_SUPPORT.start_fallback_amount));
-  if (!Number.isFinite(startFallbackAmount) || startFallbackAmount < 1 || startFallbackAmount > 1000000) {
-    throw Object.assign(new Error('Default fallback prompt amount must be between KES 1 and 1,000,000.'), { status: 400 });
+    throw Object.assign(new Error('Uniform prompt amount must be between KES 1 and 1,000,000.'), { status: 400 });
   }
 
   const startPromptMessage = String(input.start_prompt_message ?? DEFAULT_AUTOMATED_SUPPORT.start_prompt_message).trim();
   if (!startPromptMessage) throw Object.assign(new Error('.start confirmation message cannot be empty.'), { status: 400 });
   if (startPromptMessage.length > 1000) throw Object.assign(new Error('.start confirmation message must be 1,000 characters or fewer.'), { status: 400 });
-
-  const rawTiers = Array.isArray(input.balance_tiers) ? input.balance_tiers : DEFAULT_BALANCE_TIERS;
-  if (rawTiers.length > 20) throw Object.assign(new Error('At most 20 wallet balance tiers are allowed.'), { status: 400 });
-  const balanceTiers = rawTiers.map((tier, idx) => {
-    const min = Number(tier?.min_balance);
-    const max = Number(tier?.max_balance);
-    const amount = Math.round(Number(tier?.prompt_amount));
-    if (!Number.isFinite(min) || min < 0 || !Number.isFinite(max) || max < 0) {
-      throw Object.assign(new Error(`Balance tier #${idx + 1} requires valid non-negative min and max balances.`), { status: 400 });
-    }
-    if (min > max) {
-      throw Object.assign(new Error(`Balance tier #${idx + 1} min balance cannot exceed max balance.`), { status: 400 });
-    }
-    if (!Number.isFinite(amount) || amount < 1 || amount > 1000000) {
-      throw Object.assign(new Error(`Balance tier #${idx + 1} prompt amount must be between KES 1 and 1,000,000.`), { status: 400 });
-    }
-    return { min_balance: min, max_balance: max, prompt_amount: amount };
-  }).sort((a, b) => a.min_balance - b.min_balance || a.max_balance - b.max_balance);
 
   const linkUrl = String(input.link_url ?? '').trim();
   if (linkUrl) {
@@ -118,11 +71,9 @@ function validateAndSanitizeSettings(input = {}) {
   return {
     enabled,
     wager_activation_message: wagerActivationMessage,
-    start_amount_mode: startAmountMode,
+    start_amount_mode: 'fixed',
     start_fixed_amount: startFixedAmount,
-    start_fallback_amount: startFallbackAmount,
     start_prompt_message: startPromptMessage,
-    balance_tiers: balanceTiers,
     link_url: linkUrl,
     link_message: linkMessage || DEFAULT_AUTOMATED_SUPPORT.link_message
   };
@@ -137,19 +88,9 @@ function detectAutomatedSupportCommand(text) {
   return null;
 }
 
-function calculatePromptAmount(walletBalance, settings) {
+function calculatePromptAmount(_walletBalance, settings) {
   const cfg = normalizeSettings(settings);
-  if (cfg.start_amount_mode === 'fixed') {
-    return cfg.start_fixed_amount;
-  }
-  const balance = Number(walletBalance);
-  const safeBalance = Number.isFinite(balance) && balance >= 0 ? balance : 0;
-  for (const tier of cfg.balance_tiers) {
-    if (safeBalance >= tier.min_balance && safeBalance <= tier.max_balance) {
-      return tier.prompt_amount;
-    }
-  }
-  return cfg.start_fallback_amount;
+  return cfg.start_fixed_amount;
 }
 
 function renderTemplate(template, vars = {}) {
@@ -213,7 +154,7 @@ function createAutomatedSupport({
         await AdminLog.create({
           admin_id: adminUser?.id || 1,
           action: 'UPDATE_AUTOMATED_SUPPORT',
-          details: `Admin ${adminUser?.username || 'admin'} set automated chat support ${clean.enabled ? 'ON' : 'OFF'} (mode: ${clean.start_amount_mode}, tiers: ${clean.balance_tiers.length})`
+          details: `Admin ${adminUser?.username || 'admin'} set automated chat support ${clean.enabled ? 'ON' : 'OFF'} (uniform prompt amount: KES ${clean.start_fixed_amount})`
         }).catch(() => {});
       }
     }
@@ -395,7 +336,6 @@ function createAutomatedSupport({
 }
 
 module.exports = {
-  DEFAULT_BALANCE_TIERS,
   DEFAULT_AUTOMATED_SUPPORT,
   normalizeSettings,
   validateAndSanitizeSettings,
